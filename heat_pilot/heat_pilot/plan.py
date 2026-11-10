@@ -21,6 +21,7 @@ DAY_HOURS = {"living": (6, 22), "kitchen": (6, 22), "bedroom": (6, 8), "kids": (
              "office": (7, 18), "other": (6, 22)}
 SETBACK = 18.0
 AWAY = 17.0
+HOLIDAY = 15.0
 FROST = 7.0
 WINDOW_MIN = 5
 AWAY_MIN = 60
@@ -31,7 +32,7 @@ def defaults(room: dict[str, Any]) -> dict[str, Any]:
     kind = room.get("kind") or "other"
     start, end = DAY_HOURS.get(kind, (6, 22))
     return {"comfort": COMFORT.get(kind, 20.0), "setback": SETBACK, "night": NIGHT.get(kind, SETBACK),
-            "day_from": start, "day_to": end, "away": AWAY}
+            "day_from": start, "day_to": end, "away": AWAY, "holiday": HOLIDAY}
 
 
 def _minutes_open(states: dict[str, Any], entity: str, now: datetime) -> float | None:
@@ -72,13 +73,16 @@ def next_comfort(c: dict[str, Any], hours: list[int] | None, now: datetime, with
 def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], now: datetime,
            house_away: bool, manual: dict[str, Any] | None, hours: list[int] | None = None,
            temp: float | None = None, rate: float | None = None, occupied: bool = False, shower: bool = False,
-           sun: bool = False) -> dict[str, Any]:
+           sun: bool = False, summer: bool = False, holiday: str | None = None, owner_away: bool = False,
+           coming: bool = False) -> dict[str, Any]:
     """{"temp": °C or None (off), "why": key, "until": time the reason ends or None}."""
     c = {**defaults(room), **(cfg or {})}
     for w in room.get("windows") or []:
         m = _minutes_open(states, w, now)
         if m is not None and m >= WINDOW_MIN:
             return {"temp": None, "why": "window", "entity": w}
+    if summer:
+        return {"temp": None, "why": "summer"}
     if manual and manual.get("until") and now < manual["until"]:
         return {"temp": manual["temp"], "why": "manual", "until": manual["until"].isoformat()}
     t, why = base(c, hours, now)
@@ -101,7 +105,11 @@ def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], no
                 lead = max(0.0, c["comfort"] - temp) * rate
                 if now >= nxt - timedelta(minutes=lead) and c["comfort"] > t:
                     t, why = (t, "sun") if sun else (c["comfort"], "preheat")  # the sun warms it for free
-    if house_away and 6 <= now.hour < 23 and t > c["away"]:
+    if holiday and not coming:
+        return {"temp": max(FROST, c.get("holiday", HOLIDAY)), "why": "holiday", "kind": holiday}
+    if owner_away and why not in ("shower",) and t > c["setback"]:
+        t, why, until = c["setback"], "owner_away", None
+    if house_away and not coming and t > c["away"]:
         t, why, until = c["away"], "away", None
     return {"temp": max(FROST, round(t, 1)), "why": why, "until": until.isoformat() if until else None}
 

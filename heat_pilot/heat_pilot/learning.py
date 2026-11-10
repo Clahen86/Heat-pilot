@@ -30,7 +30,7 @@ def bucket(outdoor: float) -> str:
 class Learning:
     def __init__(self, data_dir: Path) -> None:
         self.file = data_dir / "heat_pilot_learning.json"
-        self.s: dict[str, Any] = {"use": {}, "rate": {}, "saved": {}, "ontime": {}}
+        self.s: dict[str, Any] = {"use": {}, "rate": {}, "saved": {}, "ontime": {}, "outdoor": {}}
         try:
             self.s.update(json.loads(self.file.read_text()))
         except (OSError, ValueError):
@@ -87,6 +87,19 @@ class Learning:
         used = {h for h, u in enumerate(got) if u and h in DAY}
         used |= {h for h in DAY if h - 1 in used and h + 1 in used}  # a lone empty hour between two used ones stays warm
         return sorted(used)
+
+    def see_outdoor(self, now: datetime, temp: float | None) -> None:
+        """The day's average outdoor temperature (for summer)."""
+        if temp is None:
+            return
+        d = self.s.setdefault("outdoor", {}).setdefault(now.date().isoformat(), [0.0, 0])
+        d[0] += temp
+        d[1] += 1
+        for old in sorted(self.s["outdoor"])[:-14]:
+            self.s["outdoor"].pop(old, None)
+
+    def outdoor_days(self) -> dict[str, float]:
+        return {k: v[0] / v[1] for k, v in (self.s.get("outdoor") or {}).items() if v[1] >= 60}
 
     # ---------- heating speed ----------
 

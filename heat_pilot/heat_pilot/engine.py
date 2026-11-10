@@ -12,12 +12,12 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from . import brands, discover, features, plan
+from . import brands, discover, features, people, plan
 from .signals import Watch
 from .learning import Learning, seed
 
 _LOGGER = logging.getLogger(__name__)
-ROOM_KEYS = {"kind", "heating", "temp_sensor", "comfort", "setback", "night", "away", "day_from", "day_to", "excluded", "fixed_hours"}
+ROOM_KEYS = {"kind", "heating", "temp_sensor", "comfort", "setback", "night", "away", "day_from", "day_to", "excluded", "fixed_hours", "owner"}
 
 
 def _num(s: dict[str, Any] | None) -> float | None:
@@ -96,8 +96,10 @@ class Pilot:
         for r in self.found:
             own = (self.settings.get("rooms") or {}).get(r["area_id"]) or {}
             room = {**r, **{k: v for k, v in own.items() if k in ("kind", "heating", "temp_sensor", "excluded")}}
-            room["cfg"] = {**plan.defaults(room), **{k: v for k, v in own.items() if k in ROOM_KEYS - {"kind", "heating", "temp_sensor", "excluded", "fixed_hours"}}}
+            room["cfg"] = {**plan.defaults(room), **{k: v for k, v in own.items() if k in ROOM_KEYS - {"kind", "heating", "temp_sensor", "excluded", "fixed_hours", "owner"}}}
             room["fixed_hours"] = bool(own.get("fixed_hours"))
+            # Whose room it is: chosen, or the person it is named after ("" = nobody's).
+            room["owner"] = own["owner"] if "owner" in own else people.owner_of(r["name"], people.persons(self.ha.states), self.ha.states)
             out.append(room)
         return out
 
@@ -105,7 +107,9 @@ class Pilot:
         own = self.settings.setdefault("rooms", {}).setdefault(area, {})
         for k, v in values.items():
             if k in ROOM_KEYS:
-                if v is None or v == "":
+                if k == "owner":
+                    own[k] = v or ""  # "" = nobody's room (also stops the guess)
+                elif v is None or v == "":
                     own.pop(k, None)
                 else:
                     own[k] = v
@@ -129,14 +133,27 @@ class Pilot:
         now = datetime.now(tz)
         st = self.ha.states
         rooms = [r for r in self.rooms() if not r.get("excluded")]
-        self.have = features.found(rooms, st, self.doors)
+        ps = people.persons(st)
+        self.have = features.found(rooms, st, self.doors, ps)
         on = features.active(self.settings, self.have)
         self.on = on
         last_motion = self._last_motion(rooms, st)
-        away = plan.house_away(rooms, st, now, None)
-        door_away = on["door"] and self.watch.door_away(self.doors, st, now, last_motion)
-        away = away or door_away
-        outdoor = self.outdoor() if on["weather"] else None
+        day = 6 <= now.hour < 23
+        motion_away = plan.house_away(rooms, st, now, None) and day and not (on["people"] and not people.all_away(st, ps))
+        door_away = on["door"] and day and self.watch.door_away(self.doors, st, now, last_motion)
+        # Every phone away - and no movement for half an hour (someone without a tracked phone may be home).
+        quiet = last_motion is None or (now - last_motion).total_seconds() >= 1800
+        phones_away = on["people"] and people.all_away(st, ps) and quiet
+        away = motion_away or door_away or phones_away
+        self.away_why = "phones" if phones_away else "door" if door_away else "motion" if motion_away else None
+        coming = people.coming_home(st, ps) if on["people"] else []
+        self.coming = coming
+        outdoor_now = self.outdoor()
+        self.learning.see_outdoor(now, outdoor_now)
+        outdoor = outdoor_now if on["weather"] else None
+        is_summer = on["summer"] and people.summer(self.learning.outdoor_days(), now)
+        holiday = people.holiday(st, ps, now, True) if on["holiday"] else None
+        self.summer_now, self.holiday_now = is_summer, holiday
         out = {}
         for r in rooms:
             a_id = r["area_id"]
@@ -155,7 +172,9 @@ class Pilot:
                                         controlled and on["manual"])
             manual = self.watch.manual_for(a_id, now) if on["manual"] else None
             want = plan.target(r, r["cfg"], st, now, away, manual, by_day[now.weekday()], temp, rate, moving or signs,
-                               on["shower"] and self.watch.shower(a_id, now), on["sun"] and self.watch.sun_warms(r, st, now))
+                               on["shower"] and self.watch.shower(a_id, now), on["sun"] and self.watch.sun_warms(r, st, now),
+                               is_summer, holiday, bool(on["people"] and people.owners_away(st, r.get("owner"))),
+                               bool(coming))
             if r["presence"]:
                 self.learning.see_presence(a_id, now, moving)
             self.learning.see_heating(a_id, now, heating_now, temp, want["temp"], r["heating"], outdoor)
@@ -219,7 +238,7 @@ class Pilot:
         for r in self.rooms():
             n = self.now.get(r["area_id"]) or {}
             rooms.append({k: r[k] for k in ("area_id", "name", "kind", "heating", "temp_sensor", "temp_options", "windows",
-                                            "presence", "humidity", "excluded", "fixed_hours") if k in r}
+                                            "presence", "humidity", "excluded", "fixed_hours", "owner") if k in r}
                          | {"cfg": r["cfg"], "thermostats": [{k: t[k] for k in ("entity_id", "name", "brand", "platform", "model")}
                                                              for t in r["thermostats"]]} | n)
         a = self.agree
@@ -233,7 +252,10 @@ class Pilot:
                 "learning": self.learning.summary(now, [r["area_id"] for r in rooms if not r.get("excluded")]),
                 "features": {k: {"found": bool(self.have.get(k)), "on": bool(getattr(self, "on", {}).get(k))}
                              for k in features.FEATURES if self.have.get(k)},
-                "doors": self.doors}
+                "doors": self.doors, "persons": [{"entity_id": p, "name": (self.ha.states.get(p) or {}).get("attributes", {}).get("friendly_name") or p,
+                                                  "home": people.home(self.ha.states, p)} for p in people.persons(self.ha.states)],
+                "away_why": getattr(self, "away_why", None), "coming": getattr(self, "coming", []),
+                "summer": getattr(self, "summer_now", False), "holiday": getattr(self, "holiday_now", None)}
 
     def outdoor_sensor(self) -> str | None:
         """The weather's or an outdoor sensor's temperature - shown beside the house."""

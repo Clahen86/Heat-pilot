@@ -75,6 +75,7 @@ def test_sun_delays_preheat():
 
 def test_features_hidden_when_missing_and_can_be_turned_off():
     have = features.found([{"kind": "living", "thermostats": [1], "presence": []}], {}, [])
-    assert have == {"signals": False, "shower": False, "sun": False, "weather": False, "door": False, "manual": True}
+    assert have == {"signals": False, "shower": False, "sun": False, "weather": False, "door": False, "manual": True,
+                    "people": False, "holiday": False, "summer": False}
     on = features.active({"features": {"manual": False}}, have)
     assert not on["manual"]
