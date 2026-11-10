@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from . import brands, discover, features, people, plan, pricefeed, supply
+from . import brands, discover, features, people, plan, pricefeed, supply, ventilation
 from .signals import Watch
 from .learning import Learning, seed
 
@@ -46,6 +46,9 @@ class Pilot:
         self.have: dict[str, bool] = {}
         self.meter: dict[str, str] | None = None
         self.price_entity: str | None = None
+        self.vent: dict[str, Any] | None = None
+        self.vent_now: dict[str, Any] | None = None
+        self.cooling_options: list[str] = []
         self.cooling = supply.Cooling(self.learning.s)
         self.timelines: dict[str, list] = {}
 
@@ -62,6 +65,10 @@ class Pilot:
         self.unplaced = discover.unplaced(entities, devices, self.ha.states)
         self.doors = discover.exit_doors(entities, self.ha.states)
         self.meter = supply.find_heat_meter(entities, devices, self.ha.states)
+        self.vent = ventilation.find(entities, devices, self.ha.states)
+        self.cooling_options = sorted(e for e, s in self.ha.states.items() if e.split(".")[0] in ("binary_sensor", "switch", "input_boolean", "sensor")
+                                      and (any(k in (s.get("attributes") or {}) for k in ("precool", "cooling", "free_cooling"))
+                                           or any(w in e for w in ("precool", "free_cooling", "frikoling", "natkoling", "kole_mode", "cooling_mode"))))[:30]
         self.price_entity = supply.find_price(entities, self.ha.states, ZoneInfo(self.ha.config.get("time_zone") or "UTC"))
         _LOGGER.info("Found %s rooms with %s thermostats", len(self.found), sum(len(r["thermostats"]) for r in self.found))
 
@@ -139,7 +146,7 @@ class Pilot:
         st = self.ha.states
         rooms = [r for r in self.rooms() if not r.get("excluded")]
         ps = people.persons(st)
-        self.have = features.found(rooms, st, self.doors, ps, self.meter, self.price_entity)
+        self.have = features.found(rooms, st, self.doors, ps, self.meter, self.price_entity, self.vent)
         on = features.active(self.settings, self.have)
         self.on = on
         last_motion = self._last_motion(rooms, st)
@@ -169,6 +176,21 @@ class Pilot:
             prices, _ = pricefeed.collect(st, self.price_entity, [], tz)
             level = supply.price_level(prices, now)
         self.price_level = level
+        cooling = ventilation.other_cooling(st, (self.settings.get("ventilation") or {}).get("cooling_entity"))
+        self.vent_now = None
+        if on["ventilation"] and self.vent:
+            temps = [t for r in rooms if (t := self.room_temp(r)) is not None]
+            comforts = [r["cfg"]["comfort"] for r in rooms]
+            shower = on["shower"] and any(self.watch.shower(r["area_id"], now) for r in rooms)
+            want_v = ventilation.decide(rooms, st, shower, away, sum(temps) / len(temps) if temps else None,
+                                        sum(comforts) / len(comforts) if comforts else 21.0, outdoor_now)
+            cur = ventilation.current_level(self.vent, st)
+            self.vent_now = {**want_v, "current": cur, "same": cur == want_v["level"], "efficiency": ventilation.efficiency(self.vent, st),
+                             "bypass": ventilation.bypass_open(self.vent, st), "calls": ventilation.calls(self.vent, st, want_v["level"]),
+                             "temps": {k: ventilation._num(st, self.vent.get(k)) for k in ("outdoor", "supply", "extract", "exhaust")},
+                             "name": self.vent["name"], "model": self.vent.get("model")}
+            cooling = cooling or want_v["cooling"]
+        self.cooling_flag = cooling
         out = {}
         for r in rooms:
             a_id = r["area_id"]
@@ -189,7 +211,7 @@ class Pilot:
             want = plan.target(r, r["cfg"], st, now, away, manual, by_day[now.weekday()], temp, rate, moving or signs,
                                on["shower"] and self.watch.shower(a_id, now), on["sun"] and self.watch.sun_warms(r, st, now),
                                is_summer, holiday, bool(on["people"] and people.owners_away(st, r.get("owner"))),
-                               bool(coming), level if supply.is_electric(r) else None, spread)
+                               bool(coming), level if supply.is_electric(r) else None, spread, cooling)
             if r["presence"]:
                 self.learning.see_presence(a_id, now, moving)
             self.learning.see_heating(a_id, now, heating_now, temp, want["temp"], r["heating"], outdoor)
@@ -261,6 +283,15 @@ class Pilot:
                     d[k] = float(values[k])
         self.save()
 
+    def set_ventilation(self, values: dict[str, Any]) -> None:
+        v = self.settings.setdefault("ventilation", {})
+        if "cooling_entity" in values:
+            if values["cooling_entity"]:
+                v["cooling_entity"] = str(values["cooling_entity"])
+            else:
+                v.pop("cooling_entity", None)
+        self.save()
+
     def set_feature(self, key: str, on: bool) -> None:
         if key in features.FEATURES:
             self.settings.setdefault("features", {})[key] = bool(on)
@@ -299,7 +330,9 @@ class Pilot:
                 "summer": getattr(self, "summer_now", False), "holiday": getattr(self, "holiday_now", None),
                 "cooling": getattr(self, "cooling_info", None), "cooling_now": getattr(self, "cooling_now", None),
                 "district": self.settings.get("district") or {}, "price_level": getattr(self, "price_level", None),
-                "electric": [r["area_id"] for r in rooms if supply.is_electric(r)]}
+                "electric": [r["area_id"] for r in rooms if supply.is_electric(r)],
+                "vent": getattr(self, "vent_now", None), "ventilation": self.settings.get("ventilation") or {},
+                "cooling_options": [{"entity_id": e, "name": (self.ha.states.get(e) or {}).get("attributes", {}).get("friendly_name") or e} for e in self.cooling_options]}
 
     def outdoor_sensor(self) -> str | None:
         """The weather's or an outdoor sensor's temperature - shown beside the house."""

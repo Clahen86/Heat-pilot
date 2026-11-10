@@ -75,7 +75,7 @@ def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], no
            house_away: bool, manual: dict[str, Any] | None, hours: list[int] | None = None,
            temp: float | None = None, rate: float | None = None, occupied: bool = False, shower: bool = False,
            sun: bool = False, summer: bool = False, holiday: str | None = None, owner_away: bool = False,
-           coming: bool = False, price: str | None = None, spread: bool = False) -> dict[str, Any]:
+           coming: bool = False, price: str | None = None, spread: bool = False, cooling: bool = False) -> dict[str, Any]:
     """{"temp": °C or None (off), "why": key, "until": time the reason ends or None}."""
     c = {**defaults(room), **(cfg or {})}
     for w in room.get("windows") or []:
@@ -84,6 +84,8 @@ def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], no
             return {"temp": None, "why": "window", "entity": w}
     if summer:
         return {"temp": None, "why": "summer"}
+    if cooling and not shower:
+        return {"temp": None, "why": "cooling"}  # the ventilation (or another system) cools the house: never heat against it
     if manual and manual.get("until") and now < manual["until"]:
         return {"temp": manual["temp"], "why": "manual", "until": manual["until"].isoformat()}
     t, why = base(c, hours, now)
