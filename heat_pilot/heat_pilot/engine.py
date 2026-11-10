@@ -483,7 +483,7 @@ class Pilot:
             n = self.now.get(r["area_id"]) or {}
             rooms.append({k: r[k] for k in ("area_id", "name", "kind", "heating", "temp_sensor", "temp_options", "windows",
                                             "presence", "humidity", "excluded", "fixed_hours", "owner", "floor_id", "doors", "doors_extra", "comfort_learned") if k in r}
-                         | {"cfg": r["cfg"], "thermostats": [{k: t[k] for k in ("entity_id", "name", "brand", "platform", "model")}
+                         | {"heat_type": r["heating"], "cfg": r["cfg"], "thermostats": [{k: t[k] for k in ("entity_id", "name", "brand", "platform", "model")}
                                                              for t in r["thermostats"]]} | n)
         a = self.agree
         tz = ZoneInfo(self.ha.config.get("time_zone") or "UTC")

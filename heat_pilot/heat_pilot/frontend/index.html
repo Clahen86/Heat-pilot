@@ -188,7 +188,7 @@ Object.assign(T, L === "da" ? {
   units: { min: "min", "°": "°", km: "km", h: "t", ppm: "", "%": "%" },
   aTitle: "Værd at vide", mTitle: "Beskeder", mH: "Advarslerne vises altid her. Vælg, om de også skal sendes som besked – og hvilke.",
   mTo: "Send til", mNobody: "Ingen valgt – vises kun i appen", mNight: "Også om natten (22–7)",
-  kinds: { mold: "Skimmelrisiko", air: "Luft ud (CO₂)", window: "Vindue åbent længe", offline: "Termostat svarer ikke", battery: "Lavt batteri", not_warming: "Rum bliver ikke varmt", cooling: "Fjernvarme-afkøling", monthly: "Månedsrapport" },
+  akinds: { mold: "Skimmelrisiko", air: "Luft ud (CO₂)", window: "Vindue åbent længe", offline: "Termostat svarer ikke", battery: "Lavt batteri", not_warming: "Rum bliver ikke varmt", cooling: "Fjernvarme-afkøling", monthly: "Månedsrapport" },
   repTitle: "Sidste måned", repText: "Sænket {dh} gradtimer – ca. {pct} % mindre varme. Varmt til tiden: {ot}.",
   vTitle: "Ventilation", vLevels: { low: "Lav", normal: "Normal", high: "Høj", boost: "Boost" }, vNow: "Står på", vWant: "Ville sætte",
   vWhy: { shower: "Bad – fjerner fugten", co2: "Høj CO₂", humidity: "Høj fugt", free_cooling: "Gratis køling udefra", away: "Alle er ude", normal: "Normal drift" },
@@ -233,7 +233,7 @@ Object.assign(T, L === "da" ? {
   units: { min: "min", "°": "°", km: "km", h: "h", ppm: "", "%": "%" },
   aTitle: "Worth knowing", mTitle: "Messages", mH: "Warnings are always shown here. Choose whether they are also sent as messages – and which.",
   mTo: "Send to", mNobody: "None chosen – only shown in the app", mNight: "Also at night (22–7)",
-  kinds: { mold: "Mould risk", air: "Air it out (CO₂)", window: "Window open long", offline: "Thermostat not responding", battery: "Low battery", not_warming: "Room not getting warm", cooling: "District heating cooling", monthly: "Monthly report" },
+  akinds: { mold: "Mould risk", air: "Air it out (CO₂)", window: "Window open long", offline: "Thermostat not responding", battery: "Low battery", not_warming: "Room not getting warm", cooling: "District heating cooling", monthly: "Monthly report" },
   repTitle: "Last month", repText: "Turned down {dh} degree-hours – about {pct} % less heat. Warm on time: {ot}.",
   vTitle: "Ventilation", vLevels: { low: "Low", normal: "Normal", high: "High", boost: "Boost" }, vNow: "Set now", vWant: "Would set",
   vWhy: { shower: "Shower – removing the humidity", co2: "High CO₂", humidity: "High humidity", free_cooling: "Free cooling from outside", away: "Everyone is out", normal: "Normal" },
@@ -279,7 +279,7 @@ function roomCard(r) {
   const heating = (r.devices || []).some((d) => d.action === "heating");
   const devs = (r.devices || []).map((d) => `<span>${esc(d.brand)} <b>${d.state === "off" ? T.off : num(d.setpoint) + "°"}</b></span>`).join("");
   return `<div class="room" style="--c:${c}" data-room="${esc(r.area_id)}">
-    <div class="hd"><div><div class="nm">${esc(r.name)}</div><div class="kd">${esc(T.kinds[r.kind] || r.kind)} · ${esc(T.heating[r.heating] || "")}</div></div>${heating ? FLAME : ""}</div>
+    <div class="hd"><div><div class="nm">${esc(r.name)}</div><div class="kd">${esc(T.kinds[r.kind] || r.kind)} · ${esc(T.heating[r.heat_type] || "")}</div></div>${heating ? FLAME : ""}</div>
     <div class="temps"><div class="now">${num(r.temp)}<small>°</small></div><span class="arrow">→</span><div class="want">${w.temp == null ? T.off : num(w.temp) + "°"}</div></div>
     <span class="why">${esc(T.why[why] || why)}${w.until && why !== "window" ? ` · ${T.until.replace("{t}", hhmm(w.until))}` : ""}</span>
     <div class="devs">${devs}</div></div>`;
@@ -380,7 +380,7 @@ function msgCard() {
     <div class="row"><div class="t"><b>${T.mTo}</b><span>${targets.length ? targets.map(nice).map(esc).join(", ") : T.mNobody}</span></div></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;padding-bottom:8px">${(data.notify || []).map((n) => `<button class="chipb ${targets.includes(n) ? "on" : ""}" data-target="${esc(n)}">${esc(nice(n))}</button>`).join("")}</div>
     <div class="row"><div class="t"><b>${T.mNight}</b></div><button class="toggle ${m.night ? "on" : ""}" data-mnight></button></div>
-    ${(data.alert_kinds || []).map((k) => `<div class="row"><div class="t"><b>${esc(T.kinds[k])}</b></div><button class="toggle ${kinds[k] === false ? "" : "on"}" data-mkind="${k}"></button></div>`).join("")}</div>`;
+    ${(data.alert_kinds || []).map((k) => `<div class="row"><div class="t"><b>${esc(T.akinds[k])}</b></div><button class="toggle ${kinds[k] === false ? "" : "on"}" data-mkind="${k}"></button></div>`).join("")}</div>`;
 }
 function ventCard() {
   const v = data.vent;
@@ -412,7 +412,7 @@ function nowTab(rooms) {
   const sunMax = (g) => g ? Math.max(...Object.values(g)) : 0;
   const learnRows = rooms.map((r) => `<div class="lrow"><b>${esc(r.name)}</b><span>${r.hours_today == null ? T.learning : r.hours_today.length ? T.uses.replace("{h}", ranges(r.hours_today)) : T.notUsed} · ${r.rate_n ? T.rate.replace("{x}", num(r.rate, 0)) : T.rateDefault}${r.loss ? " · " + T.lossTxt.replace("{x}", num(r.loss * 20, 1)) : ""}${sunMax(r.sun_gain) > 0.2 ? " · " + T.sunTxt.replace("{x}", num(sunMax(r.sun_gain), 1)) : ""}${r.comfort_learned ? " · " + num(r.cfg.comfort) + "° " + T.learnedC : ""}</span></div>`).join("");
   return `<div class="card status"><div class="dotc">${FLAME}</div><div><h2>${esc(sentence(rooms))}</h2><p>${T.heroP}${data.agree != null ? " · " + T.agree.replace("{x}", data.agree) : ""}</p></div></div>
-    ${(data.alerts || []).length ? `<div class="card"><p class="eyebrow">${T.aTitle}</p>${data.alerts.map((a) => `<div class="alert"><span class="ai">!</span><div><b>${esc(T.kinds[a.kind] || a.kind)}</b><div class="muted">${esc(a.text)}</div></div></div>`).join("")}</div>` : ""}
+    ${(data.alerts || []).length ? `<div class="card"><p class="eyebrow">${T.aTitle}</p>${data.alerts.map((a) => `<div class="alert"><span class="ai">!</span><div><b>${esc(T.akinds[a.kind] || a.kind)}</b><div class="muted">${esc(a.text)}</div></div></div>`).join("")}</div>` : ""}
     <div class="card house">${houseSvg(rooms)}</div>
     <div class="metrics">
       <div class="metric"><div class="lbl">${T.mSaved}</div><div class="v">${num(lg.today_dh)}<small>${T.dh}</small></div><div class="s">${lg.week_pct != null ? T.mSavedS.replace("{x}", num(lg.week_pct, 0)) : ""}</div></div>
@@ -491,7 +491,7 @@ function openRoom(id) {
   const calls = (r.calls || []).map((x) => `${x.domain}.${x.service} ${JSON.stringify(Object.fromEntries(Object.entries(x.data).filter(([k]) => k !== "entity_id")))}`).join("\n");
   document.getElementById("sheetbox").innerHTML = `<h3>${esc(r.name)}</h3><p class="muted">${T.windows.replace("{n}", r.windows.length)} · ${T.presence.replace("{n}", r.presence.length)} · <span class="${r.same ? "agreeok" : "agreeno"}">${r.same ? T.same : T.diff}</span></p>
     <div class="row"><div class="t"><b>${T.kind}</b></div>${`<select data-k="kind">${Object.keys(T.kinds).map((k) => `<option value="${k}" ${r.kind === k ? "selected" : ""}>${esc(T.kinds[k])}</option>`).join("")}</select>`}</div>
-    <div class="row"><div class="t"><b>${T.heat}</b></div>${seg("heating", ["radiator", "floor", "heatpump", "electric"], r.heating, T.heating)}</div>
+    <div class="row"><div class="t"><b>${T.heat}</b></div>${seg("heating", ["radiator", "floor", "heatpump", "electric"], r.heat_type, T.heating)}</div>
     <div class="row"><div class="t"><b>${T.sensor}</b><span>${T.sensorH}</span></div><select data-k="temp_sensor"><option value="">${T.none}</option>${(r.temp_options || []).map((e) => `<option value="${esc(e)}" ${r.temp_sensor === e ? "selected" : ""}>${esc(e)}</option>`).join("")}</select></div>
     <div class="row"><div class="t"><b>${T.comfort}</b><span>${T.comfortH}${r.comfort_learned ? " · " + T.learnedC : ""}</span></div>${numIn("comfort", c.comfort)}</div>
     <div class="row"><div class="t"><b>${T.eveningOn}</b><span>${T.eveningH}</span></div><input type="checkbox" data-evon ${c.evening != null ? "checked" : ""}></div>
