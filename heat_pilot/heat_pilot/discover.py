@@ -1,0 +1,102 @@
+"""Finding the house: rooms (Home Assistant's areas), their thermostats and their sensors - with nothing set up.
+
+A room is an area with at least one thermostat (climate entity) in it. In each room:
+- thermostats: every climate entity, with its brand profile (see brands.py)
+- room temperature: a temperature sensor in the room that isn't a thermostat's own, nor outdoor/floor/water/device
+- windows and doors: opening sensors in the room
+- presence: motion, occupancy and presence sensors in the room
+- humidity / CO2: kept for later (who is in the room)
+The kind of room (living room, bedroom, bathroom …) and heating (radiator, floor) are guessed from the names,
+and can always be changed.
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Any
+
+from . import brands
+
+NOT_ROOM_TEMP = re.compile(r"outdoor|outside|ude|udendørs|udeluft|exterior|garden|have|floor|gulv|water|vand|"
+                           r"radiator|flow|fremløb|retur|return|supply|boiler|tank|device_temperature|cpu|chip|"
+                           r"battery|batteri|inverter|growatt|fridge|køle|freezer|fryser|oven|ovn|dew|dug|"
+                           r"forecast|prognose|setpoint|target|apparent|feels", re.I)
+# A sensor made to steer the heating (Aqara W100 "temperature control", a "thermostat sensor") is the room's.
+CONTROL_SENSOR = re.compile(r"termostat|thermostat|styring|control|climate_sensor|regler", re.I)
+ROOM_KINDS = [
+    ("bathroom", r"bad|bath|wc|toilet|douche|dusch|salle de bain"),
+    ("bedroom", r"sove|bedroom|schlaf|sovrum|soverom|chambre|slaapkamer"),
+    ("kids", r"børn|kids|child|kinder|barn|enfant|værelse"),
+    ("kitchen", r"køkken|kitchen|küche|kök|kjøkken|cuisine|keuken"),
+    ("living", r"stue|living|wohn|vardagsrum|séjour|salon|woonkamer|dagligstue|alrum"),
+    ("office", r"kontor|office|büro|arbeits|bureau|werk"),
+]
+FLOOR_WORDS = re.compile(r"floor|gulv|fußboden|golv|plancher|vloer|underfloor", re.I)
+
+
+def _area_of(e: dict[str, Any], devices: dict[str, dict[str, Any]]) -> str | None:
+    return e.get("area_id") or (devices.get(e.get("device_id") or "") or {}).get("area_id")
+
+
+def room_kind(name: str) -> str:
+    for kind, pat in ROOM_KINDS:
+        if re.search(pat, name, re.I):
+            return kind
+    return "other"
+
+
+def find(areas: list[dict[str, Any]], devices_list: list[dict[str, Any]], entities: list[dict[str, Any]],
+         states: dict[str, Any]) -> list[dict[str, Any]]:
+    devices = {d["id"]: d for d in devices_list}
+    area_name = {a["area_id"]: a.get("name") or a["area_id"] for a in areas}
+    by_area: dict[str, list[dict[str, Any]]] = {}
+    for e in entities:
+        if e.get("disabled_by") or e.get("hidden_by") or e["entity_id"] not in states:
+            continue
+        a = _area_of(e, devices)
+        if a:
+            by_area.setdefault(a, []).append(e)
+    climate_devs = {e.get("device_id") for es in by_area.values() for e in es if e["entity_id"].startswith("climate.") and e.get("device_id")}
+    rooms = []
+    for area, ents in sorted(by_area.items(), key=lambda kv: area_name.get(kv[0], kv[0]).lower()):
+        climates = [e for e in ents if e["entity_id"].startswith("climate.") and e.get("platform") not in brands.GROUP_PLATFORMS]
+        if not climates:
+            continue
+        name = area_name.get(area, area)
+        thermostats = []
+        for e in climates:
+            d = devices.get(e.get("device_id") or "") or {}
+            attrs = (states[e["entity_id"]].get("attributes") or {})
+            prof = brands.profile(e.get("platform"), d.get("model") or d.get("model_id"), d.get("manufacturer"))
+            thermostats.append({
+                "entity_id": e["entity_id"], "name": attrs.get("friendly_name") or e["entity_id"], "platform": e.get("platform"),
+                "model": d.get("model"), "manufacturer": d.get("manufacturer"), "brand": prof["name"],
+                "hvac_modes": attrs.get("hvac_modes") or [], "preset_modes": attrs.get("preset_modes") or [],
+                "min_temp": attrs.get("min_temp"), "max_temp": attrs.get("max_temp"), "step": attrs.get("target_temp_step"),
+                "floor": bool(FLOOR_WORDS.search(f"{e['entity_id']} {attrs.get('friendly_name', '')} {d.get('model', '')}")),
+                "profile": {k: v for k, v in prof.items() if k != "name"},
+            })
+
+        def pick(pred) -> list[str]:
+            return sorted(e["entity_id"] for e in ents if pred(e, (states[e["entity_id"]].get("attributes") or {})))
+
+        temps = pick(lambda e, a: e["entity_id"].startswith("sensor.") and a.get("device_class") == "temperature"
+                     and e.get("device_id") not in climate_devs and not NOT_ROOM_TEMP.search(f"{e['entity_id']} {a.get('friendly_name', '')}"))
+        temps.sort(key=lambda x: not CONTROL_SENSOR.search(x + " " + str((states[x].get("attributes") or {}).get("friendly_name", ""))))
+        windows = pick(lambda e, a: e["entity_id"].startswith("binary_sensor.") and a.get("device_class") in ("window", "door", "opening", "garage_door"))
+        presence = pick(lambda e, a: e["entity_id"].startswith("binary_sensor.") and a.get("device_class") in ("motion", "occupancy", "presence"))
+        humidity = pick(lambda e, a: e["entity_id"].startswith("sensor.") and a.get("device_class") == "humidity"
+                        and e.get("device_id") not in climate_devs)
+        co2 = pick(lambda e, a: e["entity_id"].startswith("sensor.") and a.get("device_class") == "carbon_dioxide")
+        floor = all(t["floor"] for t in thermostats) or (room_kind(name) == "bathroom" and any(t["floor"] for t in thermostats))
+        rooms.append({"area_id": area, "name": name, "kind": room_kind(name), "heating": "floor" if floor else "radiator",
+                      "thermostats": thermostats, "temp_sensor": temps[0] if temps else None, "temp_options": temps,
+                      "windows": windows, "presence": presence, "humidity": humidity[:1], "co2": co2[:1]})
+    return rooms
+
+
+def unplaced(entities: list[dict[str, Any]], devices_list: list[dict[str, Any]], states: dict[str, Any]) -> list[str]:
+    """Thermostats with no room - shown so they can be given one."""
+    devices = {d["id"]: d for d in devices_list}
+    return sorted(e["entity_id"] for e in entities if e["entity_id"].startswith("climate.") and not e.get("disabled_by")
+                  and e.get("platform") not in brands.GROUP_PLATFORMS and e["entity_id"] in states and not _area_of(e, devices))

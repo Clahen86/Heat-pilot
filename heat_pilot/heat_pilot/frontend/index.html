@@ -1,0 +1,182 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Varmepilot</title>
+<style>
+  :root {
+    --bg:#06080d; --surface:#0d1118; --surface2:#131924; --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.12);
+    --text:#f3f5f9; --muted:#8b93a3; --faint:#5b6372;
+    --heat:#ff8a3d; --cool:#5ab8ff; --off:#6b7280; --ok:#3ddc97; --warn:#f5b544; --bad:#ff5d6c; --accent:#ff6b4a;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme=dark]) { --bg:#f4f6fa; --surface:#ffffff; --surface2:#f0f3f8; --line:rgba(15,23,42,.08); --line2:rgba(15,23,42,.14);
+      --text:#0b1220; --muted:#5d6676; --faint:#9aa3b2; }
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; }
+  body { background:var(--bg); color:var(--text); font:15px/1.45 -apple-system, "SF Pro Text", "Inter", "Segoe UI", Roboto, system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased; font-feature-settings:"tnum" 1; }
+  body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:-1;
+    background:radial-gradient(900px 420px at 50% -120px, color-mix(in srgb, var(--accent) 20%, transparent), transparent 70%); }
+  main { max-width:880px; margin:0 auto; padding:18px 16px 60px; }
+  .top { display:flex; align-items:center; gap:10px; padding:2px 2px 14px; }
+  .brand { display:flex; align-items:center; gap:10px; flex:1; }
+  .logo { width:30px; height:30px; border-radius:9px; display:grid; place-items:center; background:linear-gradient(135deg, var(--accent), #ffb347); }
+  .logo svg { width:17px; height:17px; }
+  .top h1 { font-size:19px; margin:0; letter-spacing:-.02em; font-weight:650; }
+  .badge { font-size:12px; font-weight:600; padding:5px 11px; border-radius:20px; border:1px solid var(--line2); color:var(--muted); display:flex; align-items:center; gap:6px; }
+  .badge i { width:7px; height:7px; border-radius:50%; background:var(--warn); }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:22px; padding:18px; margin-top:12px; }
+  .eyebrow { font-size:11px; font-weight:650; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); margin:0 0 12px; display:flex; justify-content:space-between; }
+  .muted { color:var(--muted); font-size:13px; }
+  .ic { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; vertical-align:-3px; }
+  .hero { display:flex; gap:14px; align-items:center; }
+  .ring { width:64px; height:64px; flex:none; }
+  .hero h2 { margin:0 0 3px; font-size:18px; font-weight:650; letter-spacing:-.015em; }
+  .hero p { margin:0; color:var(--muted); font-size:14px; }
+  .rooms { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:12px; margin-top:12px; }
+  .room { background:var(--surface); border:1px solid var(--line); border-radius:22px; padding:16px; cursor:pointer; position:relative; overflow:hidden; transition:transform .15s; }
+  .room:active { transform:scale(.985); }
+  .room::after { content:""; position:absolute; inset:auto -40px -60px auto; width:160px; height:160px; border-radius:50%;
+    background:radial-gradient(circle, color-mix(in srgb, var(--c) 30%, transparent), transparent 70%); pointer-events:none; }
+  .room .hd { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .room .nm { font-weight:650; font-size:15.5px; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .room .kd { font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.07em; }
+  .temps { display:flex; align-items:baseline; gap:10px; margin:12px 0 8px; }
+  .now { font-size:38px; font-weight:650; letter-spacing:-.04em; line-height:1; }
+  .now small { font-size:16px; color:var(--muted); font-weight:500; }
+  .arrow { color:var(--faint); }
+  .want { font-size:20px; font-weight:650; color:var(--c); }
+  .why { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; padding:5px 10px; border-radius:10px;
+    color:var(--c); background:color-mix(in srgb, var(--c) 13%, transparent); }
+  .devs { margin-top:10px; font-size:12px; color:var(--muted); display:flex; flex-wrap:wrap; gap:4px 10px; }
+  .devs b { color:var(--text); font-weight:600; }
+  .flame { width:18px; height:18px; color:var(--heat); }
+  .agreeok { color:var(--ok); } .agreeno { color:var(--warn); }
+  .sheet { position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:flex-end; justify-content:center; z-index:10; }
+  .sheet.open { display:flex; }
+  .sheet .box { background:var(--surface); width:100%; max-width:560px; max-height:88vh; overflow:auto; border-radius:22px 22px 0 0; padding:20px 18px 30px; border:1px solid var(--line2); }
+  .sheet h3 { margin:0 0 4px; font-size:19px; letter-spacing:-.02em; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-top:1px solid var(--line); }
+  .row .t b { display:block; font-size:14.5px; font-weight:600; } .row .t span { font-size:12.5px; color:var(--muted); }
+  select, input { background:var(--surface2); color:var(--text); border:1px solid var(--line2); border-radius:10px; padding:8px 10px; font:inherit; font-size:14px; max-width:200px; }
+  input.num { width:76px; text-align:right; }
+  .seg { display:flex; background:var(--surface2); border-radius:10px; padding:3px; gap:2px; flex-wrap:wrap; }
+  .seg button { border:0; background:transparent; color:var(--muted); font:inherit; font-size:13px; font-weight:600; padding:6px 10px; border-radius:8px; cursor:pointer; }
+  .seg button.on { background:var(--accent); color:#fff; }
+  .btn { border:0; background:var(--accent); color:#fff; font:inherit; font-weight:650; padding:11px 16px; border-radius:12px; cursor:pointer; width:100%; margin-top:16px; }
+  .ghost { background:transparent; color:var(--muted); border:1px solid var(--line2); }
+  .calls { font:12px ui-monospace, Menlo, monospace; color:var(--faint); white-space:pre-wrap; margin-top:6px; }
+  details summary { cursor:pointer; color:var(--muted); font-size:13px; margin-top:10px; }
+  .empty { text-align:center; padding:40px 10px; color:var(--muted); }
+  @media (max-width:520px) { .rooms { grid-template-columns:1fr 1fr; gap:10px; } .room { padding:13px; border-radius:18px; } .now { font-size:30px; } .want { font-size:16px; } .devs { display:none; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div class="brand"><div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c2 3 5 5 5 9a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 1-8z"/></svg></div><h1 id="title">Varmepilot</h1></div>
+    <div class="badge"><i></i><span id="mode"></span></div>
+  </div>
+  <div id="app"></div>
+</main>
+<div class="sheet" id="sheet"><div class="box" id="sheetbox"></div></div>
+<script>
+const L = (navigator.language || "en").slice(0, 2) === "da" ? "da" : "en";
+const T = {
+  da: { shadow: "Skygge", hero: "Kører i skygge", heroP: "Den viser, hvad den ville gøre i hvert rum – men styrer intet endnu.",
+    agree: "{x} % enig med det, der styrer nu", away: "Alle ude – sænket", rooms: "Rum", why: { comfort: "Komfort", setback: "Sænket", night: "Nat", away: "Alle ude", window: "Vindue åbent", manual: "Skruet i hånden" },
+    kinds: { living: "Stue", kitchen: "Køkken", bedroom: "Soveværelse", kids: "Børneværelse", bathroom: "Badeværelse", office: "Kontor", other: "Andet rum" },
+    heating: { radiator: "Radiator", floor: "Gulvvarme" }, off: "Slukket", until: "til {t}", nowSet: "Står nu på", would: "Ville sende",
+    kind: "Rumtype", heat: "Varme", sensor: "Rumføler", sensorH: "Temperaturen i rummet", none: "Termostatens egen", comfort: "Komfort", comfortH: "Når rummet bruges",
+    setback: "Sænket", setbackH: "Om dagen, når det ikke bruges", night: "Nat", hours: "Komfort fra – til", hoursH: "Hvornår rummet bruges", exclude: "Styr ikke dette rum",
+    save: "Gem", close: "Luk", found: "Fundet: {n} rum med {t} termostater", unplaced: "Termostater uden rum: {x} – giv dem et område i Home Assistant",
+    empty: "Fandt ingen termostater. Giv dine termostater et område (rum) i Home Assistant, så finder Varmepilot dem.", search: "Søg igen", diag: "Hent diagnose",
+    windows: "{n} vinduer/døre", presence: "{n} bevægelsessensorer", same: "Samme som nu", diff: "Anderledes end nu" },
+  en: { shadow: "Shadow", hero: "Running in shadow", heroP: "It shows what it would do in each room – but controls nothing yet.",
+    agree: "{x} % in line with what controls now", away: "Everyone away – turned down", rooms: "Rooms", why: { comfort: "Comfort", setback: "Setback", night: "Night", away: "Everyone away", window: "Window open", manual: "Turned by hand" },
+    kinds: { living: "Living room", kitchen: "Kitchen", bedroom: "Bedroom", kids: "Kids' room", bathroom: "Bathroom", office: "Office", other: "Other room" },
+    heating: { radiator: "Radiator", floor: "Floor heating" }, off: "Off", until: "until {t}", nowSet: "Set now to", would: "Would send",
+    kind: "Kind of room", heat: "Heating", sensor: "Room sensor", sensorH: "The temperature in the room", none: "The thermostat's own", comfort: "Comfort", comfortH: "When the room is used",
+    setback: "Setback", setbackH: "Daytime, when not used", night: "Night", hours: "Comfort from – to", hoursH: "When the room is used", exclude: "Don't control this room",
+    save: "Save", close: "Close", found: "Found: {n} rooms with {t} thermostats", unplaced: "Thermostats with no room: {x} – give them an area in Home Assistant",
+    empty: "No thermostats found. Give your thermostats an area (room) in Home Assistant and Heat Pilot will find them.", search: "Search again", diag: "Download diagnostics",
+    windows: "{n} windows/doors", presence: "{n} motion sensors", same: "Same as now", diff: "Different from now" },
+}[L];
+document.getElementById("title").textContent = L === "da" ? "Varmepilot" : "Heat Pilot";
+document.getElementById("mode").textContent = T.shadow;
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const num = (v, d = 1) => v == null ? "–" : Number(v).toFixed(d).replace(".", L === "da" ? "," : ".");
+const api = (p, body) => fetch(p.replace(/^\//, ""), body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}).then((r) => r.json());
+const COL = { comfort: "var(--heat)", setback: "var(--cool)", night: "#8b7bff", away: "var(--cool)", window: "var(--off)", manual: "var(--warn)" };
+const FLAME = `<svg class="flame" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c2.5 3.5 6 6 6 11a6 6 0 0 1-12 0c0-2.4 1.2-3.9 2.4-5 0 2.3 1.2 3.6 2.4 3.6 0-3.6-1.2-6 1.2-9.6z"/></svg>`;
+let data = null;
+
+function hhmm(iso) { if (!iso) return ""; const d = new Date(iso); return d.toLocaleTimeString(L, { hour: "2-digit", minute: "2-digit" }); }
+function ring(p) {
+  const r = 26, c = 2 * Math.PI * r, v = p == null ? 0 : p / 100;
+  return `<svg class="ring" viewBox="0 0 64 64"><circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--surface2)" stroke-width="6"/>
+    <circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-dasharray="${c * v} ${c}" transform="rotate(-90 32 32)"/>
+    <text x="32" y="37" text-anchor="middle" font-size="15" font-weight="650" fill="currentColor">${p == null ? "–" : p + "%"}</text></svg>`;
+}
+function roomCard(r) {
+  const w = r.want || {}, why = w.why || "comfort", c = COL[why] || "var(--heat)";
+  const heating = (r.devices || []).some((d) => d.action === "heating");
+  const devs = (r.devices || []).map((d) => `<span>${esc(d.brand)} <b>${d.state === "off" ? T.off : num(d.setpoint) + "°"}</b></span>`).join("");
+  return `<div class="room" style="--c:${c}" data-room="${esc(r.area_id)}">
+    <div class="hd"><div><div class="nm">${esc(r.name)}</div><div class="kd">${esc(T.kinds[r.kind] || r.kind)} · ${esc(T.heating[r.heating] || "")}</div></div>${heating ? FLAME : ""}</div>
+    <div class="temps"><div class="now">${num(r.temp)}<small>°</small></div><span class="arrow">→</span><div class="want">${w.temp == null ? T.off : num(w.temp) + "°"}</div></div>
+    <span class="why">${esc(T.why[why] || why)}${w.until && why !== "window" ? ` · ${T.until.replace("{t}", hhmm(w.until))}` : ""}</span>
+    <div class="devs">${devs}</div></div>`;
+}
+function render() {
+  const app = document.getElementById("app");
+  if (!data) return;
+  const rooms = data.rooms.filter((r) => !r.excluded);
+  if (!data.rooms.length) {
+    app.innerHTML = `<div class="card empty">${T.empty}<button class="btn" id="again">${T.search}</button></div>`;
+    document.getElementById("again").onclick = async () => { await api("/api/discover", {}); load(); };
+    return;
+  }
+  const nT = rooms.reduce((s, r) => s + r.thermostats.length, 0);
+  app.innerHTML = `<div class="card hero">${ring(data.agree)}<div><h2>${T.hero}</h2><p>${T.heroP}</p>
+      <p class="muted" style="margin-top:6px">${data.agree != null ? T.agree.replace("{x}", data.agree) : ""}${data.away ? " · " + T.away : ""}</p></div></div>
+    <div class="rooms">${data.rooms.map(roomCard).join("")}</div>
+    <p class="muted" style="margin-top:14px">${T.found.replace("{n}", rooms.length).replace("{t}", nT)}${data.unplaced.length ? "<br>" + T.unplaced.replace("{x}", data.unplaced.map(esc).join(", ")) : ""}</p>
+    <p class="muted"><a href="api/diagnostics" style="color:var(--muted)">${T.diag}</a></p>`;
+  document.querySelectorAll("[data-room]").forEach((el) => el.onclick = () => openRoom(el.dataset.room));
+}
+function openRoom(id) {
+  const r = data.rooms.find((x) => x.area_id === id), c = r.cfg;
+  const seg = (key, opts, cur, labels) => `<div class="seg" data-seg="${key}">${opts.map((o) => `<button data-v="${o}" class="${cur === o ? "on" : ""}">${esc(labels[o])}</button>`).join("")}</div>`;
+  const numIn = (key, v) => `<input class="num" type="number" step="0.5" inputmode="decimal" data-k="${key}" value="${v}">`;
+  const now = (r.devices || []).map((d) => `${esc(d.name)}: ${d.state === "off" ? T.off : num(d.setpoint) + "°"}`).join("<br>");
+  const calls = (r.calls || []).map((x) => `${x.domain}.${x.service} ${JSON.stringify(Object.fromEntries(Object.entries(x.data).filter(([k]) => k !== "entity_id")))}`).join("\n");
+  document.getElementById("sheetbox").innerHTML = `<h3>${esc(r.name)}</h3><p class="muted">${T.windows.replace("{n}", r.windows.length)} · ${T.presence.replace("{n}", r.presence.length)} · <span class="${r.same ? "agreeok" : "agreeno"}">${r.same ? T.same : T.diff}</span></p>
+    <div class="row"><div class="t"><b>${T.kind}</b></div>${`<select data-k="kind">${Object.keys(T.kinds).map((k) => `<option value="${k}" ${r.kind === k ? "selected" : ""}>${esc(T.kinds[k])}</option>`).join("")}</select>`}</div>
+    <div class="row"><div class="t"><b>${T.heat}</b></div>${seg("heating", ["radiator", "floor"], r.heating, T.heating)}</div>
+    <div class="row"><div class="t"><b>${T.sensor}</b><span>${T.sensorH}</span></div><select data-k="temp_sensor"><option value="">${T.none}</option>${(r.temp_options || []).map((e) => `<option value="${esc(e)}" ${r.temp_sensor === e ? "selected" : ""}>${esc(e)}</option>`).join("")}</select></div>
+    <div class="row"><div class="t"><b>${T.comfort}</b><span>${T.comfortH}</span></div>${numIn("comfort", c.comfort)}</div>
+    <div class="row"><div class="t"><b>${T.hours}</b><span>${T.hoursH}</span></div><span><input class="num" type="number" min="0" max="24" data-k="day_from" value="${c.day_from}"> – <input class="num" type="number" min="0" max="24" data-k="day_to" value="${c.day_to}"></span></div>
+    <div class="row"><div class="t"><b>${T.setback}</b><span>${T.setbackH}</span></div>${numIn("setback", c.setback)}</div>
+    <div class="row"><div class="t"><b>${T.night}</b></div>${numIn("night", c.night)}</div>
+    <div class="row"><div class="t"><b>${T.exclude}</b></div><input type="checkbox" data-k="excluded" ${r.excluded ? "checked" : ""}></div>
+    <details><summary>${T.nowSet} / ${T.would}</summary><p class="muted">${now}</p><div class="calls">${esc(calls)}</div></details>
+    <button class="btn" id="save">${T.save}</button><button class="btn ghost" id="close">${T.close}</button>`;
+  const sheet = document.getElementById("sheet");
+  sheet.classList.add("open");
+  const vals = {};
+  sheet.querySelectorAll("[data-seg] button").forEach((b) => b.onclick = () => { const s = b.parentElement; s.querySelectorAll("button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); vals[s.dataset.seg] = b.dataset.v; });
+  sheet.querySelectorAll("[data-k]").forEach((el) => el.onchange = () => { vals[el.dataset.k] = el.type === "checkbox" ? el.checked : el.type === "number" ? (el.value === "" ? null : Number(el.value.replace(",", "."))) : el.value || null; });
+  document.getElementById("close").onclick = () => sheet.classList.remove("open");
+  sheet.onclick = (e) => { if (e.target === sheet) sheet.classList.remove("open"); };
+  document.getElementById("save").onclick = async () => { await api("/api/room", { area_id: id, ...vals }); sheet.classList.remove("open"); load(); };
+}
+async function load() { try { data = await api("/api/status"); render(); } catch (e) { /* tries again */ } }
+load();
+setInterval(() => { if (!document.getElementById("sheet").classList.contains("open")) load(); }, 30000);
+</script>
+</body>
+</html>
