@@ -22,6 +22,11 @@ DAY = range(6, 22)  # comfort hours are learned in the day only - night has its 
 DEFAULT_RATE = {"radiator": 12.0, "floor": 35.0}  # minutes per degree before anything is learned
 
 
+def bucket(outdoor: float) -> str:
+    """The weather a heat-up happened in: below 0, 0-7, 7-13, warmer."""
+    return "frost" if outdoor < 0 else "cold" if outdoor < 7 else "cool" if outdoor < 13 else "mild"
+
+
 class Learning:
     def __init__(self, data_dir: Path) -> None:
         self.file = data_dir / "heat_pilot_learning.json"
@@ -86,7 +91,7 @@ class Learning:
     # ---------- heating speed ----------
 
     def see_heating(self, room: str, now: datetime, heating: bool, temp: float | None, target: float | None,
-                    heating_type: str) -> None:
+                    heating_type: str, outdoor: float | None = None) -> None:
         ep = self._heat.get(room)
         if heating and temp is not None and target is not None and temp < target - 0.5:
             if ep is None or abs(ep["target"] - target) > 0.3:
@@ -101,12 +106,20 @@ class Learning:
                     r = self.s["rate"].setdefault(room, {"per_deg": DEFAULT_RATE.get(heating_type, 12.0), "n": 0})
                     r["per_deg"] = round(per if r["n"] == 0 else 0.75 * r["per_deg"] + 0.25 * per, 1)
                     r["n"] += 1
+                    if outdoor is not None:  # colder outside, slower to heat: kept by the weather too
+                        b = r.setdefault("b", {}).setdefault(bucket(outdoor), {"per_deg": per, "n": 0})
+                        b["per_deg"] = round(per if b["n"] == 0 else 0.75 * b["per_deg"] + 0.25 * per, 1)
+                        b["n"] += 1
             if not heating or mins > 600 or temp >= ep["target"] - 0.3:
                 self._heat.pop(room, None)
 
-    def rate(self, room: str, heating_type: str) -> tuple[float, int]:
+    def rate(self, room: str, heating_type: str, outdoor: float | None = None) -> tuple[float, int]:
         r = self.s["rate"].get(room)
-        return (r["per_deg"], r["n"]) if r and r.get("n") else (DEFAULT_RATE.get(heating_type, 12.0), 0)
+        if not r or not r.get("n"):
+            return DEFAULT_RATE.get(heating_type, 12.0), 0
+        if outdoor is not None and (b := (r.get("b") or {}).get(bucket(outdoor))) and b.get("n", 0) >= 2:
+            return b["per_deg"], b["n"]
+        return r["per_deg"], r["n"]
 
     # ---------- what it gave ----------
 

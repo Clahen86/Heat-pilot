@@ -88,10 +88,11 @@ def find(areas: list[dict[str, Any]], devices_list: list[dict[str, Any]], entiti
         humidity = pick(lambda e, a: e["entity_id"].startswith("sensor.") and a.get("device_class") == "humidity"
                         and e.get("device_id") not in climate_devs)
         co2 = pick(lambda e, a: e["entity_id"].startswith("sensor.") and a.get("device_class") == "carbon_dioxide")
+        lights = pick(lambda e, a: e["entity_id"].startswith("light."))
         floor = all(t["floor"] for t in thermostats) or (room_kind(name) == "bathroom" and any(t["floor"] for t in thermostats))
         rooms.append({"area_id": area, "name": name, "kind": room_kind(name), "heating": "floor" if floor else "radiator",
                       "thermostats": thermostats, "temp_sensor": temps[0] if temps else None, "temp_options": temps,
-                      "windows": windows, "presence": presence, "humidity": humidity[:1], "co2": co2[:1]})
+                      "windows": windows, "presence": presence, "humidity": humidity[:1], "co2": co2[:1], "lights": lights})
     return rooms
 
 
@@ -100,3 +101,20 @@ def unplaced(entities: list[dict[str, Any]], devices_list: list[dict[str, Any]],
     devices = {d["id"]: d for d in devices_list}
     return sorted(e["entity_id"] for e in entities if e["entity_id"].startswith("climate.") and not e.get("disabled_by")
                   and e.get("platform") not in brands.GROUP_PLATFORMS and e["entity_id"] in states and not _area_of(e, devices))
+
+
+EXIT_WORDS = re.compile(r"entre|entré|hoveddør|hovedør|hoveddor|front|entrance|main_door|haustür|haustur|ytterdør|ytterdörr|"
+                        r"voordeur|porte_d_entree|porte_entree|yttredør", re.I)
+
+
+def exit_doors(entities: list[dict[str, Any]], states: dict[str, Any]) -> list[str]:
+    """The house's outer doors (front door, entrance): opened and then no movement = everyone left."""
+    out = []
+    for e in entities:
+        eid = e["entity_id"]
+        if not eid.startswith("binary_sensor.") or e.get("disabled_by") or eid not in states:
+            continue
+        a = states[eid].get("attributes") or {}
+        if a.get("device_class") in ("door", "opening") and EXIT_WORDS.search(f"{eid} {str(a.get('friendly_name', '')).lower().replace(' ', '_')}"):
+            out.append(eid)
+    return sorted(out)

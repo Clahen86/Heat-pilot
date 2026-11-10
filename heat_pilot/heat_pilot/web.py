@@ -25,6 +25,12 @@ def make_app(pilot) -> web.Application:
         pilot.tick()
         return web.json_response({"ok": True})
 
+    async def feature(req: web.Request) -> web.Response:
+        body = await req.json()
+        pilot.set_feature(str(body.get("key")), bool(body.get("on")))
+        pilot.tick()
+        return web.json_response({"ok": True})
+
     async def rediscover(_req: web.Request) -> web.Response:
         await pilot.discover()
         pilot.tick()
@@ -43,5 +49,6 @@ def make_app(pilot) -> web.Application:
     app.router.add_get("/api/status", status)
     app.router.add_post("/api/room", room)
     app.router.add_post("/api/discover", rediscover)
+    app.router.add_post("/api/feature", feature)
     app.router.add_get("/api/diagnostics", diagnostics)
     return app

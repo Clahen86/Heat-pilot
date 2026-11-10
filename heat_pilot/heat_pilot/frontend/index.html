@@ -106,6 +106,9 @@
   .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-top:14px; }
   .legend i { display:inline-block; width:12px; height:12px; border-radius:4px; margin-right:6px; vertical-align:-2px; }
   @media (max-width:520px) { .metrics { grid-template-columns:1fr 1fr; } .tl { grid-template-columns:74px 1fr; } .axis { margin-left:84px; } }
+  .toggle { width:46px; height:28px; border-radius:14px; background:var(--surface2); border:1px solid var(--line2); position:relative; cursor:pointer; flex:none; transition:background .2s; }
+  .toggle::after { content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:var(--muted); transition:all .2s; }
+  .toggle.on { background:var(--accent); border-color:var(--accent); } .toggle.on::after { left:21px; background:#fff; }
   .empty { text-align:center; padding:40px 10px; color:var(--muted); }
   @media (max-width:520px) { .rooms { grid-template-columns:1fr 1fr; gap:10px; } .room { padding:13px; border-radius:18px; } .now { font-size:30px; } .want { font-size:16px; } .devs { display:none; } }
 </style>
@@ -143,21 +146,35 @@ const T = {
 }[L];
 
 Object.assign(T, L === "da" ? {
-  tabs: { now: "Nu", plan: "Plan", rooms: "Rum" }, sHeat: "{r} varmes op til kl. {t}", sHeatN: "{n} rum varmes op", sPre: "{r} varmes op, så det er varmt kl. {t}",
+  tabs: { now: "Nu", plan: "Plan", rooms: "Rum", settings: "Indstillinger" },
+  feat: { title: "Det kan den – fundet i dit hjem", hint: "Slår selv til, når udstyret findes. Det, du ikke har, vises ikke.",
+    signals: ["Nogen er i rummet", "CO₂, fugt og lys holder rummet varmt, når man sidder stille"],
+    shower: ["Bruser-hold", "Badeværelset holdes varmt en time efter et bad (fugten stiger)"],
+    sun: ["Solen varmer gratis", "Venter med at varme op, når solen allerede varmer rummet"],
+    weather: ["Vejret", "Lærer opvarmningstid efter udetemperaturen – starter tidligere, når det er koldt"],
+    door: ["Hoveddøren", "Døren åbnes og ingen bevægelse i 10 min: alle er ude – huset sænkes"],
+    manual: ["Skruet i hånden", "Når nogen drejer på en termostat, holdes deres temperatur en time"] }, sHeat: "{r} varmes op til kl. {t}", sHeatN: "{n} rum varmes op", sPre: "{r} varmes op, så det er varmt kl. {t}",
   sDown: "{n} rum er sænket, fordi ingen bruger dem", sDown1: "{r} er sænket, fordi ingen bruger det", sWin: "Vinduet i {r} er åbent – varmen er slukket",
   sAway: "Alle er ude – huset er sænket", sAllGood: "Alle rum har den temperatur, de skal have", sNight: "Natsænkning i {n} rum",
   mSaved: "Sænket i dag", mSavedS: "≈ {x} % mindre varme denne uge", mOnTime: "Varmt til tiden", mOnTimeS: "{n} gange målt", mHeating: "Varmer nu", mHeatingS: "af {n} rum", mOut: "Ude", mOutS: "fra vejret",
   dh: "°·t", learned: "Det har den lært", uses: "bruges {h}", notUsed: "bruges sjældent", rate: "{x} min pr. grad", rateDefault: "lærer opvarmningstid", learning: "lærer stadig",
   planTitle: "De næste 24 timer", planHint: "Varmen starter i god tid, så rummet er varmt, når det bruges.",
-  why2: { preheat: "Varmer op i tide", occupied: "Nogen er her" }, fixed: "Brug faste tider", fixedH: "I stedet for de lærte",
+  why2: { preheat: "Varmer op i tide", occupied: "Nogen er her", shower: "Efter bad", sun: "Solen varmer" }, fixed: "Brug faste tider", fixedH: "I stedet for de lærte",
 } : {
-  tabs: { now: "Now", plan: "Plan", rooms: "Rooms" }, sHeat: "{r} heats until {t}", sHeatN: "{n} rooms are heating", sPre: "{r} heats up to be warm at {t}",
+  tabs: { now: "Now", plan: "Plan", rooms: "Rooms", settings: "Settings" },
+  feat: { title: "What it can do – found in your home", hint: "Turns itself on when the equipment is found. What you don't have isn't shown.",
+    signals: ["Someone is in the room", "CO₂, humidity and lights keep the room warm when people sit still"],
+    shower: ["Shower hold", "The bathroom is kept warm for an hour after a shower (humidity rises)"],
+    sun: ["Free heat from the sun", "Waits with heating up when the sun is already warming the room"],
+    weather: ["The weather", "Learns heat-up time by the outdoor temperature – starts earlier when it's cold"],
+    door: ["The front door", "Door opened and no movement for 10 min: everyone is out – the house is turned down"],
+    manual: ["Turned by hand", "When someone turns a thermostat, their temperature holds for an hour"] }, sHeat: "{r} heats until {t}", sHeatN: "{n} rooms are heating", sPre: "{r} heats up to be warm at {t}",
   sDown: "{n} rooms are turned down because nobody uses them", sDown1: "{r} is turned down because nobody uses it", sWin: "The window in {r} is open – heating is off",
   sAway: "Everyone is away – the house is turned down", sAllGood: "Every room is at the temperature it should be", sNight: "Night setback in {n} rooms",
   mSaved: "Turned down today", mSavedS: "≈ {x} % less heat this week", mOnTime: "Warm on time", mOnTimeS: "measured {n} times", mHeating: "Heating now", mHeatingS: "of {n} rooms", mOut: "Outside", mOutS: "from the weather",
   dh: "°·h", learned: "What it has learned", uses: "used {h}", notUsed: "rarely used", rate: "{x} min per degree", rateDefault: "learning heat-up time", learning: "still learning",
   planTitle: "The next 24 hours", planHint: "Heating starts in good time, so the room is warm when it is used.",
-  why2: { preheat: "Heating up in time", occupied: "Someone is here" }, fixed: "Use fixed hours", fixedH: "Instead of the learned ones",
+  why2: { preheat: "Heating up in time", occupied: "Someone is here", shower: "After a shower", sun: "The sun warms it" }, fixed: "Use fixed hours", fixedH: "Instead of the learned ones",
 });
 Object.assign(T.why, T.why2);
 document.getElementById("title").textContent = L === "da" ? "Varmepilot" : "Heat Pilot";
@@ -165,7 +182,7 @@ document.getElementById("mode").textContent = T.shadow;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const num = (v, d = 1) => v == null ? "–" : Number(v).toFixed(d).replace(".", L === "da" ? "," : ".");
 const api = (p, body) => fetch(p.replace(/^\//, ""), body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}).then((r) => r.json());
-const COL = { comfort: "var(--heat)", preheat: "#ffb347", occupied: "var(--heat)", setback: "var(--cool)", night: "#8b7bff", away: "var(--cool)", window: "var(--off)", manual: "var(--warn)" };
+const COL = { shower: "#ff9f6e", sun: "#f5c451", comfort: "var(--heat)", preheat: "#ffb347", occupied: "var(--heat)", setback: "var(--cool)", night: "#8b7bff", away: "var(--cool)", window: "var(--off)", manual: "var(--warn)" };
 let tab = location.hash.slice(1) || "now";
 const FLAME = `<svg class="flame" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c2.5 3.5 6 6 6 11a6 6 0 0 1-12 0c0-2.4 1.2-3.9 2.4-5 0 2.3 1.2 3.6 2.4 3.6 0-3.6-1.2-6 1.2-9.6z"/></svg>`;
 let data = null;
@@ -268,16 +285,22 @@ function render() {
     return;
   }
   const nT = rooms.reduce((s, r) => s + r.thermostats.length, 0);
-  const tabs = `<div class="tabs">${["now", "plan", "rooms"].map((k) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${T.tabs[k]}</button>`).join("")}</div>`;
+  const tabs = `<div class="tabs">${["now", "plan", "rooms", "settings"].map((k) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${T.tabs[k]}</button>`).join("")}</div>`;
   let body = "";
   if (tab === "plan") body = planTab(rooms);
   else if (tab === "rooms") body = `<div class="rooms">${data.rooms.map(roomCard).join("")}</div>
     <p class="muted" style="margin-top:14px">${T.found.replace("{n}", rooms.length).replace("{t}", nT)}${data.unplaced.length ? "<br>" + T.unplaced.replace("{x}", data.unplaced.map(esc).join(", ")) : ""}</p>
     <p class="muted"><a href="api/diagnostics" style="color:var(--muted)">${T.diag}</a></p>`;
+  else if (tab === "settings") {
+    const f = data.features || {};
+    body = `<div class="card"><p class="eyebrow">${T.feat.title}</p><p class="muted" style="margin:-4px 0 6px">${T.feat.hint}</p>
+      ${Object.keys(f).map((k) => `<div class="row"><div class="t"><b>${esc(T.feat[k][0])}</b><span>${esc(T.feat[k][1])}</span></div><button class="toggle ${f[k].on ? "on" : ""}" data-feat="${k}"></button></div>`).join("")}</div>`;
+  }
   else body = nowTab(rooms);
   app.innerHTML = tabs + body;
   document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; location.hash = tab; render(); });
   document.querySelectorAll("[data-room]").forEach((el) => el.onclick = () => openRoom(el.dataset.room));
+  document.querySelectorAll("[data-feat]").forEach((b) => b.onclick = async () => { await api("/api/feature", { key: b.dataset.feat, on: !b.classList.contains("on") }); load(); });
 }
 function openRoom(id) {
   const r = data.rooms.find((x) => x.area_id === id), c = r.cfg;

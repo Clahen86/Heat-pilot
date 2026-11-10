@@ -71,7 +71,8 @@ def next_comfort(c: dict[str, Any], hours: list[int] | None, now: datetime, with
 
 def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], now: datetime,
            house_away: bool, manual: dict[str, Any] | None, hours: list[int] | None = None,
-           temp: float | None = None, rate: float | None = None, occupied: bool = False) -> dict[str, Any]:
+           temp: float | None = None, rate: float | None = None, occupied: bool = False, shower: bool = False,
+           sun: bool = False) -> dict[str, Any]:
     """{"temp": °C or None (off), "why": key, "until": time the reason ends or None}."""
     c = {**defaults(room), **(cfg or {})}
     for w in room.get("windows") or []:
@@ -81,15 +82,17 @@ def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], no
     if manual and manual.get("until") and now < manual["until"]:
         return {"temp": manual["temp"], "why": "manual", "until": manual["until"].isoformat()}
     t, why = base(c, hours, now)
-    if occupied and why != "comfort" and 6 <= now.hour < 22 and c["comfort"] > t:
+    if shower and c["comfort"] > t:
+        t, why = c["comfort"], "shower"  # warm during and after the shower
+    elif occupied and why != "comfort" and 6 <= now.hour < 22 and c["comfort"] > t:
         t, why = c["comfort"], "occupied"  # someone is in the room now: comfort, whatever the plan said
     until = None
-    if why in ("comfort", "occupied") and why != "occupied":
+    if why == "comfort":
         e = now.replace(second=0, microsecond=0)
         while comfort_at(c, hours, e) and e < now + timedelta(hours=24):
             e += timedelta(minutes=15)
         until = e
-    else:
+    elif why not in ("occupied", "shower"):
         nxt = next_comfort(c, hours, now)
         if nxt is not None:
             until = nxt
@@ -97,7 +100,7 @@ def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], no
             if temp is not None and rate:
                 lead = max(0.0, c["comfort"] - temp) * rate
                 if now >= nxt - timedelta(minutes=lead) and c["comfort"] > t:
-                    t, why = c["comfort"], "preheat"
+                    t, why = (t, "sun") if sun else (c["comfort"], "preheat")  # the sun warms it for free
     if house_away and 6 <= now.hour < 23 and t > c["away"]:
         t, why, until = c["away"], "away", None
     return {"temp": max(FROST, round(t, 1)), "why": why, "until": until.isoformat() if until else None}
