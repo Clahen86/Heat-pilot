@@ -30,6 +30,8 @@ SUPPLY = re.compile(r"supply|forward|flow_temp|fremløb|fremlob|frem_temp|vorlau
 RETURN = re.compile(r"return|retur|rücklauf|rucklauf|returledning|temperature_2|t2\b", re.I)
 FLOW = re.compile(r"flow_rate|flow|gennemstrømning|durchfluss|volume_flow", re.I)
 VOLUME = re.compile(r"volume|m3|vandmængde|volumen", re.I)
+STATS = re.compile(r"avg|average|mean|gennemsnit|durchschnitt|\bmin\b|_min_|min_|\bmax\b|_max_|max_|month|year|week|day\b|daily|"
+                   r"monthly|yearly|weekly|måned|maned|år\b|total|peak|target|setpoint", re.I)
 DH_WORDS = re.compile(r"kamstrup|multical|heat_meter|varmemåler|varmemaler|fjernvarme|district|wärmezähler|fernwärme|"
                       r"fjärrvärme|sensus|landis|ultrego|sharky|qundis|danfoss_sonometer|sonometer|heat_energy", re.I)
 
@@ -44,7 +46,11 @@ def find_heat_meter(entities: list[dict[str, Any]], devices: list[dict[str, Any]
     best = None
     for dev, ents in by_dev.items():
         def first(pat, cls=None, unit=None):
-            for x in sorted(ents):
+            # The live value: never an average, a minimum or a maximum over a day/month/year (Kamstrup readers have
+            # "Avg Temperature 1 (Month)" beside "Temperature 1 Supply"); names that say supply/return first.
+            live = [x for x in sorted(ents) if not STATS.search(x + " " + str((states[x].get("attributes") or {}).get("friendly_name", "")))]
+            live.sort(key=lambda x: not re.search(r"supply|forward|fremløb|fremlob|vorlauf|return|retur|rücklauf", x, re.I))
+            for x in live:
                 a = states[x].get("attributes") or {}
                 text = f"{x} {a.get('friendly_name', '')}"
                 if pat.search(text) and (cls is None or a.get("device_class") == cls) and \
@@ -82,6 +88,12 @@ class Cooling:
     def see(self, meter: dict[str, str] | None, states: dict[str, Any], now: datetime) -> dict[str, Any] | None:
         if not meter:
             return None
+        if self.s.get("_meter") != meter["supply"]:
+            # Another sensor than before (or the wrong one was used): what was kept is not this meter's.
+            for k in [k for k in self.s if not k.startswith("_")]:
+                self.s.pop(k, None)
+            self.s["_meter"] = meter["supply"]
+            self._vol = None
         sup, ret = _num(states, meter["supply"]), _num(states, meter["return"])
         if sup is None or ret is None:
             return None
@@ -96,7 +108,7 @@ class Cooling:
         day["w"] += weight
         day["wdt"] += weight * (sup - ret)
         day["wret"] += weight * ret
-        for old in sorted(self.s)[:-400]:
+        for old in sorted(k for k in self.s if not k.startswith("_"))[:-400]:
             self.s.pop(old, None)
         return {"supply": sup, "return": ret, "now": round(sup - ret, 1)}
 
@@ -106,7 +118,7 @@ class Cooling:
 
     def summary(self, now: datetime, need: float | None, penalty: float | None, bonus: float | None) -> dict[str, Any]:
         today = now.date().isoformat()
-        days = sorted(self.s)
+        days = sorted(k for k in self.s if not k.startswith("_"))
         year = [d for d in days if d.startswith(str(now.year))]
         out = {"today": self.period([today]), "week": self.period(days[-7:]), "year": self.period(year), "need": need}
         if need is not None and out["year"] is not None:

@@ -53,3 +53,20 @@ def test_price_levels_and_electric_rooms():
     assert plan.target(room, {}, {}, NOW, False, None, price="dear")["temp"] == 20.0
     assert supply.is_electric({"heating": "heatpump"}) and supply.is_electric({"thermostats": [{"platform": "melcloud"}]})
     assert not supply.is_electric({"heating": "radiator", "thermostats": [{"platform": "mqtt"}]})
+
+
+def test_never_a_monthly_average_kamstrup_reader():
+    ids = ["sensor.k_avg_temperature_1_month", "sensor.k_avg_temperature_2_month", "sensor.k_temperature_1_supply",
+           "sensor.k_temperature_2_return", "sensor.k_avg_temperature_1_year", "sensor.k_volume"]
+    ents = [{"entity_id": e, "device_id": "k"} for e in ids]
+    st = {e: s(50, "temperature") for e in ids[:5]} | {"sensor.k_volume": s(1, None, "m³")}
+    m = supply.find_heat_meter(ents, [{"id": "k", "manufacturer": "Smart Gateways", "model": "Kamst-IR"}], st)
+    assert m["supply"] == "sensor.k_temperature_1_supply" and m["return"] == "sensor.k_temperature_2_return"
+
+
+def test_kept_cooling_starts_over_with_another_sensor():
+    state = {}
+    c = supply.Cooling(state)
+    c.see({"supply": "a", "return": "r"}, {"a": s(65), "r": s(37)}, NOW)
+    c.see({"supply": "b", "return": "r2"}, {"b": s(66), "r2": s(34)}, NOW)
+    assert c.summary(NOW, 25, None, None)["today"] == 32.0
