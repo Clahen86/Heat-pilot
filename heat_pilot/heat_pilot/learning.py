@@ -161,7 +161,12 @@ class Learning:
         dh_week = sum(sum(self.s["saved"][d].values()) for d in week)
         ot = [self.s["ontime"].get(r) for r in rooms if self.s["ontime"].get(r)]
         ok, n = sum(x["ok"] for x in ot), sum(x["n"] for x in ot)
-        return {"today_dh": round(sum(today.values()), 1), "week_dh": round(dh_week, 1), "days": len(week),
+        hours_today = max(1.0, now.hour + now.minute / 60)
+        n = max(1, len(rooms))
+        dh_today = sum(today.values())
+        return {"today_dh": round(dh_today, 1), "week_dh": round(dh_week, 1), "days": len(week),
+                # In plain words: about how much cooler the rooms were on average, and what that saves.
+                "today_avg_down": round(dh_today / (hours_today * n), 1), "today_pct": round(dh_today / (hours_today * n) * 6),
                 # Rule of thumb: each degree lower for a day saves about 6 % of the heating that day.
                 "week_pct": round(dh_week / (24 * max(1, len(week)) * max(1, len(rooms))) * 6, 1) if week else None,
                 "ontime": round(100 * ok / n) if n else None, "ontime_n": n}

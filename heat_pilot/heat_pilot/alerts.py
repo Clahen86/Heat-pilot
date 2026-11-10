@@ -121,7 +121,7 @@ TEXT = {
            "battery": "{device} har {level} % tilbage – skift batteriet.",
            "not_warming": "{room} bliver ikke varmt ({temp}° af {want}°). Måske luft i radiatoren eller en ventil, der sidder fast.",
            "cooling": "Fjernvarmen: afkøling {today}° i dag – kravet er {need}°. Tjek om nogle radiatorer står helt åbne.",
-           "monthly": "Varmepilot i {month}: sænket {degree_hours} gradtimer – ca. {pct} % mindre varme. Varmt til tiden: {ontime} %.",
+           "monthly": "Varmepilot i {month}: ca. {pct} % mindre varme end uden. Rummene var varme til tiden {ontime} % af gangene.",
            "title": "Varmepilot"},
     "en": {"mold": "Mould risk in {room}: {hum} % humidity. Air it out and keep the room warmer.",
            "air": "Stale air in {room} ({co2} ppm CO₂). Open a window for a few minutes.",
@@ -130,7 +130,7 @@ TEXT = {
            "battery": "{device} has {level} % left – change the battery.",
            "not_warming": "{room} isn't getting warm ({temp}° of {want}°). Maybe air in the radiator or a stuck valve.",
            "cooling": "District heating: cooling {today}° today – required is {need}°. Check for radiators fully open.",
-           "monthly": "Heat Pilot in {month}: turned down {degree_hours} degree-hours – about {pct} % less heat. Warm on time: {ontime} %.",
+           "monthly": "Heat Pilot in {month}: about {pct} % less heat than without. Rooms were warm on time {ontime} % of the time.",
            "title": "Heat Pilot"},
 }
 

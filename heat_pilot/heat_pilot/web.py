@@ -54,6 +54,48 @@ def make_app(pilot) -> web.Application:
         pilot.tick()
         return web.json_response({"ok": True})
 
+    async def history(req: web.Request) -> web.Response:
+        """A room's last 24 hours (the room temperature, every 15 minutes) and its plan for the next 24."""
+        from datetime import datetime, timedelta
+        from zoneinfo import ZoneInfo
+
+        area = req.query.get("area", "")
+        room = next((r for r in pilot.rooms() if r["area_id"] == area), None)
+        if not room:
+            return web.json_response({"past": [], "plan": []})
+        tz = ZoneInfo(pilot.ha.config.get("time_zone") or "UTC")
+        end = datetime.now(tz)
+        start = end - timedelta(hours=24)
+        past: list = []
+        e = room.get("temp_sensor") or (room["thermostats"][0]["entity_id"] if room["thermostats"] else None)
+        if e:
+            try:
+                rows = (await pilot.ha.history(e, start, end) or [[]])[0]
+            except Exception:  # noqa: BLE001
+                rows = []
+            pts = []
+            for h in rows:
+                v = h.get("state") if e.startswith("sensor.") else (h.get("attributes") or {}).get("current_temperature")
+                try:
+                    pts.append((datetime.fromisoformat(h["last_changed"]).astimezone(tz), float(v)))
+                except (TypeError, ValueError, KeyError):
+                    continue
+            # One value per quarter hour: the last known one.
+            t, i, last = start.replace(minute=start.minute // 15 * 15, second=0, microsecond=0), 0, None
+            while t <= end:
+                while i < len(pts) and pts[i][0] <= t:
+                    last = pts[i][1]
+                    i += 1
+                if last is not None:
+                    past.append({"t": t.isoformat(), "temp": round(last, 2)})
+                t += timedelta(minutes=15)
+        return web.json_response({"past": past, "plan": pilot.timelines.get(area) or []})
+
+    async def setup(req: web.Request) -> web.Response:
+        pilot.settings["setup_done"] = bool((await req.json()).get("done", True))
+        pilot.save()
+        return web.json_response({"ok": True})
+
     async def rediscover(_req: web.Request) -> web.Response:
         await pilot.discover()
         pilot.tick()
@@ -77,5 +119,7 @@ def make_app(pilot) -> web.Application:
     app.router.add_post("/api/ventilation", vent)
     app.router.add_post("/api/messages", messages)
     app.router.add_post("/api/tune", tune)
+    app.router.add_get("/api/history", history)
+    app.router.add_post("/api/setup", setup)
     app.router.add_get("/api/diagnostics", diagnostics)
     return app

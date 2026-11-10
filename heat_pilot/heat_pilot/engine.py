@@ -483,7 +483,8 @@ class Pilot:
             n = self.now.get(r["area_id"]) or {}
             rooms.append({k: r[k] for k in ("area_id", "name", "kind", "heating", "temp_sensor", "temp_options", "windows",
                                             "presence", "humidity", "excluded", "fixed_hours", "owner", "floor_id", "doors", "doors_extra", "comfort_learned") if k in r}
-                         | {"heat_type": r["heating"], "cfg": r["cfg"], "thermostats": [{k: t[k] for k in ("entity_id", "name", "brand", "platform", "model")}
+                         | {"heat_type": r["heating"], "cfg": r["cfg"],
+                            "temp_names": {e: ((self.ha.states.get(e) or {}).get("attributes") or {}).get("friendly_name") or e for e in r.get("temp_options") or []}, "thermostats": [{k: t[k] for k in ("entity_id", "name", "brand", "platform", "model")}
                                                              for t in r["thermostats"]]} | n)
         a = self.agree
         tz = ZoneInfo(self.ha.config.get("time_zone") or "UTC")
@@ -492,7 +493,7 @@ class Pilot:
             room["timeline"] = self.timelines.get(room["area_id"]) or []
         out_t = self.outdoor()
         sun = (self.ha.states.get("sun.sun") or {}).get("state")
-        return {"all_doors": [{"entity_id": e, "name": (self.ha.states.get(e) or {}).get("attributes", {}).get("friendly_name") or e} for e in self.all_doors],
+        return {"setup_done": bool(self.settings.get("setup_done")), "all_doors": [{"entity_id": e, "name": (self.ha.states.get(e) or {}).get("attributes", {}).get("friendly_name") or e} for e in self.all_doors],
                 "arm": getattr(self, "arm", None), "cold_snap": getattr(self, "cold_snap", False), "tune": features.tune_view(self.settings), "month": self.month_report(now), "floors": self.floors, "sun": sun, "rooms": rooms, "unplaced": self.unplaced, "away": getattr(self, "away", False), "now": now.isoformat(),
                 "agree": round(100 * a["same"] / a["checks"]) if a["checks"] else None, "outdoor": out_t,
                 "learning": self.learning.summary(now, [r["area_id"] for r in rooms if not r.get("excluded")]),

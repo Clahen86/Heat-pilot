@@ -103,15 +103,16 @@
   .learn { display:grid; gap:8px; }
   .lrow { display:flex; justify-content:space-between; gap:10px; font-size:13.5px; padding:8px 0; border-top:1px solid var(--line); }
   .lrow:first-child { border-top:0; } .lrow b { font-weight:600; } .lrow span { color:var(--muted); text-align:right; }
-  .tl { display:grid; grid-template-columns:96px 1fr; gap:8px 10px; align-items:center; }
-  .tl .nm { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .bars { position:relative; height:22px; border-radius:7px; overflow:hidden; display:flex; background:var(--surface2); }
-  .bars i { display:block; height:100%; }
+  .tl { display:grid; grid-template-columns:112px 1fr; gap:10px 10px; align-items:center; }
+  .tl .nm { font-size:12.5px; font-weight:600; line-height:1.2; cursor:pointer; overflow-wrap:anywhere; }
+  .bars { position:relative; height:28px; border-radius:8px; overflow:hidden; display:flex; background:var(--surface2); cursor:pointer; }
+  .bars i { display:flex; align-items:center; justify-content:center; height:100%; font-style:normal; }
+  .bars em { font-style:normal; font-size:10.5px; font-weight:700; color:var(--text); opacity:.85; }
   .nowline { position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--text); border-radius:1px; }
-  .axis { display:flex; justify-content:space-between; font-size:10.5px; color:var(--faint); margin-left:106px; margin-top:4px; }
+  .axis { display:flex; justify-content:space-between; font-size:10.5px; color:var(--faint); margin-left:122px; margin-top:6px; }
   .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-top:14px; }
   .legend i { display:inline-block; width:12px; height:12px; border-radius:4px; margin-right:6px; vertical-align:-2px; }
-  @media (max-width:520px) { .metrics { grid-template-columns:1fr 1fr; } .tl { grid-template-columns:74px 1fr; } .axis { margin-left:84px; } }
+  @media (max-width:520px) { .metrics { grid-template-columns:1fr 1fr; } .tl { grid-template-columns:84px 1fr; } .axis { margin-left:94px; } }
   .toggle { width:46px; height:28px; border-radius:14px; background:var(--surface2); border:1px solid var(--line2); position:relative; cursor:pointer; flex:none; transition:background .2s; }
   .toggle::after { content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:var(--muted); transition:all .2s; }
   .toggle.on { background:var(--accent); border-color:var(--accent); } .toggle.on::after { left:21px; background:#fff; }
@@ -121,6 +122,23 @@
   .stepper { display:flex; align-items:center; gap:6px; }
   .stepper button { width:34px; height:34px; border-radius:10px; border:1px solid var(--line2); background:var(--surface2); color:var(--text); font-size:18px; font-weight:600; cursor:pointer; }
   .stepper b { min-width:52px; text-align:center; font-size:16px; }
+  .rtop { display:flex; align-items:flex-end; gap:16px; margin:14px 0 10px; }
+  .rtop .now { font-size:42px; }
+  .whybox { border-left:3px solid var(--c); background:color-mix(in srgb, var(--c) 10%, transparent); border-radius:10px; padding:10px 12px; display:flex; flex-direction:column; gap:2px; }
+  .whybox b { color:var(--c); font-size:14px; } .whybox span { font-size:13.5px; color:var(--text); }
+  .chart { background:var(--surface2); border-radius:14px; padding:8px; }
+  .guide { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; padding:16px;
+    background:color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter:blur(10px); }
+  .guide.open { display:flex; }
+  .gbox { background:var(--surface); border:1px solid var(--line2); border-radius:26px; padding:26px 22px 20px; max-width:440px; width:100%; max-height:90vh; overflow:auto; animation:fadein .3s ease both; }
+  .gbox h2 { margin:10px 0 8px; font-size:22px; letter-spacing:-.02em; } .gbox p { margin:0 0 10px; line-height:1.5; }
+  .gicon { width:52px; height:52px; border-radius:16px; display:grid; place-items:center; font-size:24px; color:var(--c, var(--accent));
+    background:color-mix(in srgb, var(--c, var(--accent)) 15%, transparent); } .gicon .flame { width:28px; height:28px; }
+  .gchips { display:flex; gap:6px; flex-wrap:wrap; } .gchips .chipb { cursor:default; }
+  .glist { display:grid; gap:6px; margin-bottom:10px; } .glist div { display:flex; justify-content:space-between; gap:10px; padding:8px 10px; border-radius:10px; background:var(--surface2); font-size:13.5px; }
+  .glist span { color:var(--muted); text-align:right; }
+  .gdots { display:flex; gap:6px; justify-content:center; margin:16px 0 4px; } .gdots i { width:7px; height:7px; border-radius:50%; background:var(--line2); } .gdots i.on { background:var(--accent); width:20px; border-radius:4px; }
+  .gbtns { display:flex; gap:8px; } .gbtns .btn { margin-top:10px; }
   .alert { display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-top:1px solid var(--line); }
   .alert:first-of-type { border-top:0; padding-top:0; }
   .alert .ai { width:26px; height:26px; flex:none; border-radius:9px; display:grid; place-items:center; font-weight:800; color:var(--warn); background:color-mix(in srgb, var(--warn) 16%, transparent); }
@@ -140,6 +158,7 @@
   <div id="app"></div>
 </main>
 <div class="sheet" id="sheet"><div class="box" id="sheetbox"></div></div>
+<div class="guide" id="guide"></div>
 <script>
 const HA_LANG = "__HA_LANG__";
 const L = ((HA_LANG.startsWith("__") ? navigator.language : HA_LANG) || "en").slice(0, 2) === "da" ? "da" : "en";
@@ -189,7 +208,7 @@ Object.assign(T, L === "da" ? {
   aTitle: "Værd at vide", mTitle: "Beskeder", mH: "Advarslerne vises altid her. Vælg, om de også skal sendes som besked – og hvilke.",
   mTo: "Send til", mNobody: "Ingen valgt – vises kun i appen", mNight: "Også om natten (22–7)",
   akinds: { mold: "Skimmelrisiko", air: "Luft ud (CO₂)", window: "Vindue åbent længe", offline: "Termostat svarer ikke", battery: "Lavt batteri", not_warming: "Rum bliver ikke varmt", cooling: "Fjernvarme-afkøling", monthly: "Månedsrapport" },
-  repTitle: "Sidste måned", repText: "Sænket {dh} gradtimer – ca. {pct} % mindre varme. Varmt til tiden: {ot}.",
+  repTitle: "Sidste måned", repText: "Ca. {pct} % mindre varme end uden Varmepilot. Varmt til tiden: {ot}.",
   vTitle: "Ventilation", vLevels: { low: "Lav", normal: "Normal", high: "Høj", boost: "Boost" }, vNow: "Står på", vWant: "Ville sætte",
   vWhy: { shower: "Bad – fjerner fugten", co2: "Høj CO₂", humidity: "Høj fugt", free_cooling: "Gratis køling udefra", away: "Alle er ude", normal: "Normal drift" },
   vEff: "Varmegenvinding", vBypass: "Bypass", vOpen: "åben", vClosed: "lukket", vOut: "Ude", vSup: "Ind", vExt: "Ud af rum", vExh: "Ud af hus",
@@ -234,7 +253,7 @@ Object.assign(T, L === "da" ? {
   aTitle: "Worth knowing", mTitle: "Messages", mH: "Warnings are always shown here. Choose whether they are also sent as messages – and which.",
   mTo: "Send to", mNobody: "None chosen – only shown in the app", mNight: "Also at night (22–7)",
   akinds: { mold: "Mould risk", air: "Air it out (CO₂)", window: "Window open long", offline: "Thermostat not responding", battery: "Low battery", not_warming: "Room not getting warm", cooling: "District heating cooling", monthly: "Monthly report" },
-  repTitle: "Last month", repText: "Turned down {dh} degree-hours – about {pct} % less heat. Warm on time: {ot}.",
+  repTitle: "Last month", repText: "About {pct} % less heat than without Heat Pilot. Warm on time: {ot}.",
   vTitle: "Ventilation", vLevels: { low: "Low", normal: "Normal", high: "High", boost: "Boost" }, vNow: "Set now", vWant: "Would set",
   vWhy: { shower: "Shower – removing the humidity", co2: "High CO₂", humidity: "High humidity", free_cooling: "Free cooling from outside", away: "Everyone is out", normal: "Normal" },
   vEff: "Heat recovery", vBypass: "Bypass", vOpen: "open", vClosed: "closed", vOut: "Outdoor", vSup: "Supply", vExt: "Extract", vExh: "Exhaust",
@@ -256,6 +275,7 @@ Object.assign(T, L === "da" ? {
   lossTxt: "loses about {x}° an hour when it's cold", sunTxt: "the sun gives up to {x}° an hour", arm: { normal: "Normal heating", early: "Early heating", gentle: "Gentle heating" }, armToday: "Today it tries", coldSnap: "Cold weather coming – starting earlier", fixed: "Use fixed hours", fixedH: "Instead of the learned ones",
 });
 Object.assign(T.why, T.why2);
+Object.assign(T, {"da": {"mSaved2": "Sparet i dag", "mSaved2S": "Rummene var i snit {x}° køligere, når de ikke blev brugt", "g1": "Velkommen til Varmepilot", "g1t": "Vi har kigget dit hjem igennem og fundet {n} rum med {t} termostater.", "g1f": "Det kan den hos dig:", "g2": "Altid i skygge først", "g2t": "Varmepilot viser, hvad den ville gøre i hvert rum – men rører ingen termostater, før du selv slår styring til. Så kan du se, om du er enig først.", "g3": "Ser rummene rigtige ud?", "g3t": "Tryk på et rum senere for at rette rumtype, føler eller temperaturer.", "next": "Næste", "back": "Tilbage", "go": "Kom i gang", "roomNow": "Nu", "roomWant": "Mål", "dayChart": "Sidste døgn og de næste 24 timer", "chartPast": "Målt", "chartPlan": "Planen", "settingsT": "Indstillinger for rummet", "devicesT": "Termostater", "whyLong": {"comfort": "Rummet bruges nu, så det holdes på komfort.", "comfort_evening": "Det er aften, så rummet holdes på aften-komfort.", "setback": "Ingen bruger rummet lige nu, så det er sænket for at spare.", "night": "Det er nat, så rummet er sænket.", "away": "Alle er ude, så hele huset er sænket.", "window": "Et vindue står åbent, så varmen er slukket.", "manual": "Nogen har skruet på termostaten – deres temperatur holdes et stykke tid.", "preheat": "Rummet varmes op nu, så det er varmt, når det skal bruges.", "occupied": "Der er nogen i rummet, så det får komfort.", "shower": "Der er lige taget bad, så badeværelset holdes varmt.", "sun": "Solen varmer rummet gratis, så opvarmningen venter.", "summer": "Det er sommer, så varmen er slukket.", "holiday": "Ferie – huset holdes køligt, til I kommer hjem.", "owner_away": "Personen, der bor her, er ude – rummet er sænket.", "spread": "Rummet varmes langsomt op for at give fjernvarmen god afkøling.", "cheap": "Strømmen er billig nu, så rummet får lidt ekstra varme.", "dear": "Strømmen er dyr nu, så rummet er en anelse køligere.", "cooling": "Ventilationen køler huset, så varmen holder sig væk.", "floor": "Der er nogen på etagen, så gulvvarmen holdes varm.", "hold": "Kun en kort pause, før rummet bruges igen – det betaler sig ikke at sænke.", "door": "En dør står åben, så rummet er lidt lavere.", "buffer": "Gulvet tager ekstra varme for at hjælpe fjernvarmens afkøling."}}, "en": {"mSaved2": "Saved today", "mSaved2S": "Rooms were {x}° cooler on average when not in use", "g1": "Welcome to Heat Pilot", "g1t": "We looked through your home and found {n} rooms with {t} thermostats.", "g1f": "What it can do in your home:", "g2": "Always in shadow first", "g2t": "Heat Pilot shows what it would do in each room – but touches no thermostat until you turn control on yourself. So you can see if you agree first.", "g3": "Do the rooms look right?", "g3t": "Tap a room later to change its kind, sensor or temperatures.", "next": "Next", "back": "Back", "go": "Get started", "roomNow": "Now", "roomWant": "Target", "dayChart": "The last day and the next 24 hours", "chartPast": "Measured", "chartPlan": "The plan", "settingsT": "Room settings", "devicesT": "Thermostats", "whyLong": {"comfort": "The room is in use, so it's kept at comfort.", "comfort_evening": "It's evening, so the room is at evening comfort.", "setback": "Nobody uses the room right now, so it's turned down to save.", "night": "It's night, so the room is turned down.", "away": "Everyone is out, so the whole house is turned down.", "window": "A window is open, so the heating is off.", "manual": "Someone turned the thermostat – their temperature is kept for a while.", "preheat": "The room is heating up now, so it's warm when it's used.", "occupied": "Someone is in the room, so it gets comfort.", "shower": "Someone just showered, so the bathroom is kept warm.", "sun": "The sun warms the room for free, so heating waits.", "summer": "It's summer, so heating is off.", "holiday": "Holiday – the house is kept cool until you're back.", "owner_away": "The person who lives here is out – the room is turned down.", "spread": "The room warms slowly to give the district heating good cooling.", "cheap": "Power is cheap now, so the room gets a little extra heat.", "dear": "Power is dear now, so the room is a touch cooler.", "cooling": "The ventilation cools the house, so heating keeps out of it.", "floor": "Someone is on this floor, so the floor heating stays warm.", "hold": "Only a short break before the room is used again – turning down wouldn't pay.", "door": "A door is open, so the room is a little lower.", "buffer": "The floor takes extra heat to help the district heating's cooling."}}}[L]);
 T.heating = T.heating3;
 document.getElementById("title").textContent = L === "da" ? "Varmepilot" : "Heat Pilot";
 document.getElementById("mode").textContent = T.shadow;
@@ -263,7 +283,8 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 const num = (v, d = 1) => v == null ? "–" : Number(v).toFixed(d).replace(".", L === "da" ? "," : ".");
 const api = (p, body) => fetch(p.replace(/^\//, ""), body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}).then((r) => r.json());
 const COL = { comfort_evening: "var(--heat)", floor: "var(--heat)", hold: "var(--heat)", door: "var(--cool)", buffer: "#ffb347", cooling: "var(--cool)", spread: "#ffb347", cheap: "var(--ok)", dear: "var(--cool)", summer: "#f5c451", holiday: "var(--cool)", owner_away: "var(--cool)", shower: "#ff9f6e", sun: "#f5c451", comfort: "var(--heat)", preheat: "#ffb347", occupied: "var(--heat)", setback: "var(--cool)", night: "#8b7bff", away: "var(--cool)", window: "var(--off)", manual: "var(--warn)" };
-let tab = location.hash.slice(1) || "now";
+let tab = location.hash.slice(1) || "now", openFirst = null;
+if (tab.startsWith("room=")) { openFirst = decodeURIComponent(tab.slice(5)); tab = "rooms"; }
 const FLAME = `<svg class="flame" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c2.5 3.5 6 6 6 11a6 6 0 0 1-12 0c0-2.4 1.2-3.9 2.4-5 0 2.3 1.2 3.6 2.4 3.6 0-3.6-1.2-6 1.2-9.6z"/></svg>`;
 let data = null;
 
@@ -415,7 +436,7 @@ function nowTab(rooms) {
     ${(data.alerts || []).length ? `<div class="card"><p class="eyebrow">${T.aTitle}</p>${data.alerts.map((a) => `<div class="alert"><span class="ai">!</span><div><b>${esc(T.akinds[a.kind] || a.kind)}</b><div class="muted">${esc(a.text)}</div></div></div>`).join("")}</div>` : ""}
     <div class="card house">${houseSvg(rooms)}</div>
     <div class="metrics">
-      <div class="metric"><div class="lbl">${T.mSaved}</div><div class="v">${num(lg.today_dh)}<small>${T.dh}</small></div><div class="s">${lg.week_pct != null ? T.mSavedS.replace("{x}", num(lg.week_pct, 0)) : ""}</div></div>
+      <div class="metric"><div class="lbl">${T.mSaved2}</div><div class="v">≈ ${lg.today_pct ?? 0}<small>%</small></div><div class="s">${T.mSaved2S.replace("{x}", num(lg.today_avg_down ?? 0, 1))}</div></div>
       <div class="metric"><div class="lbl">${T.mOnTime}</div><div class="v">${lg.ontime != null ? lg.ontime + "<small>%</small>" : "–"}</div><div class="s">${lg.ontime_n ? T.mOnTimeS.replace("{n}", lg.ontime_n) : T.learning}</div></div>
       <div class="metric"><div class="lbl">${T.mHeating}</div><div class="v">${heating}</div><div class="s">${T.mHeatingS.replace("{n}", rooms.length)}</div></div>
       <div class="metric"><div class="lbl">${T.mOut}</div><div class="v">${num(data.outdoor)}<small>°</small></div><div class="s">${T.mOutS}</div></div>
@@ -427,23 +448,49 @@ function nowTab(rooms) {
     <div class="card"><p class="eyebrow">${T.learned}</p>${data.arm ? `<p class="muted" style="margin:-4px 0 8px">${T.armToday}: ${esc(T.arm[data.arm] || data.arm)}${data.cold_snap ? " · " + T.coldSnap : ""}</p>` : ""}<div class="learn">${learnRows}</div></div>`;
 }
 function planTab(rooms) {
-  const now = new Date(data.now);
+  const used = new Set();
   const rowsHtml = rooms.map((r) => {
     const tl = r.timeline || [];
     const runs = [];
     tl.forEach((q) => { const last = runs[runs.length - 1]; if (last && last.why === q.why && last.temp === q.temp) last.n++; else runs.push({ ...q, n: 1 }); });
-    const segs = runs.map((q) => `<i style="width:${100 * q.n / tl.length}%;background:color-mix(in srgb, ${COL[q.why] || "var(--heat)"} ${q.why === "comfort" ? 85 : q.why === "preheat" ? 70 : 35}%, transparent)" title="${hhmm(q.t)} ${num(q.temp)}°"></i>`).join("");
-    return `<div class="nm">${esc(r.name)}</div><div class="bars">${segs}<span class="nowline" style="left:0"></span></div>`;
+    runs.forEach((q) => used.add(q.why));
+    const segs = runs.map((q) => {
+      const strong = ["comfort", "preheat", "comfort_evening", "floor"].includes(q.why);
+      return `<i style="width:${100 * q.n / tl.length}%;background:color-mix(in srgb, ${COL[q.why] || "var(--heat)"} ${strong ? 80 : 32}%, transparent)" title="${hhmm(q.t)} ${num(q.temp)}°">${q.n >= 10 ? `<em>${num(q.temp, q.temp % 1 ? 1 : 0)}°</em>` : ""}</i>`;
+    }).join("");
+    return `<div class="nm" data-room="${esc(r.area_id)}">${esc(r.name)}</div><div class="bars" data-room="${esc(r.area_id)}">${segs}<span class="nowline" style="left:0"></span></div>`;
   }).join("");
-  const t0 = now.getHours();
-  const ticks = [0, 6, 12, 18, 24].map((h) => `<span>${String((t0 + h) % 24).padStart(2, "0")}</span>`).join("");
-  const legend = ["comfort", "preheat", "setback", "night"].map((k) => `<span><i style="background:${COL[k]}"></i>${esc(T.why[k])}</span>`).join("");
+  const first = (rooms.find((r) => (r.timeline || []).length) || {}).timeline || [];
+  const t0 = first.length ? new Date(first[0].t) : new Date();
+  const ticks = [0, 6, 12, 18, 24].map((h) => { const d = new Date(t0.getTime() + h * 3600e3); return `<span>${h === 0 ? (L === "da" ? "nu" : "now") : String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")}</span>`; }).join("");
+  const legend = ["comfort", "preheat", "setback", "night", "away", "spread", "cheap", "dear"].filter((k) => used.has(k)).map((k) => `<span><i style="background:${COL[k]}"></i>${esc(T.why[k])}</span>`).join("");
   return `<div class="card"><p class="eyebrow">${T.planTitle}</p><p class="muted" style="margin:-4px 0 14px">${T.planHint}</p>
     <div class="tl">${rowsHtml}</div><div class="axis">${ticks}</div><div class="legend">${legend}</div></div>`;
+}
+let gstep = 0;
+function guide() {
+  const g = document.getElementById("guide");
+  if (!data || data.setup_done || !data.rooms.length) { g.classList.remove("open"); return; }
+  const rooms = data.rooms.filter((r) => !r.excluded), nT = rooms.reduce((s, r) => s + r.thermostats.length, 0);
+  const feats = Object.keys(data.features || {}).map((k) => `<span class="chipb on">${esc((T.feat[k] || [k])[0])}</span>`).join("");
+  const pages = [
+    `<div class="gicon">${FLAME}</div><h2>${T.g1}</h2><p>${T.g1t.replace("{n}", rooms.length).replace("{t}", nT)}</p><p class="muted">${T.g1f}</p><div class="gchips">${feats}</div>`,
+    `<div class="gicon" style="--c:var(--warn)">◐</div><h2>${T.g2}</h2><p>${T.g2t}</p>`,
+    `<div class="gicon" style="--c:var(--ok)">✓</div><h2>${T.g3}</h2><div class="glist">${rooms.map((r) => `<div><b>${esc(r.name)}</b><span>${esc(T.kinds[r.kind] || r.kind)} · ${esc(T.heating[r.heat_type] || "")} · ${r.temp != null ? num(r.temp) + "°" : "–"}</span></div>`).join("")}</div><p class="muted">${T.g3t}</p>`,
+  ];
+  g.innerHTML = `<div class="gbox">${pages[gstep]}<div class="gdots">${pages.map((_, i) => `<i class="${i === gstep ? "on" : ""}"></i>`).join("")}</div>
+    <div class="gbtns">${gstep ? `<button class="btn ghost" id="gback">${T.back}</button>` : ""}<button class="btn" id="gnext">${gstep < pages.length - 1 ? T.next : T.go}</button></div></div>`;
+  g.classList.add("open");
+  if (gstep) document.getElementById("gback").onclick = () => { gstep--; guide(); };
+  document.getElementById("gnext").onclick = async () => {
+    if (gstep < pages.length - 1) { gstep++; guide(); return; }
+    await api("/api/setup", { done: true }); data.setup_done = true; g.classList.remove("open");
+  };
 }
 function render() {
   const app = document.getElementById("app");
   if (!data) return;
+  guide();
   const rooms = data.rooms.filter((r) => !r.excluded);
   if (!data.rooms.length) {
     app.innerHTML = `<div class="card empty">${T.empty}<button class="btn" id="again">${T.search}</button></div>`;
@@ -482,6 +529,25 @@ function render() {
   document.querySelectorAll("[data-dh]").forEach((el) => el.onchange = async () => { await api("/api/district", { [el.dataset.dh]: el.value === "" ? null : Number(el.value.replace(",", ".")) }); load(); });
   document.querySelectorAll("[data-feat]").forEach((b) => b.onclick = async () => { await api("/api/feature", { key: b.dataset.feat, on: !b.classList.contains("on") }); load(); });
 }
+function roomChart(h, col) {
+  const past = (h.past || []).map((p) => ({ t: new Date(p.t).getTime(), v: p.temp }));
+  const plan = (h.plan || []).map((p) => ({ t: new Date(p.t).getTime(), v: p.temp }));
+  if (!past.length && !plan.length) return `<div class="muted">–</div>`;
+  const all = past.concat(plan), W = 520, H = 170, pl = 30, pr = 20, pt = 10, pb = 22;
+  const t0 = Math.min(...all.map((p) => p.t)), t1 = Math.max(...all.map((p) => p.t));
+  const vs = all.map((p) => p.v).filter((v) => v != null), lo = Math.floor(Math.min(...vs) - 0.5), hi = Math.ceil(Math.max(...vs) + 0.5);
+  const x = (t) => pl + (t - t0) / Math.max(1, t1 - t0) * (W - pl - pr), y = (v) => pt + (hi - v) / Math.max(0.5, hi - lo) * (H - pt - pb);
+  const line = (pts) => pts.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+  const step = (pts) => pts.map((p, i) => i ? `H${x(p.t).toFixed(1)} V${y(p.v).toFixed(1)}` : `M${x(p.t).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+  const now = Date.now(), grid = [];
+  for (let v = lo; v <= hi; v += Math.max(1, Math.round((hi - lo) / 4))) grid.push(`<line x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${pl - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="var(--faint)">${v}°</text>`);
+  const ticks = [];
+  for (let k = 0; k <= 4; k++) { const t = t0 + (t1 - t0) * k / 4, d = new Date(t); ticks.push(`<text x="${x(t)}" y="${H - 6}" text-anchor="middle" font-size="10" fill="var(--faint)">${String(d.getHours()).padStart(2, "0")}:00</text>`); }
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${grid.join("")}${ticks.join("")}
+    ${plan.length ? `<path d="${step(plan)}" fill="none" stroke="${col}" stroke-width="2.5" stroke-dasharray="5 4"/>` : ""}
+    ${past.length ? `<path d="${line(past)}" fill="none" stroke="var(--text)" stroke-width="2"/>` : ""}
+    <line x1="${x(now)}" x2="${x(now)}" y1="${pt}" y2="${H - pb}" stroke="var(--accent)" stroke-width="1.5"/></svg>`;
+}
 function openRoom(id) {
   const r = data.rooms.find((x) => x.area_id === id), c = r.cfg;
   const seg = (key, opts, cur, labels) => `<div class="seg" data-seg="${key}">${opts.map((o) => `<button data-v="${o}" class="${cur === o ? "on" : ""}">${esc(labels[o])}</button>`).join("")}</div>`;
@@ -489,10 +555,18 @@ function openRoom(id) {
   const hourSel = (key, v) => `<select data-k="${key}">${Array.from({ length: 25 }, (_, h) => `<option value="${h}" ${Number(v) === h ? "selected" : ""}>${String(h).padStart(2, "0")}:00</option>`).join("")}</select>`;
   const now = (r.devices || []).map((d) => `${esc(d.name)}: ${d.state === "off" ? T.off : num(d.setpoint) + "°"}`).join("<br>");
   const calls = (r.calls || []).map((x) => `${x.domain}.${x.service} ${JSON.stringify(Object.fromEntries(Object.entries(x.data).filter(([k]) => k !== "entity_id")))}`).join("\n");
-  document.getElementById("sheetbox").innerHTML = `<h3>${esc(r.name)}</h3><p class="muted">${T.windows.replace("{n}", r.windows.length)} · ${T.presence.replace("{n}", r.presence.length)} · <span class="${r.same ? "agreeok" : "agreeno"}">${r.same ? T.same : T.diff}</span></p>
+  const w = r.want || {}, why = w.why || "comfort", col = COL[why] || "var(--heat)";
+  const top = `<div class="rtop"><div><div class="muted">${T.roomNow}</div><div class="now">${num(r.temp)}<small>°</small></div></div>
+      <div class="arrow" style="font-size:22px">→</div><div><div class="muted">${T.roomWant}</div><div class="now" style="color:${col}">${w.temp == null ? T.off : num(w.temp) + "<small>°</small>"}</div></div></div>
+    <div class="whybox" style="--c:${col}"><b>${esc(T.why[why] || why)}</b><span>${esc((T.whyLong || {})[why] || "")}${w.until && why !== "window" ? " " + (L === "da" ? "Gælder til kl. " : "Until ") + hhmm(w.until) + "." : ""}</span></div>
+    <p class="eyebrow" style="margin-top:16px">${T.dayChart}</p><div id="roomchart" class="chart"><div class="muted">…</div></div>
+    <div class="legend" style="margin-top:6px"><span><i style="background:var(--text)"></i>${T.chartPast}</span><span><i style="background:${col}"></i>${T.chartPlan}</span></div>
+    <p class="eyebrow" style="margin-top:18px">${T.devicesT}</p><div class="muted">${(r.devices || []).map((d) => `${esc(d.name)} · ${esc(d.brand)} · ${d.state === "off" ? T.off : num(d.setpoint) + "°"}${d.action === "heating" ? " 🔥" : ""}`).join("<br>")}</div>
+    <p class="eyebrow" style="margin-top:18px">${T.settingsT}</p>`;
+  document.getElementById("sheetbox").innerHTML = `<h3>${esc(r.name)}</h3><p class="muted">${T.windows.replace("{n}", r.windows.length)} · ${T.presence.replace("{n}", r.presence.length)} · <span class="${r.same ? "agreeok" : "agreeno"}">${r.same ? T.same : T.diff}</span></p>${top}
     <div class="row"><div class="t"><b>${T.kind}</b></div>${`<select data-k="kind">${Object.keys(T.kinds).map((k) => `<option value="${k}" ${r.kind === k ? "selected" : ""}>${esc(T.kinds[k])}</option>`).join("")}</select>`}</div>
     <div class="row"><div class="t"><b>${T.heat}</b></div>${seg("heating", ["radiator", "floor", "heatpump", "electric"], r.heat_type, T.heating)}</div>
-    <div class="row"><div class="t"><b>${T.sensor}</b><span>${T.sensorH}</span></div><select data-k="temp_sensor"><option value="">${T.none}</option>${(r.temp_options || []).map((e) => `<option value="${esc(e)}" ${r.temp_sensor === e ? "selected" : ""}>${esc(e)}</option>`).join("")}</select></div>
+    <div class="row"><div class="t"><b>${T.sensor}</b><span>${T.sensorH}</span></div><select data-k="temp_sensor"><option value="">${T.none}</option>${(r.temp_options || []).map((e) => `<option value="${esc(e)}" ${r.temp_sensor === e ? "selected" : ""}>${esc((r.temp_names || {})[e] || e)}</option>`).join("")}</select></div>
     <div class="row"><div class="t"><b>${T.comfort}</b><span>${T.comfortH}${r.comfort_learned ? " · " + T.learnedC : ""}</span></div>${numIn("comfort", c.comfort)}</div>
     <div class="row"><div class="t"><b>${T.eveningOn}</b><span>${T.eveningH}</span></div><input type="checkbox" data-evon ${c.evening != null ? "checked" : ""}></div>
     <div class="evrow" style="${c.evening != null ? "" : "display:none"}"><div class="row"><div class="t"><b>${T.evening}</b></div>${numIn("evening", c.evening ?? (c.comfort + 1))}</div>
@@ -509,6 +583,7 @@ function openRoom(id) {
     <button class="btn" id="save">${T.save}</button><button class="btn ghost" id="close">${T.close}</button>`;
   const sheet = document.getElementById("sheet");
   sheet.classList.add("open");
+  api("/api/history?area=" + encodeURIComponent(id)).then((h) => { const el = document.getElementById("roomchart"); if (el) el.innerHTML = roomChart(h, col); }).catch(() => {});
   const vals = {};
   sheet.querySelectorAll("[data-seg] button").forEach((b) => b.onclick = () => { const s = b.parentElement; s.querySelectorAll("button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); vals[s.dataset.seg] = b.dataset.v; });
   sheet.querySelectorAll("[data-door]").forEach((b) => b.onclick = () => {
@@ -528,7 +603,7 @@ function openRoom(id) {
   sheet.onclick = (e) => { if (e.target === sheet) sheet.classList.remove("open"); };
   document.getElementById("save").onclick = async () => { await api("/api/room", { area_id: id, ...vals }); sheet.classList.remove("open"); load(); };
 }
-async function load() { try { data = await api("/api/status"); render(); } catch (e) { /* tries again */ } }
+async function load() { try { data = await api("/api/status"); render(); if (openFirst) { const id = openFirst; openFirst = null; openRoom(id); } } catch (e) { /* tries again */ } }
 load();
 setInterval(() => { if (!document.getElementById("sheet").classList.contains("open")) load(); }, 30000);
 </script>

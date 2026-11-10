@@ -1,5 +1,5 @@
 name: Varmepilot
-version: "0.10.1"
+version: "0.11.0"
 slug: heat_pilot
 description: Varmen i hvert rum - finder selv termostater og følere, starter i skygge.
 url: https://github.com/Clahen86/heat-pilot

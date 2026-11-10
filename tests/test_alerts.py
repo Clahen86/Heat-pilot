@@ -60,4 +60,4 @@ def test_texts():
 
 def test_monthly_text():
     t = text({"kind": "monthly", "month": "2026-11", "degree_hours": 420, "pct": 8.5, "ontime": 92}, "da")
-    assert "420 gradtimer" in t and "8.5 %" in t
+    assert "8.5 %" in t and "gradtimer" not in t
