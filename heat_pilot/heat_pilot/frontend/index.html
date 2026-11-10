@@ -88,9 +88,9 @@
   .wave { fill:none; stroke:var(--heat); stroke-width:1.6; stroke-linecap:round; opacity:0; animation:rise 2.6s ease-in infinite; }
   .wave.w2 { animation-delay:.9s; } .wave.w3 { animation-delay:1.7s; }
   @keyframes rise { 0% { opacity:0; transform:translateY(6px); } 30% { opacity:.9; } 100% { opacity:0; transform:translateY(-12px); } }
-  .smoke { fill:var(--muted); opacity:0; animation:smoke 4s ease-out infinite; }
-  .smoke.s2 { animation-delay:1.3s; } .smoke.s3 { animation-delay:2.6s; }
-  @keyframes smoke { 0% { opacity:0; transform:translate(0, 10px) scale(.6); } 25% { opacity:.35; } 100% { opacity:0; transform:translate(14px, -26px) scale(1.6); } }
+  .smoke { fill:color-mix(in srgb, var(--muted) 70%, var(--text)); opacity:0; transform-box:fill-box; transform-origin:center; animation:smoke 4.8s ease-out infinite; }
+  .smoke.s2 { animation-delay:1.2s; } .smoke.s3 { animation-delay:2.4s; } .smoke.s4 { animation-delay:3.6s; }
+  @keyframes smoke { 0% { opacity:0; transform:translate(0, 4px) scale(.5); } 15% { opacity:.7; } 60% { opacity:.4; } 100% { opacity:0; transform:translate(16px, -34px) scale(2.1); } }
   .glow { opacity:.08; animation:glow 3s ease-in-out infinite; } @keyframes glow { 50% { opacity:.2; } }
   .tile { transition:transform .15s; transform-box:fill-box; transform-origin:center; } .tile:hover { transform:scale(1.02); }
   #app > * { animation:fadein .35s ease both; } @keyframes fadein { from { opacity:0; transform:translateY(6px); } }
@@ -374,14 +374,15 @@ function houseSvg(rooms) {
   });
   const H = y + 16, anyHeat = rooms.some((r) => r.heating), day = data.sun !== "below_horizon";
   const chx = bx + bw - 90;
-  const smoke = anyHeat ? [0, 1, 2].map((k) => `<circle class="smoke s${k + 1}" cx="${chx + 11}" cy="22" r="${5 + k * 2}"/>`).join("") : "";
+  const smoke = anyHeat ? [0, 1, 2, 3].map((k) => `<circle class="smoke s${k + 1}" cx="${chx + 11}" cy="30" r="7"/>`).join("") : "";
   const sx = narrow ? 22 : bx - 4;
   const sky = day ? `<circle cx="${sx}" cy="30" r="13" fill="#f5c451"/><circle cx="${sx}" cy="30" r="22" fill="#f5c451" opacity=".15"/>`
     : `<path d="M${sx + 2} 18 a13 13 0 1 0 10 22 a10 10 0 1 1 -10 -22z" fill="#c9d3ff"/>`;
   const out = data.outdoor != null ? `<text x="${sx + 22}" y="35" font-size="13" font-weight="650" fill="var(--muted)">${num(data.outdoor)}° ${L === "da" ? "ude" : "outside"}</text>` : "";
   const roof = `<defs><linearGradient id="roofg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".35"/><stop offset="1" stop-color="var(--accent)" stop-opacity=".06"/></linearGradient></defs>
-    <rect x="${chx}" y="34" width="22" height="46" rx="3" fill="var(--surface2)" stroke="var(--line2)" stroke-width="1.5"/>${smoke}
-    <path d="M${bx - (narrow ? 4 : 22)} ${roofH + 22} L${W / 2} 22 L${bx + bw + (narrow ? 4 : 22)} ${roofH + 22} Z" fill="url(#roofg)" stroke="var(--line2)" stroke-width="2" stroke-linejoin="round"/>`;
+    <path d="M${bx - (narrow ? 4 : 22)} ${roofH + 22} L${W / 2} 22 L${bx + bw + (narrow ? 4 : 22)} ${roofH + 22} Z" fill="url(#roofg)" stroke="var(--line2)" stroke-width="2" stroke-linejoin="round"/>
+    <rect x="${chx}" y="34" width="22" height="46" rx="3" fill="var(--surface2)" stroke="var(--line2)" stroke-width="1.5"/>
+    <rect x="${chx - 3}" y="31" width="28" height="6" rx="2" fill="var(--surface2)" stroke="var(--line2)" stroke-width="1.5"/>${smoke}`;
   const gl = ground != null ? `<line x1="0" x2="${W}" y1="${ground}" y2="${ground}" stroke="#8b6b4a" stroke-width="3" stroke-linecap="round" opacity=".7"/>` : "";
   return `<svg viewBox="0 0 ${W} ${H}">${sky}${out}${roof}${body}${gl}${tiles}</svg>`;
 }
