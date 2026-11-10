@@ -10,9 +10,10 @@ FRONTEND = Path(__file__).parent / "frontend"
 
 
 def make_app(pilot) -> web.Application:
-    async def index(_req: web.Request) -> web.Response:
-        """The page, in Home Assistant's own language (not the browser's)."""
-        lang = str(pilot.ha.config.get("language") or "en")[:2]
+    async def index(req: web.Request) -> web.Response:
+        """The page, in Home Assistant's own language (not the browser's) - or ?lang=de to see another."""
+        q = str(req.query.get("lang", ""))[:2]
+        lang = q if q in ("da", "en", "de", "fr", "nl", "sv", "nb") else pilot.lang()
         html = (FRONTEND / "index.html").read_text().replace("__HA_LANG__", lang)
         return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
 
@@ -75,7 +76,11 @@ def make_app(pilot) -> web.Application:
                 rows = []
             pts = []
             for h in rows:
-                v = h.get("state") if e.startswith("sensor.") else (h.get("attributes") or {}).get("current_temperature")
+                if e.startswith("sensor."):
+                    unit = ((pilot.ha.states.get(e) or {}).get("attributes") or {}).get("unit_of_measurement") or "°C"
+                    v = pilot.c(h.get("state"), unit)
+                else:
+                    v = pilot.c((h.get("attributes") or {}).get("current_temperature"))
                 try:
                     pts.append((datetime.fromisoformat(h["last_changed"]).astimezone(tz), float(v)))
                 except (TypeError, ValueError, KeyError):
@@ -94,6 +99,12 @@ def make_app(pilot) -> web.Application:
     async def setup(req: web.Request) -> web.Response:
         pilot.settings["setup_done"] = bool((await req.json()).get("done", True))
         pilot.save()
+        return web.json_response({"ok": True})
+
+    async def mode(req: web.Request) -> web.Response:
+        body = await req.json()
+        pilot.set_mode(body.get("area_id"), str(body.get("mode")))
+        pilot.tick()
         return web.json_response({"ok": True})
 
     async def rediscover(_req: web.Request) -> web.Response:
@@ -121,5 +132,6 @@ def make_app(pilot) -> web.Application:
     app.router.add_post("/api/tune", tune)
     app.router.add_get("/api/history", history)
     app.router.add_post("/api/setup", setup)
+    app.router.add_post("/api/mode", mode)
     app.router.add_get("/api/diagnostics", diagnostics)
     return app

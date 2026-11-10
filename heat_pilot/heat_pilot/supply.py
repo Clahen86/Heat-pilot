@@ -72,10 +72,15 @@ def find_heat_meter(entities: list[dict[str, Any]], devices: list[dict[str, Any]
 
 
 def _num(states: dict[str, Any], e: str | None) -> float | None:
+    """A number - a temperature in °F is turned into °C (supply/return in American homes)."""
+    s = states.get(e or "") or {}
     try:
-        return float((states.get(e or "") or {}).get("state"))
+        v = float(s.get("state"))
     except (TypeError, ValueError):
         return None
+    if "F" in str((s.get("attributes") or {}).get("unit_of_measurement") or "") and "°" in str((s.get("attributes") or {}).get("unit_of_measurement")):
+        v = (v - 32) * 5 / 9
+    return v
 
 
 class Cooling:

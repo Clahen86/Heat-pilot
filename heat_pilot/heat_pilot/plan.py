@@ -20,6 +20,8 @@ NIGHT = {"bedroom": 18.0, "bathroom": 19.0}
 DAY_HOURS = {"living": (6, 22), "kitchen": (6, 22), "bedroom": (6, 8), "kids": (6, 21), "bathroom": (5, 22),
              "office": (7, 18), "other": (6, 22)}
 SETBACK = 18.0
+NIGHT_FROM = 22  # night: from this hour …
+NIGHT_TO = 6     # … to this one (both chosen in the settings)
 AWAY = 17.0
 HOLIDAY = 15.0
 PRICE_FLEX = 1.0  # degrees up in the cheapest hours / down in the dearest (electric heating)
@@ -62,7 +64,7 @@ def base(c: dict[str, Any], hours: list[int] | None, t: datetime) -> tuple[float
             return float(ev), "evening"  # a warmer (or cooler) evening, e.g. the living room at 22° from 15 to 22
         return c["comfort"], "comfort"
     h = t.hour + t.minute / 60
-    return (c["night"], "night") if (h >= 22 or h < 6) else (c["setback"], "setback")
+    return (c["night"], "night") if (h >= NIGHT_FROM or h < NIGHT_TO) else (c["setback"], "setback")
 
 
 def next_comfort(c: dict[str, Any], hours: list[int] | None, now: datetime, within_h: int = 8) -> datetime | None:
@@ -101,13 +103,13 @@ def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], no
     t, why = base(c, hours, now)
     if why == "evening":
         why = "comfort_evening"
-    if x.get("floor_active") and room.get("heating") == "floor" and 6 <= now.hour < 22 and c["comfort"] > t:
+    if x.get("floor_active") and room.get("heating") == "floor" and NIGHT_TO <= now.hour < NIGHT_FROM and c["comfort"] > t:
         t, why = c["comfort"], "floor"  # floor heating is slow: warm while someone is on the same floor
     if x.get("hold_warm") and why in ("setback",) and c["comfort"] > t:
         t, why = c["comfort"], "hold"  # a short gap: setting back wouldn't pay (it hardly cools)
     if shower and c["comfort"] > t:
         t, why = c["comfort"], "shower"  # warm during and after the shower
-    elif occupied and why != "comfort" and 6 <= now.hour < 22 and c["comfort"] > t:
+    elif occupied and why != "comfort" and NIGHT_TO <= now.hour < NIGHT_FROM and c["comfort"] > t:
         t, why = c["comfort"], "occupied"  # someone is in the room now: comfort, whatever the plan said
     until = None
     if why in ("comfort", "comfort_evening"):

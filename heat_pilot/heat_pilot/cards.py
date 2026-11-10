@@ -50,8 +50,9 @@ class Publisher:
 
     async def publish(self, ha: Any, pilot: Any) -> None:
         st = pilot.status()
-        rooms = [{"area_id": r["area_id"], "name": r["name"], "sensor": r.get("temp_sensor"), "temp": r.get("temp"),
-                  "want": (r.get("want") or {}).get("temp"), "why": (r.get("want") or {}).get("why"), "heating": r.get("heating")}
+        conv = lambda v: None if v is None else pilot.out_unit(v)  # the card shows the home's own unit (°F in the US)
+        rooms = [{"area_id": r["area_id"], "name": r["name"], "sensor": r.get("temp_sensor"), "temp": conv(r.get("temp")),
+                  "want": conv((r.get("want") or {}).get("temp")), "why": (r.get("want") or {}).get("why"), "heating": r.get("heating")}
                  for r in st["rooms"] if not r.get("excluded")]
         attrs = {"friendly_name": "Varmepilot", "icon": "mdi:radiator", "rooms": rooms, "sentence": pilot.sentence(),
                  "mode": "shadow" if all(r.get("mode", "shadow") == "shadow" for r in st["rooms"]) else "control",

@@ -38,6 +38,7 @@ async def main() -> None:
                 if rounds % 30 == 0:
                     await pilot.refresh_forecast()
                 pilot.tick()
+                await pilot.control()  # only rooms turned to control - every room starts in shadow
                 await pilot.publish()
                 await pilot.send_alerts()
                 await pub.publish(ha, pilot)

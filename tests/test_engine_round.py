@@ -78,3 +78,46 @@ def test_a_whole_round(tmp_path):
     assert s["vent"]["level"] in ("low", "normal", "high", "boost") and s["cooling_now"]["now"] == 25.0
     assert s["persons"][0]["home"] and s["arm"] in ("normal", "early", "gentle")
     assert p.sentence()
+
+
+def test_shadow_sends_nothing_control_sends_once(tmp_path):
+    ha = FakeHA()
+    sent = []
+
+    async def call_service(domain, service, data, **k):
+        sent.append((domain, service, data))
+        ha.states[data["entity_id"]]["attributes"]["temperature"] = data.get("temperature", ha.states[data["entity_id"]]["attributes"].get("temperature"))
+
+    ha.call_service = call_service
+    p = Pilot(ha, tmp_path)
+    asyncio.run(p.discover())
+    p.tick()
+    asyncio.run(p.control())
+    assert sent == []  # every room starts in shadow
+    p.set_mode("stue", "control")
+    p.settings["rooms"] = {"stue": {"comfort": 23.0}}
+    p.tick()
+    asyncio.run(p.control())
+    temps = [d for _d, s, d in sent if s == "set_temperature"]
+    assert temps and temps[0]["entity_id"] == "climate.stue"
+    n = len(sent)
+    p.tick()
+    asyncio.run(p.control())
+    assert len(sent) == n  # nothing new to send: nothing sent
+    p.set_mode(None, "shadow")
+    assert p.mode("stue") == "shadow"
+
+
+def test_fahrenheit_home(tmp_path):
+    ha = FakeHA()
+    ha.config = {"time_zone": "America/New_York", "unit_system": {"temperature": "°F"}}
+    for e in ("climate.stue",):
+        ha.states[e]["attributes"].update(temperature=70, current_temperature=69, min_temp=41, max_temp=86, target_temp_step=1)
+    ha.states["sensor.stue_temp"] = {"state": "69.8", "attributes": {"device_class": "temperature", "unit_of_measurement": "°F"}, "last_changed": NOW.isoformat()}
+    p = Pilot(ha, tmp_path)
+    asyncio.run(p.discover())
+    p.tick()
+    r = {x["name"]: x for x in p.status()["rooms"]}["Stue"]
+    assert abs(r["temp"] - 21.0) < 0.1  # 69.8 °F = 21 °C inside
+    t = [c for c in r["calls"] if c["service"] == "set_temperature"][0]["data"]["temperature"]
+    assert t > 60  # sent in °F

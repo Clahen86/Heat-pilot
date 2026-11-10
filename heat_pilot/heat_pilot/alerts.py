@@ -134,6 +134,52 @@ TEXT = {
            "title": "Heat Pilot"},
 }
 
+TEXT["de"] = {"mold": "Schimmelgefahr in {room}: {hum} % Feuchte. Lüften und den Raum wärmer halten.",
+              "air": "Schlechte Luft in {room} ({co2} ppm CO₂). Ein paar Minuten lüften.",
+              "window": "Das Fenster in {room} ist seit {minutes} min offen. Die Heizung ist so lange aus.",
+              "offline": "{device} in {room} antwortet nicht. Batterie oder Verbindung prüfen.",
+              "battery": "{device} hat noch {level} % – Batterie wechseln.",
+              "not_warming": "{room} wird nicht warm ({temp}° von {want}°). Vielleicht Luft im Heizkörper oder ein klemmendes Ventil.",
+              "cooling": "Fernwärme: Auskühlung heute {today}° – gefordert sind {need}°. Prüfen, ob Heizkörper voll offen stehen.",
+              "monthly": "Heat Pilot im {month}: etwa {pct} % weniger Wärme als ohne. Rechtzeitig warm in {ontime} % der Fälle.",
+              "title": "Heat Pilot"}
+TEXT["fr"] = {"mold": "Risque de moisissure dans {room} : {hum} % d'humidité. Aérez et gardez la pièce plus chaude.",
+              "air": "Air vicié dans {room} ({co2} ppm de CO₂). Aérez quelques minutes.",
+              "window": "La fenêtre de {room} est ouverte depuis {minutes} min. Le chauffage est coupé en attendant.",
+              "offline": "{device} dans {room} ne répond pas. Vérifiez la pile ou la connexion.",
+              "battery": "{device} n'a plus que {level} % – changez la pile.",
+              "not_warming": "{room} ne chauffe pas ({temp}° sur {want}°). Peut-être de l'air dans le radiateur ou une vanne bloquée.",
+              "cooling": "Chauffage urbain : refroidissement {today}° aujourd'hui – exigé {need}°. Vérifiez les radiateurs ouverts à fond.",
+              "monthly": "Heat Pilot en {month} : environ {pct} % de chaleur en moins. Chaud à temps dans {ontime} % des cas.",
+              "title": "Heat Pilot"}
+TEXT["nl"] = {"mold": "Schimmelrisico in {room}: {hum} % vocht. Lucht en houd de kamer warmer.",
+              "air": "Slechte lucht in {room} ({co2} ppm CO₂). Lucht een paar minuten.",
+              "window": "Het raam in {room} staat al {minutes} min open. De verwarming is zolang uit.",
+              "offline": "{device} in {room} reageert niet. Controleer batterij of verbinding.",
+              "battery": "{device} heeft nog {level} % – vervang de batterij.",
+              "not_warming": "{room} wordt niet warm ({temp}° van {want}°). Misschien lucht in de radiator of een vastzittende klep.",
+              "cooling": "Stadsverwarming: afkoeling vandaag {today}° – vereist is {need}°. Controleer of radiatoren volledig open staan.",
+              "monthly": "Heat Pilot in {month}: ongeveer {pct} % minder warmte. Op tijd warm in {ontime} % van de keren.",
+              "title": "Heat Pilot"}
+TEXT["sv"] = {"mold": "Mögelrisk i {room}: {hum} % fukt. Vädra och håll rummet varmare.",
+              "air": "Dålig luft i {room} ({co2} ppm CO₂). Vädra några minuter.",
+              "window": "Fönstret i {room} har varit öppet i {minutes} min. Värmen är av så länge.",
+              "offline": "{device} i {room} svarar inte. Kontrollera batteri eller anslutning.",
+              "battery": "{device} har {level} % kvar – byt batteri.",
+              "not_warming": "{room} blir inte varmt ({temp}° av {want}°). Kanske luft i elementet eller en ventil som fastnat.",
+              "cooling": "Fjärrvärme: avkylning {today}° i dag – kravet är {need}°. Kontrollera om element står helt öppna.",
+              "monthly": "Heat Pilot i {month}: ungefär {pct} % mindre värme. Varmt i tid {ontime} % av gångerna.",
+              "title": "Heat Pilot"}
+TEXT["nb"] = {"mold": "Muggfare i {room}: {hum} % fukt. Luft ut og hold rommet varmere.",
+              "air": "Dårlig luft i {room} ({co2} ppm CO₂). Luft ut noen minutter.",
+              "window": "Vinduet i {room} har vært åpent i {minutes} min. Varmen er av så lenge.",
+              "offline": "{device} i {room} svarer ikke. Sjekk batteri eller tilkobling.",
+              "battery": "{device} har {level} % igjen – bytt batteri.",
+              "not_warming": "{room} blir ikke varmt ({temp}° av {want}°). Kanskje luft i radiatoren eller en ventil som har satt seg fast.",
+              "cooling": "Fjernvarme: avkjøling {today}° i dag – kravet er {need}°. Sjekk om radiatorer står helt åpne.",
+              "monthly": "Heat Pilot i {month}: omtrent {pct} % mindre varme. Varmt i tide {ontime} % av gangene.",
+              "title": "Heat Pilot"}
+
 
 def text(a: dict[str, Any], lang: str) -> str:
     t = TEXT.get(lang, TEXT["en"])

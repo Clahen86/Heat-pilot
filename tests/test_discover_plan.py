@@ -34,7 +34,7 @@ STATES = {"climate.stue": st("heat", hvac_modes=["off", "heat"]), "sensor.trv_te
 
 def test_rooms_found():
     rooms = {r["area_id"]: r for r in discover.find(AREAS, DEVS, ENTS, STATES)}
-    assert set(rooms) == {"stue", "bad"}  # no thermostat in the hall
+    assert set(rooms) == {"stue", "bad", "climate:climate.loose"}  # no thermostat in the hall
     s = rooms["stue"]
     assert [t["entity_id"] for t in s["thermostats"]] == ["climate.stue"]  # never the group too
     assert s["thermostats"][0]["brand"] == "SONOFF TRVZB"
@@ -43,6 +43,8 @@ def test_rooms_found():
     assert s["kind"] == "living"
     assert rooms["bad"]["kind"] == "bathroom" and rooms["bad"]["heating"] == "floor"
     assert discover.unplaced(ENTS, DEVS, STATES) == ["climate.loose"]
+    loose = [r for r in discover.find(AREAS, DEVS, ENTS, STATES) if r["area_id"] == "climate:climate.loose"]
+    assert loose and loose[0]["thermostats"][0]["brand"] == "tado°"  # a thermostat with no room is a room of its own
 
 
 def room(**kw):

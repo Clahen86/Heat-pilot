@@ -14,10 +14,19 @@ from zoneinfo import ZoneInfo
 
 from . import alerts, brands, discover, features, people, plan, pricefeed, supply, ventilation
 from .signals import Watch
+from .control import Sender, exercise_now
 from .learning import Learning, Model, seed
 
 _LOGGER = logging.getLogger(__name__)
 ROOM_KEYS = {"doors_extra", "evening", "evening_from", "evening_to", "price_flex", "kind", "heating", "temp_sensor", "comfort", "setback", "night", "away", "day_from", "day_to", "excluded", "fixed_hours", "owner"}
+
+
+def f_to_c(v: float) -> float:
+    return (v - 32) * 5 / 9
+
+
+def c_to_f(v: float) -> float:
+    return v * 9 / 5 + 32
 
 
 def floor_level(name: str) -> int:
@@ -66,6 +75,7 @@ class Pilot:
         self.cooling_options: list[str] = []
         self.alerts = alerts.Alerts(self.learning.s)
         self.model = Model(self.learning.s)
+        self.sender = Sender()
         self.forecast: list[tuple[datetime, float, str]] = []
         self.notify: list[str] = []
         self.cooling = supply.Cooling(self.learning.s)
@@ -73,6 +83,29 @@ class Pilot:
 
     def save(self) -> None:
         self.file.write_text(json.dumps(self.settings, indent=1, ensure_ascii=False))
+
+    # ---------- units: everything is worked out in °C; homes in °F are read and written in °F ----------
+
+    @property
+    def fahrenheit(self) -> bool:
+        return "F" in str((self.ha.config.get("unit_system") or {}).get("temperature") or "")
+
+    def c(self, v: Any, unit: str | None = None) -> float | None:
+        """A temperature from Home Assistant in °C (a sensor's own unit, or the home's for climate and weather)."""
+        try:
+            x = float(v)
+        except (TypeError, ValueError):
+            return None
+        u = unit if unit is not None else ("°F" if self.fahrenheit else "°C")
+        return round(f_to_c(x), 2) if "F" in str(u) else x
+
+    def out_unit(self, v: float) -> float:
+        """A temperature to send to a thermostat, in the home's unit."""
+        return round(c_to_f(v), 1) if self.fahrenheit else v
+
+    def sensor_c(self, entity: str | None) -> float | None:
+        s = self.ha.states.get(entity or "") or {}
+        return self.c(s.get("state"), (s.get("attributes") or {}).get("unit_of_measurement") or "°C")
 
     # ---------- the house ----------
 
@@ -166,15 +199,51 @@ class Pilot:
         self.save()
 
     def mode(self, area: str) -> str:
+        """shadow (the start for every room), control or off."""
         return (self.settings.get("modes") or {}).get(area, "shadow")
+
+    def set_mode(self, area: str | None, mode: str) -> None:
+        if mode not in ("shadow", "control", "off"):
+            return
+        modes = self.settings.setdefault("modes", {})
+        if area is None:  # every room back to shadow
+            for a in list(modes):
+                modes[a] = "shadow"
+        else:
+            modes[area] = mode
+        self.save()
+
+    async def control(self) -> None:
+        """Send what the rooms in control need (nothing at all while every room is in shadow)."""
+        tz = ZoneInfo(self.ha.config.get("time_zone") or "UTC")
+        now = datetime.now(tz)
+        rooms = {r["area_id"]: r for r in self.rooms() if not r.get("excluded")}
+        todo = []
+        for a_id, n in self.now.items():
+            r = rooms.get(a_id)
+            if not r or self.mode(a_id) != "control":
+                continue
+            calls = list(n.get("calls") or [])
+            if exercise_now(now, getattr(self, "summer_now", False)):
+                calls = []
+                for th in r["thermostats"]:
+                    attrs = dict((self.ha.states.get(th["entity_id"]) or {}).get("attributes") or {})
+                    attrs["_state"] = (self.ha.states.get(th["entity_id"]) or {}).get("state")
+                    calls += brands.heat_calls(th["entity_id"], attrs, th["profile"], float(attrs.get("max_temp") or 30))
+            gaps = {th["entity_id"]: float(th["profile"].get("min_gap_min") or 1) for th in r["thermostats"]}
+            steps = {th["entity_id"]: float(((self.ha.states.get(th["entity_id"]) or {}).get("attributes") or {}).get("target_temp_step") or 0.5)
+                     for th in r["thermostats"]}
+            todo += self.sender.due(calls, self.ha.states, gaps, now, steps)
+        if todo:
+            await self.sender.send(self.ha, todo, now, lambda e, v, t: self.watch.wrote(e, self.c(v) or v, t))
 
     # ---------- every minute ----------
 
     def room_temp(self, room: dict[str, Any]) -> float | None:
         st = self.ha.states
-        if room.get("temp_sensor") and (t := _num(st.get(room["temp_sensor"]))) is not None:
+        if room.get("temp_sensor") and (t := self.sensor_c(room["temp_sensor"])) is not None:
             return t
-        vals = [a.get("current_temperature") for th in room["thermostats"]
+        vals = [self.c(a.get("current_temperature")) for th in room["thermostats"]
                 if isinstance(a := (st.get(th["entity_id"]) or {}).get("attributes"), dict) and a.get("current_temperature") is not None]
         return round(sum(vals) / len(vals), 1) if vals else None
 
@@ -240,7 +309,7 @@ class Pilot:
             cur = ventilation.current_level(self.vent, st)
             self.vent_now = {**want_v, "current": cur, "same": cur == want_v["level"], "efficiency": ventilation.efficiency(self.vent, st),
                              "bypass": ventilation.bypass_open(self.vent, st), "calls": ventilation.calls(self.vent, st, want_v["level"]),
-                             "temps": {k: ventilation._num(st, self.vent.get(k)) for k in ("outdoor", "supply", "extract", "exhaust")},
+                             "temps": {k: self.sensor_c(self.vent.get(k)) for k in ("outdoor", "supply", "extract", "exhaust")},
                              "name": self.vent["name"], "model": self.vent.get("model")}
             cooling = cooling or want_v["cooling"]
         self.cooling_flag = cooling
@@ -259,7 +328,7 @@ class Pilot:
             controlled = self.mode(a_id) == "control"
             for th in r["thermostats"]:
                 sp = ((st.get(th["entity_id"]) or {}).get("attributes") or {}).get("temperature")
-                self.watch.see_setpoint(a_id, th["entity_id"], float(sp) if isinstance(sp, (int, float)) else None, now,
+                self.watch.see_setpoint(a_id, th["entity_id"], self.c(sp) if isinstance(sp, (int, float)) else None, now,
                                         controlled and on["manual"])
             manual = self.watch.manual_for(a_id, now) if on["manual"] else None
             hours_today = by_day[now.weekday()]
@@ -282,7 +351,7 @@ class Pilot:
                                on["shower"] and self.watch.shower(a_id, now), on["sun"] and self.watch.sun_warms(r, st, now),
                                is_summer, holiday, bool(on["people"] and people.owners_away(st, r.get("owner"))),
                                bool(coming), level if supply.is_electric(r) else None, spread, cooling, extra)
-            if manual and r["cfg"].get("comfort") and 6 <= now.hour < 22 and not self.watch.manual.get(a_id, {}).get("learned"):
+            if manual and r["cfg"].get("comfort") and plan.NIGHT_TO <= now.hour < plan.NIGHT_FROM and not self.watch.manual.get(a_id, {}).get("learned"):
                 self.model.learn_comfort(a_id, manual["temp"], r["cfg"]["comfort"])  # turned by hand: comfort moves a little
                 self.watch.manual[a_id]["learned"] = True
             if want["temp"] is not None and temp is not None:
@@ -299,18 +368,18 @@ class Pilot:
                 a = dict(s.get("attributes") or {})
                 a["_state"] = s.get("state")
                 prof = th["profile"]
-                c = brands.off_calls(th["entity_id"], a, prof) if want["temp"] is None else brands.heat_calls(th["entity_id"], a, prof, want["temp"])
+                c = brands.off_calls(th["entity_id"], a, prof) if want["temp"] is None else brands.heat_calls(th["entity_id"], a, prof, self.out_unit(want["temp"]))
                 calls += c
                 cur_off = s.get("state") == "off"
-                cur = a.get("temperature")
+                cur = self.c(a.get("temperature"))
                 if want["temp"] is None:
-                    same = same and (cur_off or (cur is not None and float(cur) <= float(a.get("min_temp") or 5) + 0.1))
+                    same = same and (cur_off or (cur is not None and cur <= (self.c(a.get("min_temp")) or 5) + 0.1))
                 else:
                     # Another system that turns the valve off once the room is warm enough heats to the same.
                     warm = (room_t := self.room_temp(r)) is not None and room_t >= want["temp"] - 0.3
-                    same = same and cur is not None and abs(float(cur) - want["temp"]) <= 0.5 and (not cur_off or warm)
+                    same = same and cur is not None and abs(cur - want["temp"]) <= 0.5 and (not cur_off or warm)
                 devs.append({"entity_id": th["entity_id"], "name": th["name"], "brand": th["brand"], "state": s.get("state"),
-                             "setpoint": cur, "temp": a.get("current_temperature"), "action": a.get("hvac_action")})
+                             "setpoint": cur, "temp": self.c(a.get("current_temperature")), "action": a.get("hvac_action")})
             self.agree["checks"] += 1
             self.agree["same"] += int(same)
             out[a_id] = {"want": want, "temp": temp, "devices": devs, "calls": calls, "same": same, "mode": self.mode(a_id),
@@ -337,28 +406,50 @@ class Pilot:
             latest = t if latest is None or t > latest else latest
         return latest
 
+    def lang(self) -> str:
+        code = str(self.ha.config.get("language") or "en")[:2]
+        code = "nb" if code in ("no", "nn") else code
+        return code if code in ("da", "en", "de", "fr", "nl", "sv", "nb") else "en"
+
+    SENTENCE = {
+        "da": ("Sommer – varmen er slukket.", "Ferie – huset holdes køligt.", "Alle er ude – huset er sænket", "Vindue åbent i {r}",
+               "{n} rum varmer", "{r} varmer", "{n} rum er sænket", "Alle rum har den rette temperatur."),
+        "en": ("Summer – heating is off.", "Holiday – the house is kept cool.", "Everyone is away – the house is turned down", "Window open in {r}",
+               "{n} rooms heating", "{r} is heating", "{n} rooms turned down", "Every room is as it should be."),
+        "de": ("Sommer – die Heizung ist aus.", "Urlaub – das Haus bleibt kühl.", "Alle sind weg – das Haus ist abgesenkt", "Fenster offen in {r}",
+               "{n} Räume heizen", "{r} heizt", "{n} Räume abgesenkt", "Jeder Raum hat die richtige Temperatur."),
+        "fr": ("Été – le chauffage est coupé.", "Vacances – la maison reste fraîche.", "Tout le monde est absent – la maison est baissée", "Fenêtre ouverte : {r}",
+               "{n} pièces chauffent", "{r} chauffe", "{n} pièces baissées", "Chaque pièce est à la bonne température."),
+        "nl": ("Zomer – de verwarming is uit.", "Vakantie – het huis blijft koel.", "Iedereen is weg – het huis is verlaagd", "Raam open in {r}",
+               "{n} kamers verwarmen", "{r} verwarmt", "{n} kamers verlaagd", "Elke kamer heeft de juiste temperatuur."),
+        "sv": ("Sommar – värmen är avstängd.", "Semester – huset hålls svalt.", "Alla är borta – huset är sänkt", "Fönster öppet i {r}",
+               "{n} rum värms", "{r} värms", "{n} rum sänkta", "Alla rum har rätt temperatur."),
+        "nb": ("Sommer – varmen er av.", "Ferie – huset holdes kjølig.", "Alle er borte – huset er senket", "Vindu åpent i {r}",
+               "{n} rom varmes", "{r} varmes", "{n} rom senket", "Alle rom har riktig temperatur."),
+    }
+
     def sentence(self) -> str:
         """One sentence of what is going on - for the dashboard card and the sensor."""
-        da = str(self.ha.config.get("language") or "").startswith("da")
+        t = self.SENTENCE[self.lang()]
         rooms = {r["area_id"]: r for r in self.rooms()}
         whys = [(rooms[a]["name"], (n.get("want") or {}).get("why"), n.get("heating")) for a, n in self.now.items() if a in rooms]
         if getattr(self, "summer_now", False):
-            return "Sommer – varmen er slukket." if da else "Summer – heating is off."
+            return t[0]
         if getattr(self, "holiday_now", None):
-            return "Ferie – huset holdes køligt." if da else "Holiday – the house is kept cool."
+            return t[1]
         parts = []
         if getattr(self, "away", False):
-            parts.append("Alle er ude – huset er sænket" if da else "Everyone is away – the house is turned down")
+            parts.append(t[2])
         heat = [n for n, w, h in whys if h]
         down = [n for n, w, h in whys if w in ("setback", "owner_away")]
         win = [n for n, w, h in whys if w == "window"]
         if win:
-            parts.append((f"Vindue åbent i {win[0]}" if da else f"Window open in {win[0]}"))
+            parts.append(t[3].replace("{r}", win[0]))
         if heat:
-            parts.append((f"{len(heat)} rum varmer" if da else f"{len(heat)} rooms heating") if len(heat) > 1 else (f"{heat[0]} varmer" if da else f"{heat[0]} is heating"))
+            parts.append(t[4].replace("{n}", str(len(heat))) if len(heat) > 1 else t[5].replace("{r}", heat[0]))
         if down:
-            parts.append(f"{len(down)} rum er sænket" if da else f"{len(down)} rooms turned down")
-        return (". ".join(parts) + ".") if parts else ("Alle rum har den rette temperatur." if da else "Every room is as it should be.")
+            parts.append(t[6].replace("{n}", str(len(down))))
+        return (". ".join(parts) + ".") if parts else t[7]
 
     def month_report(self, now: datetime) -> dict[str, Any] | None:
         """Last month: degrees turned down, about how much heat that saved, warm on time, district cooling."""
@@ -379,7 +470,7 @@ class Pilot:
         tz = ZoneInfo(self.ha.config.get("time_zone") or "UTC")
         now = datetime.now(tz)
         due = self.alerts.to_send(self.settings, now)
-        lang = "da" if str(self.ha.config.get("language") or "").startswith("da") else "en"
+        lang = self.lang()
         m = self.settings.get("messages") or {}
         if now.day == 1 and now.hour >= 9 and (m.get("kinds") or {}).get("monthly", True) and m.get("targets") \
                 and self.alerts.s["sent"].get("monthly") != now.strftime("%Y-%m") and (rep := self.month_report(now)):
@@ -493,7 +584,7 @@ class Pilot:
             room["timeline"] = self.timelines.get(room["area_id"]) or []
         out_t = self.outdoor()
         sun = (self.ha.states.get("sun.sun") or {}).get("state")
-        return {"setup_done": bool(self.settings.get("setup_done")), "all_doors": [{"entity_id": e, "name": (self.ha.states.get(e) or {}).get("attributes", {}).get("friendly_name") or e} for e in self.all_doors],
+        return {"unit": "°F" if self.fahrenheit else "°C", "sent": self.sender.log[:20], "setup_done": bool(self.settings.get("setup_done")), "all_doors": [{"entity_id": e, "name": (self.ha.states.get(e) or {}).get("attributes", {}).get("friendly_name") or e} for e in self.all_doors],
                 "arm": getattr(self, "arm", None), "cold_snap": getattr(self, "cold_snap", False), "tune": features.tune_view(self.settings), "month": self.month_report(now), "floors": self.floors, "sun": sun, "rooms": rooms, "unplaced": self.unplaced, "away": getattr(self, "away", False), "now": now.isoformat(),
                 "agree": round(100 * a["same"] / a["checks"]) if a["checks"] else None, "outdoor": out_t,
                 "learning": self.learning.summary(now, [r["area_id"] for r in rooms if not r.get("excluded")]),
@@ -506,7 +597,7 @@ class Pilot:
                 "cooling": getattr(self, "cooling_info", None), "cooling_now": getattr(self, "cooling_now", None),
                 "district": self.settings.get("district") or {}, "price_level": getattr(self, "price_level", None),
                 "electric": [r["area_id"] for r in rooms if supply.is_electric(r)],
-                "alerts": [{**a, "text": alerts.text(a, "da" if str(self.ha.config.get("language") or "").startswith("da") else "en")}
+                "alerts": [{**a, "text": alerts.text(a, self.lang())}
                            for a in self.alerts.active],
                 "messages": self.settings.get("messages") or {}, "notify": self.notify, "alert_kinds": alerts.KINDS,
                 "vent": getattr(self, "vent_now", None), "ventilation": self.settings.get("ventilation") or {},
@@ -522,7 +613,4 @@ class Pilot:
 
     def outdoor(self) -> float | None:
         e = self.outdoor_sensor()
-        try:
-            return float(((self.ha.states.get(e or "") or {}).get("attributes") or {}).get("temperature"))
-        except (TypeError, ValueError):
-            return None
+        return self.c(((self.ha.states.get(e or "") or {}).get("attributes") or {}).get("temperature"))

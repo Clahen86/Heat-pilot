@@ -29,7 +29,7 @@ def _num(s: dict[str, Any] | None) -> float | None:
     try:
         return float((s or {}).get("state"))
     except (TypeError, ValueError):
-        return None
+        return None  # (humidity, CO2: no unit to turn)
 
 
 class Watch:

@@ -84,8 +84,10 @@ class Learning:
         got = [self.used(room, weekday, h) for h in range(24)]
         if sum(x is not None for x in got) < 12:
             return None
-        used = {h for h, u in enumerate(got) if u and h in DAY}
-        used |= {h for h in DAY if h - 1 in used and h + 1 in used}  # a lone empty hour between two used ones stays warm
+        from . import plan
+        day = range(plan.NIGHT_TO, plan.NIGHT_FROM)  # comfort hours are learned in the day - night has its own
+        used = {h for h, u in enumerate(got) if u and h in day}
+        used |= {h for h in day if h - 1 in used and h + 1 in used}  # a lone empty hour between two used ones stays warm
         return sorted(used)
 
     def see_outdoor(self, now: datetime, temp: float | None) -> None:

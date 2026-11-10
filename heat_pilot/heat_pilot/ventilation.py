@@ -34,10 +34,13 @@ CO2_HIGH, CO2_BOOST, HUM_HIGH = 1000, 1400, 65
 
 
 def _num(states: dict[str, Any], e: str | None) -> float | None:
+    s = states.get(e or "") or {}
     try:
-        return float((states.get(e or "") or {}).get("state"))
+        v = float(s.get("state"))
     except (TypeError, ValueError):
         return None
+    u = str((s.get("attributes") or {}).get("unit_of_measurement") or "")
+    return (v - 32) * 5 / 9 if u in ("°F", "F") else v  # a temperature in °F: in °C like the rest
 
 
 def find(entities: list[dict[str, Any]], devices: list[dict[str, Any]], states: dict[str, Any]) -> dict[str, Any] | None:

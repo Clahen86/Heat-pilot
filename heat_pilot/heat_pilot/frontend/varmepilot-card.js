@@ -4,6 +4,13 @@ const VP_T = {
   da: { title: "Varmepilot", off: "Slukket", shadow: "Skygge", why: { comfort: "Komfort", setback: "Sænket", night: "Nat", away: "Alle ude", window: "Vindue åbent", manual: "Skruet", preheat: "Varmer op", occupied: "Nogen er her", shower: "Efter bad", sun: "Solen varmer", summer: "Sommer", holiday: "Ferie", owner_away: "Ejeren er væk", spread: "Varmer roligt", cheap: "Billig strøm", dear: "Dyr strøm", cooling: "Køler" } },
   en: { title: "Heat Pilot", off: "Off", shadow: "Shadow", why: { comfort: "Comfort", setback: "Setback", night: "Night", away: "Away", window: "Window open", manual: "By hand", preheat: "Heating up", occupied: "Someone here", shower: "After shower", sun: "Sun warms", summer: "Summer", holiday: "Holiday", owner_away: "Owner away", spread: "Gentle", cheap: "Cheap power", dear: "Dear power", cooling: "Cooling" } },
 };
+Object.assign(VP_T, {
+  de: { title: "Heat Pilot", off: "Aus", shadow: "Schatten", why: { comfort: "Komfort", setback: "Abgesenkt", night: "Nacht", away: "Alle weg", window: "Fenster offen", manual: "Von Hand", preheat: "Heizt auf", occupied: "Jemand da", shower: "Nach Dusche", sun: "Sonne wärmt", summer: "Sommer", holiday: "Urlaub", owner_away: "Bewohner weg", spread: "Sanft", cheap: "Günstig", dear: "Teuer", cooling: "Kühlt" } },
+  fr: { title: "Heat Pilot", off: "Arrêt", shadow: "Ombre", why: { comfort: "Confort", setback: "Abaissé", night: "Nuit", away: "Absents", window: "Fenêtre ouverte", manual: "À la main", preheat: "Préchauffe", occupied: "Quelqu'un", shower: "Après douche", sun: "Soleil", summer: "Été", holiday: "Vacances", owner_away: "Occupant absent", spread: "Doux", cheap: "Bon marché", dear: "Cher", cooling: "Rafraîchit" } },
+  nl: { title: "Heat Pilot", off: "Uit", shadow: "Schaduw", why: { comfort: "Comfort", setback: "Verlaagd", night: "Nacht", away: "Iedereen weg", window: "Raam open", manual: "Met de hand", preheat: "Warmt op", occupied: "Iemand hier", shower: "Na douche", sun: "Zon warmt", summer: "Zomer", holiday: "Vakantie", owner_away: "Bewoner weg", spread: "Rustig", cheap: "Goedkoop", dear: "Duur", cooling: "Koelt" } },
+  sv: { title: "Heat Pilot", off: "Av", shadow: "Skugga", why: { comfort: "Komfort", setback: "Sänkt", night: "Natt", away: "Alla borta", window: "Fönster öppet", manual: "För hand", preheat: "Värmer upp", occupied: "Någon här", shower: "Efter dusch", sun: "Solen värmer", summer: "Sommar", holiday: "Semester", owner_away: "Ägaren borta", spread: "Lugnt", cheap: "Billig el", dear: "Dyr el", cooling: "Kyler" } },
+  nb: { title: "Heat Pilot", off: "Av", shadow: "Skygge", why: { comfort: "Komfort", setback: "Senket", night: "Natt", away: "Alle borte", window: "Vindu åpent", manual: "For hånd", preheat: "Varmer opp", occupied: "Noen her", shower: "Etter dusj", sun: "Solen varmer", summer: "Sommer", holiday: "Ferie", owner_away: "Beboer borte", spread: "Rolig", cheap: "Billig strøm", dear: "Dyr strøm", cooling: "Kjøler" } },
+});
 const VP_COL = { comfort: "#ff8a3d", preheat: "#ffb347", occupied: "#ff8a3d", shower: "#ff9f6e", setback: "#5ab8ff", night: "#8b7bff", away: "#5ab8ff",
   window: "#6b7280", manual: "#f5b544", sun: "#f5c451", summer: "#f5c451", holiday: "#5ab8ff", owner_away: "#5ab8ff", spread: "#ffb347", cheap: "#3ddc97", dear: "#5ab8ff", cooling: "#5ab8ff" };
 
@@ -21,10 +28,11 @@ class VarmepilotCard extends HTMLElement {
   }
   render() {
     const hass = this._hass, s = hass.states["sensor.varmepilot"];
-    const T = VP_T[(hass.language || "en").slice(0, 2)] || VP_T.en;
+    const code = (hass.language || "en").slice(0, 2).replace(/^(no|nn)$/, "nb");
+    const T = VP_T[code] || VP_T.en;
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     if (!s) { this.shadowRoot.innerHTML = `<ha-card><div style="padding:16px">sensor.varmepilot …</div></ha-card>`; return; }
-    const a = s.attributes, num = (v) => v == null || isNaN(v) ? "–" : Number(v).toFixed(1).replace(".", T === VP_T.da ? "," : ".");
+    const a = s.attributes, num = (v) => v == null || isNaN(v) ? "–" : Number(v).toFixed(1).replace(".", ["en"].includes(code) ? "." : ",");
     const tiles = (a.rooms || []).map((r) => {
       const live = parseFloat(hass.states[r.sensor]?.state), temp = isNaN(live) ? r.temp : live, col = VP_COL[r.why] || "#ff8a3d";
       return `<div class="t" style="--c:${col}" data-area="${r.area_id}"><div class="n">${r.name}${r.heating ? ' <span class="f">●</span>' : ""}</div>

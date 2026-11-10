@@ -39,6 +39,8 @@ def active(settings: dict[str, Any], have: dict[str, bool]) -> dict[str, bool]:
 
 # What can be adjusted, and the easy choices for it: key -> (module, constant, default, choices, unit, feature or None).
 TUNE: dict[str, tuple[str, str, float, list[float], str, str | None]] = {
+    "night_from": ("plan", "NIGHT_FROM", 22, [20, 21, 22, 23, 24], "clock", None),
+    "night_to": ("plan", "NIGHT_TO", 6, [4, 5, 6, 7, 8], "clock", None),
     "window_min": ("plan", "WINDOW_MIN", 5, [2, 5, 10, 15], "min", None),
     "away_temp": ("plan", "AWAY", 17, [15, 16, 17, 18, 19], "°", None),
     "shower_min": ("signals", "SHOWER_MIN", 60, [30, 60, 90], "min", "shower"),

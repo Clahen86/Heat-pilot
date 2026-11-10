@@ -105,6 +105,26 @@ def find(areas: list[dict[str, Any]], devices_list: list[dict[str, Any]], entiti
         rooms.append({"area_id": area, "name": name, "kind": room_kind(name), "floor_id": area_floor.get(area), "heating": "floor" if floor else "radiator",
                       "thermostats": thermostats, "temp_sensor": temps[0] if temps else None, "temp_options": temps,
                       "windows": windows, "doors": doors, "presence": presence, "humidity": humidity[:1], "co2": co2[:1], "lights": lights, "batteries": batteries})
+    # Thermostats with no area (a single Nest or ecobee is often never put in a room): each is a room of its own,
+    # named after it - with nothing but the thermostat's own temperature.
+    for e in entities:
+        eid = e["entity_id"]
+        if not eid.startswith("climate.") or e.get("disabled_by") or e.get("platform") in brands.GROUP_PLATFORMS or eid not in states:
+            continue
+        if _area_of(e, devices):
+            continue
+        d = devices.get(e.get("device_id") or "") or {}
+        attrs = states[eid].get("attributes") or {}
+        name = attrs.get("friendly_name") or eid
+        prof = brands.profile(e.get("platform"), d.get("model") or d.get("model_id"), d.get("manufacturer"))
+        rooms.append({"area_id": "climate:" + eid, "name": name, "kind": room_kind(name) if room_kind(name) != "other" else "living",
+                      "floor_id": None, "heating": "radiator", "temp_sensor": None, "temp_options": [], "windows": [], "doors": [],
+                      "presence": [], "humidity": [], "co2": [], "lights": [], "batteries": [], "whole_house": True,
+                      "thermostats": [{"entity_id": eid, "name": name, "platform": e.get("platform"), "model": d.get("model"),
+                                       "manufacturer": d.get("manufacturer"), "brand": prof["name"], "hvac_modes": attrs.get("hvac_modes") or [],
+                                       "preset_modes": attrs.get("preset_modes") or [], "min_temp": attrs.get("min_temp"),
+                                       "max_temp": attrs.get("max_temp"), "step": attrs.get("target_temp_step"), "floor": False,
+                                       "profile": {k: v for k, v in prof.items() if k != "name"}}]})
     return rooms
 
 
