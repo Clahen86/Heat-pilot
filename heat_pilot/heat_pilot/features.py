@@ -6,10 +6,13 @@ from __future__ import annotations
 from typing import Any
 
 # key: (what it needs, on by default)
-FEATURES = ["signals", "shower", "sun", "weather", "door", "manual", "people", "holiday", "summer"]
+FEATURES = ["signals", "shower", "sun", "weather", "door", "manual", "people", "holiday", "summer", "district", "price"]
 
 
-def found(rooms: list[dict[str, Any]], states: dict[str, Any], doors: list[str], persons: list[str] | None = None) -> dict[str, bool]:
+def found(rooms: list[dict[str, Any]], states: dict[str, Any], doors: list[str], persons: list[str] | None = None,
+          meter: dict | None = None, price: str | None = None) -> dict[str, bool]:
+    from .supply import is_electric
+
     return {
         "signals": any(r.get("co2") or r.get("humidity") or r.get("lights") for r in rooms),
         "shower": any(r.get("kind") == "bathroom" and r.get("humidity") for r in rooms),
@@ -20,6 +23,8 @@ def found(rooms: list[dict[str, Any]], states: dict[str, Any], doors: list[str],
         "people": bool(persons),
         "holiday": bool(persons) or any(e.startswith("calendar.") for e in states),
         "summer": any(e.startswith("weather.") for e in states),
+        "district": bool(meter),
+        "price": bool(price) and any(is_electric(r) for r in rooms),
     }
 
 

@@ -22,6 +22,7 @@ DAY_HOURS = {"living": (6, 22), "kitchen": (6, 22), "bedroom": (6, 8), "kids": (
 SETBACK = 18.0
 AWAY = 17.0
 HOLIDAY = 15.0
+PRICE_FLEX = 1.0  # degrees up in the cheapest hours / down in the dearest (electric heating)
 FROST = 7.0
 WINDOW_MIN = 5
 AWAY_MIN = 60
@@ -74,7 +75,7 @@ def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], no
            house_away: bool, manual: dict[str, Any] | None, hours: list[int] | None = None,
            temp: float | None = None, rate: float | None = None, occupied: bool = False, shower: bool = False,
            sun: bool = False, summer: bool = False, holiday: str | None = None, owner_away: bool = False,
-           coming: bool = False) -> dict[str, Any]:
+           coming: bool = False, price: str | None = None, spread: bool = False) -> dict[str, Any]:
     """{"temp": °C or None (off), "why": key, "until": time the reason ends or None}."""
     c = {**defaults(room), **(cfg or {})}
     for w in room.get("windows") or []:
@@ -103,8 +104,21 @@ def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], no
             # Start in time: warm when the room is used - the learned minutes per degree from where it is now.
             if temp is not None and rate:
                 lead = max(0.0, c["comfort"] - temp) * rate
+                if spread:
+                    lead *= 1.5  # district heating cooling poor: start earlier, warm gently
                 if now >= nxt - timedelta(minutes=lead) and c["comfort"] > t:
-                    t, why = (t, "sun") if sun else (c["comfort"], "preheat")  # the sun warms it for free
+                    if sun:
+                        t, why = t, "sun"  # the sun warms it for free
+                    elif spread:
+                        t, why = min(c["comfort"], temp + 0.5), "spread"  # a little at a time: low return temperature
+                    else:
+                        t, why = c["comfort"], "preheat"
+    # Electric heating / heat pump: warmer in the cheapest hours (heat stored in the house), cooler in the dearest.
+    flex = float(c.get("price_flex", PRICE_FLEX))
+    if price == "cheap" and why in ("comfort", "occupied", "preheat", "setback"):
+        t, why = t + flex, "cheap"
+    elif price == "dear" and why in ("comfort", "occupied") and why != "shower":
+        t, why = t - flex, "dear"
     if holiday and not coming:
         return {"temp": max(FROST, c.get("holiday", HOLIDAY)), "why": "holiday", "kind": holiday}
     if owner_away and why not in ("shower",) and t > c["setback"]:

@@ -12,12 +12,12 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from . import brands, discover, features, people, plan
+from . import brands, discover, features, people, plan, pricefeed, supply
 from .signals import Watch
 from .learning import Learning, seed
 
 _LOGGER = logging.getLogger(__name__)
-ROOM_KEYS = {"kind", "heating", "temp_sensor", "comfort", "setback", "night", "away", "day_from", "day_to", "excluded", "fixed_hours", "owner"}
+ROOM_KEYS = {"price_flex", "kind", "heating", "temp_sensor", "comfort", "setback", "night", "away", "day_from", "day_to", "excluded", "fixed_hours", "owner"}
 
 
 def _num(s: dict[str, Any] | None) -> float | None:
@@ -44,6 +44,9 @@ class Pilot:
         self.watch = Watch()
         self.doors: list[str] = []
         self.have: dict[str, bool] = {}
+        self.meter: dict[str, str] | None = None
+        self.price_entity: str | None = None
+        self.cooling = supply.Cooling(self.learning.s)
         self.timelines: dict[str, list] = {}
 
     def save(self) -> None:
@@ -58,6 +61,8 @@ class Pilot:
         self.found = discover.find(areas, devices, entities, self.ha.states)
         self.unplaced = discover.unplaced(entities, devices, self.ha.states)
         self.doors = discover.exit_doors(entities, self.ha.states)
+        self.meter = supply.find_heat_meter(entities, devices, self.ha.states)
+        self.price_entity = supply.find_price(entities, self.ha.states, ZoneInfo(self.ha.config.get("time_zone") or "UTC"))
         _LOGGER.info("Found %s rooms with %s thermostats", len(self.found), sum(len(r["thermostats"]) for r in self.found))
 
     async def seed_history(self) -> None:
@@ -134,7 +139,7 @@ class Pilot:
         st = self.ha.states
         rooms = [r for r in self.rooms() if not r.get("excluded")]
         ps = people.persons(st)
-        self.have = features.found(rooms, st, self.doors, ps)
+        self.have = features.found(rooms, st, self.doors, ps, self.meter, self.price_entity)
         on = features.active(self.settings, self.have)
         self.on = on
         last_motion = self._last_motion(rooms, st)
@@ -154,6 +159,16 @@ class Pilot:
         is_summer = on["summer"] and people.summer(self.learning.outdoor_days(), now)
         holiday = people.holiday(st, ps, now, True) if on["holiday"] else None
         self.summer_now, self.holiday_now = is_summer, holiday
+        dh = self.settings.get("district") or {}
+        need = float(dh.get("need", 25.0))
+        self.cooling_now = self.cooling.see(self.meter, st, now) if on["district"] else None
+        self.cooling_info = self.cooling.summary(now, need, dh.get("penalty"), dh.get("bonus")) if on["district"] else None
+        spread = on["district"] and supply.poor_cooling(self.cooling_info, need)
+        level = None
+        if on["price"]:
+            prices, _ = pricefeed.collect(st, self.price_entity, [], tz)
+            level = supply.price_level(prices, now)
+        self.price_level = level
         out = {}
         for r in rooms:
             a_id = r["area_id"]
@@ -174,7 +189,7 @@ class Pilot:
             want = plan.target(r, r["cfg"], st, now, away, manual, by_day[now.weekday()], temp, rate, moving or signs,
                                on["shower"] and self.watch.shower(a_id, now), on["sun"] and self.watch.sun_warms(r, st, now),
                                is_summer, holiday, bool(on["people"] and people.owners_away(st, r.get("owner"))),
-                               bool(coming))
+                               bool(coming), level if supply.is_electric(r) else None, spread)
             if r["presence"]:
                 self.learning.see_presence(a_id, now, moving)
             self.learning.see_heating(a_id, now, heating_now, temp, want["temp"], r["heating"], outdoor)
@@ -220,6 +235,32 @@ class Pilot:
             latest = t if latest is None or t > latest else latest
         return latest
 
+    async def publish(self) -> None:
+        """For Energy Pilot (and dashboards): the electric heating now and the hours it plans to heat - only when
+        some rooms are heated by electricity."""
+        rooms = [r for r in self.rooms() if not r.get("excluded") and supply.is_electric(r)]
+        if not rooms:
+            return
+        heating = [r["name"] for r in rooms if (self.now.get(r["area_id"]) or {}).get("heating")]
+        planned = sorted({q["t"] for r in rooms for q in self.timelines.get(r["area_id"]) or []
+                          if q["why"] in ("comfort", "preheat", "cheap")})
+        try:
+            await self.ha.set_state("sensor.varmepilot_elvarme", len(heating),
+                                    {"friendly_name": "Varmepilot elvarme", "rooms_heating": heating, "planned": planned[:96],
+                                     "price_level": getattr(self, "price_level", None), "icon": "mdi:radiator"})
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Could not publish", exc_info=True)
+
+    def set_district(self, values: dict[str, Any]) -> None:
+        d = self.settings.setdefault("district", {})
+        for k in ("need", "penalty", "bonus"):
+            if k in values:
+                if values[k] in (None, ""):
+                    d.pop(k, None)
+                else:
+                    d[k] = float(values[k])
+        self.save()
+
     def set_feature(self, key: str, on: bool) -> None:
         if key in features.FEATURES:
             self.settings.setdefault("features", {})[key] = bool(on)
@@ -255,7 +296,10 @@ class Pilot:
                 "doors": self.doors, "persons": [{"entity_id": p, "name": (self.ha.states.get(p) or {}).get("attributes", {}).get("friendly_name") or p,
                                                   "home": people.home(self.ha.states, p)} for p in people.persons(self.ha.states)],
                 "away_why": getattr(self, "away_why", None), "coming": getattr(self, "coming", []),
-                "summer": getattr(self, "summer_now", False), "holiday": getattr(self, "holiday_now", None)}
+                "summer": getattr(self, "summer_now", False), "holiday": getattr(self, "holiday_now", None),
+                "cooling": getattr(self, "cooling_info", None), "cooling_now": getattr(self, "cooling_now", None),
+                "district": self.settings.get("district") or {}, "price_level": getattr(self, "price_level", None),
+                "electric": [r["area_id"] for r in rooms if supply.is_electric(r)]}
 
     def outdoor_sensor(self) -> str | None:
         """The weather's or an outdoor sensor's temperature - shown beside the house."""

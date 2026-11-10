@@ -156,7 +156,12 @@ Object.assign(T, L === "da" ? {
     manual: ["Skruet i hånden", "Når nogen drejer på en termostat, holdes deres temperatur en time"],
     people: ["Personer", "Alle telefoner væk: huset sænkes – også om natten. På vej hjem: varmer op i forvejen. Et værelse sænkes, når dets person er væk"],
     holiday: ["Ferie", "Alle væk over et døgn, eller \"ferie\" i kalenderen: ferie-temperatur"],
-    summer: ["Sommer", "Tre varme dage i træk (over 16° i snit): varmen slukker, til det bliver koldere"] },
+    summer: ["Sommer", "Tre varme dage i træk (over 16° i snit): varmen slukker, til det bliver koldere"],
+    district: ["Fjernvarme-afkøling", "Følger afkølingen fra din varmemåler. Er den dårlig, varmes rummene op i ro og mag – det giver lavere retur"],
+    price: ["Elpris", "Rum med elvarme eller varmepumpe er lidt varmere i de billigste timer og lidt køligere i de dyreste"] },
+  dhTitle: "Fjernvarme", dhNow: "Afkøling nu", dhToday: "I dag", dhYear: "I år", dhNeed: "Krav", dhSupRet: "Frem {s}° · retur {r}°",
+  dhGood: "Bedre end kravet – bonus", dhBad: "Under kravet – risiko for straf", dhPer: "{x} kr pr. MWh", dhSet: "Afkølingskrav", dhSetH: "Fra dit fjernvarmeværk (typisk 25–30°)",
+  dhPen: "Straf pr. grad under", dhBon: "Bonus pr. grad over", dhUnit: "kr/MWh", heating3: { radiator: "Radiator", floor: "Gulvvarme", heatpump: "Varmepumpe", electric: "Elvarme" },
   owner: "Hvis værelse", ownerH: "Sænkes, når personen er væk", nobody: "Ingen", home: "hjemme", awayP: "væk", who: "Hvem er hjemme",
   sSummer: "Sommer – varmen er slukket", sHoliday: "Ferie – huset holdes på {t}°", sComing: "{p} er på vej hjem – varmer op", sOwner: "{n} værelser er sænket, fordi deres person er væk",
   sAwayPhones: "Alle er væk – huset er sænket", sAwayDoor: "Hoveddøren blev åbnet og ingen er hjemme – huset er sænket", sHeat: "{r} varmes op til kl. {t}", sHeatN: "{n} rum varmes op", sPre: "{r} varmes op, så det er varmt kl. {t}",
@@ -165,7 +170,7 @@ Object.assign(T, L === "da" ? {
   mSaved: "Sænket i dag", mSavedS: "≈ {x} % mindre varme denne uge", mOnTime: "Varmt til tiden", mOnTimeS: "{n} gange målt", mHeating: "Varmer nu", mHeatingS: "af {n} rum", mOut: "Ude", mOutS: "fra vejret",
   dh: "°·t", learned: "Det har den lært", uses: "bruges {h}", notUsed: "bruges sjældent", rate: "{x} min pr. grad", rateDefault: "lærer opvarmningstid", learning: "lærer stadig",
   planTitle: "De næste 24 timer", planHint: "Varmen starter i god tid, så rummet er varmt, når det bruges.",
-  why2: { preheat: "Varmer op i tide", occupied: "Nogen er her", shower: "Efter bad", sun: "Solen varmer", summer: "Sommer", holiday: "Ferie", owner_away: "Ejeren er væk" }, fixed: "Brug faste tider", fixedH: "I stedet for de lærte",
+  why2: { preheat: "Varmer op i tide", occupied: "Nogen er her", shower: "Efter bad", sun: "Solen varmer", summer: "Sommer", holiday: "Ferie", owner_away: "Ejeren er væk", spread: "Varmer i ro og mag", cheap: "Billig strøm", dear: "Dyr strøm" }, fixed: "Brug faste tider", fixedH: "I stedet for de lærte",
 } : {
   tabs: { now: "Now", plan: "Plan", rooms: "Rooms", settings: "Settings" },
   feat: { title: "What it can do – found in your home", hint: "Turns itself on when the equipment is found. What you don't have isn't shown.",
@@ -177,7 +182,12 @@ Object.assign(T, L === "da" ? {
     manual: ["Turned by hand", "When someone turns a thermostat, their temperature holds for an hour"],
     people: ["People", "Every phone away: the house is turned down – at night too. On the way home: heats up ahead. A room is turned down while its person is away"],
     holiday: ["Holiday", "Everyone away for over a day, or \"holiday\" in the calendar: holiday temperature"],
-    summer: ["Summer", "Three warm days in a row (over 16° on average): heating off until it gets colder"] },
+    summer: ["Summer", "Three warm days in a row (over 16° on average): heating off until it gets colder"],
+    district: ["District heating cooling", "Follows the cooling from your heat meter. When it's poor, rooms warm up gently – a lower return temperature"],
+    price: ["Electricity price", "Rooms with electric heating or a heat pump are a little warmer in the cheapest hours and cooler in the dearest"] },
+  dhTitle: "District heating", dhNow: "Cooling now", dhToday: "Today", dhYear: "This year", dhNeed: "Required", dhSupRet: "Supply {s}° · return {r}°",
+  dhGood: "Better than required – bonus", dhBad: "Below required – risk of a penalty", dhPer: "{x} per MWh", dhSet: "Required cooling", dhSetH: "From your utility (typically 25–30°)",
+  dhPen: "Penalty per degree below", dhBon: "Bonus per degree above", dhUnit: "per MWh", heating3: { radiator: "Radiator", floor: "Floor heating", heatpump: "Heat pump", electric: "Electric" },
   owner: "Whose room", ownerH: "Turned down while the person is away", nobody: "Nobody", home: "home", awayP: "away", who: "Who is home",
   sSummer: "Summer – heating is off", sHoliday: "Holiday – the house is kept at {t}°", sComing: "{p} is on the way home – heating up", sOwner: "{n} rooms are turned down because their person is away",
   sAwayPhones: "Everyone is away – the house is turned down", sAwayDoor: "The front door opened and nobody is home – the house is turned down", sHeat: "{r} heats until {t}", sHeatN: "{n} rooms are heating", sPre: "{r} heats up to be warm at {t}",
@@ -186,15 +196,16 @@ Object.assign(T, L === "da" ? {
   mSaved: "Turned down today", mSavedS: "≈ {x} % less heat this week", mOnTime: "Warm on time", mOnTimeS: "measured {n} times", mHeating: "Heating now", mHeatingS: "of {n} rooms", mOut: "Outside", mOutS: "from the weather",
   dh: "°·h", learned: "What it has learned", uses: "used {h}", notUsed: "rarely used", rate: "{x} min per degree", rateDefault: "learning heat-up time", learning: "still learning",
   planTitle: "The next 24 hours", planHint: "Heating starts in good time, so the room is warm when it is used.",
-  why2: { preheat: "Heating up in time", occupied: "Someone is here", shower: "After a shower", sun: "The sun warms it", summer: "Summer", holiday: "Holiday", owner_away: "Owner away" }, fixed: "Use fixed hours", fixedH: "Instead of the learned ones",
+  why2: { preheat: "Heating up in time", occupied: "Someone is here", shower: "After a shower", sun: "The sun warms it", summer: "Summer", holiday: "Holiday", owner_away: "Owner away", spread: "Warming gently", cheap: "Cheap power", dear: "Dear power" }, fixed: "Use fixed hours", fixedH: "Instead of the learned ones",
 });
 Object.assign(T.why, T.why2);
+T.heating = T.heating3;
 document.getElementById("title").textContent = L === "da" ? "Varmepilot" : "Heat Pilot";
 document.getElementById("mode").textContent = T.shadow;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const num = (v, d = 1) => v == null ? "–" : Number(v).toFixed(d).replace(".", L === "da" ? "," : ".");
 const api = (p, body) => fetch(p.replace(/^\//, ""), body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}).then((r) => r.json());
-const COL = { summer: "#f5c451", holiday: "var(--cool)", owner_away: "var(--cool)", shower: "#ff9f6e", sun: "#f5c451", comfort: "var(--heat)", preheat: "#ffb347", occupied: "var(--heat)", setback: "var(--cool)", night: "#8b7bff", away: "var(--cool)", window: "var(--off)", manual: "var(--warn)" };
+const COL = { spread: "#ffb347", cheap: "var(--ok)", dear: "var(--cool)", summer: "#f5c451", holiday: "var(--cool)", owner_away: "var(--cool)", shower: "#ff9f6e", sun: "#f5c451", comfort: "var(--heat)", preheat: "#ffb347", occupied: "var(--heat)", setback: "var(--cool)", night: "#8b7bff", away: "var(--cool)", window: "var(--off)", manual: "var(--warn)" };
 let tab = location.hash.slice(1) || "now";
 const FLAME = `<svg class="flame" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c2.5 3.5 6 6 6 11a6 6 0 0 1-12 0c0-2.4 1.2-3.9 2.4-5 0 2.3 1.2 3.6 2.4 3.6 0-3.6-1.2-6 1.2-9.6z"/></svg>`;
 let data = null;
@@ -263,6 +274,18 @@ function houseSvg(rooms) {
   const out = data.outdoor != null ? `<text x="${bx - 4}" y="64" font-size="13" font-weight="650" fill="var(--cool)">☁ ${num(data.outdoor)}°</text>` : "";
   return `<svg viewBox="0 0 ${W} ${H}">${roof}${out}${tiles}</svg>`;
 }
+function dhCard() {
+  const c = data.cooling, n = data.cooling_now;
+  if (!c || !n) return "";
+  const need = c.need, ref = c.year ?? c.week ?? c.today ?? n.now, good = need == null || ref >= need;
+  const pct = Math.max(0, Math.min(100, (n.now / 45) * 100)), needPct = need ? (need / 45) * 100 : null;
+  return `<div class="card"><p class="eyebrow">${T.dhTitle}<span style="color:${good ? "var(--ok)" : "var(--warn)"}">${good ? T.dhGood : T.dhBad}</span></p>
+    <div style="display:flex;align-items:baseline;gap:10px"><div class="now">${num(n.now)}<small>°</small></div><span class="muted">${T.dhNow} · ${T.dhSupRet.replace("{s}", num(n.supply, 0)).replace("{r}", num(n.return, 0))}</span></div>
+    <div style="position:relative;height:8px;border-radius:4px;background:var(--surface2);margin:12px 0 6px;overflow:visible">
+      <div style="height:100%;width:${pct}%;border-radius:4px;background:linear-gradient(90deg, var(--cool), var(--ok))"></div>
+      ${needPct ? `<span style="position:absolute;left:${needPct}%;top:-4px;bottom:-4px;width:2px;background:var(--text)"></span>` : ""}</div>
+    <div class="muted">${T.dhToday} ${num(c.today)}° · ${T.dhYear} ${num(c.year)}° · ${T.dhNeed} ${num(need, 0)}°${c.per_mwh != null ? " · " + T.dhPer.replace("{x}", (c.per_mwh > 0 ? "+" : "") + num(c.per_mwh, 2)) : ""}</div></div>`;
+}
 function nowTab(rooms) {
   const lg = data.learning || {}, heating = rooms.filter((r) => r.heating).length;
   const learnRows = rooms.map((r) => `<div class="lrow"><b>${esc(r.name)}</b><span>${r.hours_today == null ? T.learning : r.hours_today.length ? T.uses.replace("{h}", ranges(r.hours_today)) : T.notUsed} · ${r.rate_n ? T.rate.replace("{x}", num(r.rate, 0)) : T.rateDefault}</span></div>`).join("");
@@ -274,6 +297,7 @@ function nowTab(rooms) {
       <div class="metric"><div class="lbl">${T.mHeating}</div><div class="v">${heating}</div><div class="s">${T.mHeatingS.replace("{n}", rooms.length)}</div></div>
       <div class="metric"><div class="lbl">${T.mOut}</div><div class="v">${num(data.outdoor)}<small>°</small></div><div class="s">${T.mOutS}</div></div>
     </div>
+    ${dhCard()}
     ${(data.persons || []).length ? `<div class="card"><p class="eyebrow">${T.who}</p><div style="display:flex;gap:8px;flex-wrap:wrap">${data.persons.map((p) => `<span class="why" style="--c:${p.home ? "var(--ok)" : "var(--off)"}">${esc(p.name)} · ${p.home ? T.home : T.awayP}</span>`).join("")}</div></div>` : ""}
     <div class="card"><p class="eyebrow">${T.learned}</p><div class="learn">${learnRows}</div></div>`;
 }
@@ -311,12 +335,17 @@ function render() {
   else if (tab === "settings") {
     const f = data.features || {};
     body = `<div class="card"><p class="eyebrow">${T.feat.title}</p><p class="muted" style="margin:-4px 0 6px">${T.feat.hint}</p>
-      ${Object.keys(f).map((k) => `<div class="row"><div class="t"><b>${esc(T.feat[k][0])}</b><span>${esc(T.feat[k][1])}</span></div><button class="toggle ${f[k].on ? "on" : ""}" data-feat="${k}"></button></div>`).join("")}</div>`;
+      ${Object.keys(f).map((k) => `<div class="row"><div class="t"><b>${esc(T.feat[k][0])}</b><span>${esc(T.feat[k][1])}</span></div><button class="toggle ${f[k].on ? "on" : ""}" data-feat="${k}"></button></div>`).join("")}</div>
+      ${f.district && f.district.on ? `<div class="card"><p class="eyebrow">${T.dhTitle}</p>
+        <div class="row"><div class="t"><b>${T.dhSet}</b><span>${T.dhSetH}</span></div><input class="num" type="number" step="1" data-dh="need" value="${data.district.need ?? 25}"></div>
+        <div class="row"><div class="t"><b>${T.dhPen}</b><span>${T.dhUnit}</span></div><input class="num" type="number" step="0.01" data-dh="penalty" value="${data.district.penalty ?? ""}"></div>
+        <div class="row"><div class="t"><b>${T.dhBon}</b><span>${T.dhUnit}</span></div><input class="num" type="number" step="0.01" data-dh="bonus" value="${data.district.bonus ?? ""}"></div></div>` : ""}`;
   }
   else body = nowTab(rooms);
   app.innerHTML = tabs + body;
   document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; location.hash = tab; render(); });
   document.querySelectorAll("[data-room]").forEach((el) => el.onclick = () => openRoom(el.dataset.room));
+  document.querySelectorAll("[data-dh]").forEach((el) => el.onchange = async () => { await api("/api/district", { [el.dataset.dh]: el.value === "" ? null : Number(el.value.replace(",", ".")) }); load(); });
   document.querySelectorAll("[data-feat]").forEach((b) => b.onclick = async () => { await api("/api/feature", { key: b.dataset.feat, on: !b.classList.contains("on") }); load(); });
 }
 function openRoom(id) {
@@ -327,7 +356,7 @@ function openRoom(id) {
   const calls = (r.calls || []).map((x) => `${x.domain}.${x.service} ${JSON.stringify(Object.fromEntries(Object.entries(x.data).filter(([k]) => k !== "entity_id")))}`).join("\n");
   document.getElementById("sheetbox").innerHTML = `<h3>${esc(r.name)}</h3><p class="muted">${T.windows.replace("{n}", r.windows.length)} · ${T.presence.replace("{n}", r.presence.length)} · <span class="${r.same ? "agreeok" : "agreeno"}">${r.same ? T.same : T.diff}</span></p>
     <div class="row"><div class="t"><b>${T.kind}</b></div>${`<select data-k="kind">${Object.keys(T.kinds).map((k) => `<option value="${k}" ${r.kind === k ? "selected" : ""}>${esc(T.kinds[k])}</option>`).join("")}</select>`}</div>
-    <div class="row"><div class="t"><b>${T.heat}</b></div>${seg("heating", ["radiator", "floor"], r.heating, T.heating)}</div>
+    <div class="row"><div class="t"><b>${T.heat}</b></div>${seg("heating", ["radiator", "floor", "heatpump", "electric"], r.heating, T.heating)}</div>
     <div class="row"><div class="t"><b>${T.sensor}</b><span>${T.sensorH}</span></div><select data-k="temp_sensor"><option value="">${T.none}</option>${(r.temp_options || []).map((e) => `<option value="${esc(e)}" ${r.temp_sensor === e ? "selected" : ""}>${esc(e)}</option>`).join("")}</select></div>
     <div class="row"><div class="t"><b>${T.comfort}</b><span>${T.comfortH}</span></div>${numIn("comfort", c.comfort)}</div>
     <div class="row"><div class="t"><b>${T.hours}</b><span>${T.hoursH}</span></div><span><input class="num" type="number" min="0" max="24" data-k="day_from" value="${c.day_from}"> – <input class="num" type="number" min="0" max="24" data-k="day_to" value="${c.day_to}"></span></div>

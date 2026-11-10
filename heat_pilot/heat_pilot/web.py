@@ -31,6 +31,11 @@ def make_app(pilot) -> web.Application:
         pilot.tick()
         return web.json_response({"ok": True})
 
+    async def district(req: web.Request) -> web.Response:
+        pilot.set_district(await req.json())
+        pilot.tick()
+        return web.json_response({"ok": True})
+
     async def rediscover(_req: web.Request) -> web.Response:
         await pilot.discover()
         pilot.tick()
@@ -50,5 +55,6 @@ def make_app(pilot) -> web.Application:
     app.router.add_post("/api/room", room)
     app.router.add_post("/api/discover", rediscover)
     app.router.add_post("/api/feature", feature)
+    app.router.add_post("/api/district", district)
     app.router.add_get("/api/diagnostics", diagnostics)
     return app
