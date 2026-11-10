@@ -206,6 +206,11 @@ class Pilot:
         if mode not in ("shadow", "control", "off"):
             return
         modes = self.settings.setdefault("modes", {})
+        if area == "*":  # the whole house at once (every room found)
+            for r in self.found:
+                modes[r["area_id"]] = mode
+            self.save()
+            return
         if area is None:  # every room back to shadow
             for a in list(modes):
                 modes[a] = "shadow"

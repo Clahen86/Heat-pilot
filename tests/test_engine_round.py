@@ -121,3 +121,12 @@ def test_fahrenheit_home(tmp_path):
     assert abs(r["temp"] - 21.0) < 0.1  # 69.8 °F = 21 °C inside
     t = [c for c in r["calls"] if c["service"] == "set_temperature"][0]["data"]["temperature"]
     assert t > 60  # sent in °F
+
+
+def test_whole_house_at_once(tmp_path):
+    p = Pilot(FakeHA(), tmp_path)
+    asyncio.run(p.discover())
+    p.set_mode("*", "control")
+    assert all(p.mode(r["area_id"]) == "control" for r in p.found)
+    p.set_mode(None, "shadow")
+    assert all(p.mode(r["area_id"]) == "shadow" for r in p.found)
