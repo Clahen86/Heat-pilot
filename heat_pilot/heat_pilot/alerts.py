@@ -18,7 +18,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
-KINDS = ["mold", "air", "window", "offline", "battery", "not_warming", "cooling"]
+KINDS = ["mold", "air", "window", "offline", "battery", "not_warming", "cooling", "monthly"]
 REPEAT_H = 12
 
 
@@ -108,7 +108,7 @@ class Alerts:
                 continue
             self.s["sent"][a["key"]] = now.isoformat()
             due.append(a)
-        for k in [k for k, v in self.s["sent"].items() if now - datetime.fromisoformat(v) > timedelta(days=3)]:
+        for k in [k for k, v in self.s["sent"].items() if k != "monthly" and now - datetime.fromisoformat(v) > timedelta(days=3)]:
             self.s["sent"].pop(k, None)
         return due
 
@@ -118,17 +118,19 @@ TEXT = {
            "air": "Dårlig luft i {room} ({co2} ppm CO₂). Luft ud et par minutter.",
            "window": "Vinduet i {room} har været åbent i {minutes} min. Varmen er slukket imens.",
            "offline": "{device} i {room} svarer ikke. Tjek batteri eller forbindelse.",
-           "battery": "Lavt batteri: {device} ({level} %).",
+           "battery": "{device} har {level} % tilbage – skift batteriet.",
            "not_warming": "{room} bliver ikke varmt ({temp}° af {want}°). Måske luft i radiatoren eller en ventil, der sidder fast.",
            "cooling": "Fjernvarmen: afkøling {today}° i dag – kravet er {need}°. Tjek om nogle radiatorer står helt åbne.",
+           "monthly": "Varmepilot i {month}: sænket {degree_hours} gradtimer – ca. {pct} % mindre varme. Varmt til tiden: {ontime} %.",
            "title": "Varmepilot"},
     "en": {"mold": "Mould risk in {room}: {hum} % humidity. Air it out and keep the room warmer.",
            "air": "Stale air in {room} ({co2} ppm CO₂). Open a window for a few minutes.",
            "window": "The window in {room} has been open for {minutes} min. Heating is off meanwhile.",
            "offline": "{device} in {room} isn't responding. Check its battery or connection.",
-           "battery": "Low battery: {device} ({level} %).",
+           "battery": "{device} has {level} % left – change the battery.",
            "not_warming": "{room} isn't getting warm ({temp}° of {want}°). Maybe air in the radiator or a stuck valve.",
            "cooling": "District heating: cooling {today}° today – required is {need}°. Check for radiators fully open.",
+           "monthly": "Heat Pilot in {month}: turned down {degree_hours} degree-hours – about {pct} % less heat. Warm on time: {ontime} %.",
            "title": "Heat Pilot"},
 }
 

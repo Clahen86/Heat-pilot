@@ -49,6 +49,7 @@ def find(areas: list[dict[str, Any]], devices_list: list[dict[str, Any]], entiti
          states: dict[str, Any]) -> list[dict[str, Any]]:
     devices = {d["id"]: d for d in devices_list}
     area_name = {a["area_id"]: a.get("name") or a["area_id"] for a in areas}
+    area_floor = {a["area_id"]: a.get("floor_id") for a in areas}
     by_area: dict[str, list[dict[str, Any]]] = {}
     for e in entities:
         if e.get("disabled_by") or e.get("hidden_by") or e["entity_id"] not in states:
@@ -95,7 +96,7 @@ def find(areas: list[dict[str, Any]], devices_list: list[dict[str, Any]], entiti
                            if e.get("device_id") in own_devs and e["entity_id"].startswith("sensor.")
                            and (states[e["entity_id"]].get("attributes") or {}).get("device_class") == "battery")
         floor = all(t["floor"] for t in thermostats) or (room_kind(name) == "bathroom" and any(t["floor"] for t in thermostats))
-        rooms.append({"area_id": area, "name": name, "kind": room_kind(name), "heating": "floor" if floor else "radiator",
+        rooms.append({"area_id": area, "name": name, "kind": room_kind(name), "floor_id": area_floor.get(area), "heating": "floor" if floor else "radiator",
                       "thermostats": thermostats, "temp_sensor": temps[0] if temps else None, "temp_options": temps,
                       "windows": windows, "presence": presence, "humidity": humidity[:1], "co2": co2[:1], "lights": lights, "batteries": batteries})
     return rooms

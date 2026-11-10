@@ -20,6 +20,19 @@ _LOGGER = logging.getLogger(__name__)
 ROOM_KEYS = {"price_flex", "kind", "heating", "temp_sensor", "comfort", "setback", "night", "away", "day_from", "day_to", "excluded", "fixed_hours", "owner"}
 
 
+def floor_level(name: str) -> int:
+    """A floor without a level set: guessed from its name (basement below, ground floor, upstairs, attic)."""
+    import re
+    n = name.lower()
+    if re.search(r"kælder|kaelder|basement|cellar|keller|källare|kjeller|sous-sol|kelder", n):
+        return -1
+    if re.search(r"loft|attic|dachboden|vind|grenier|zolder", n):
+        return 2
+    if re.search(r"1\.? ?sal|first|upstairs|ober|övervåning|overetasje|étage|eerste|1st|2\.? ?etage", n):
+        return 1
+    return 0
+
+
 def _num(s: dict[str, Any] | None) -> float | None:
     try:
         return float((s or {}).get("state"))
@@ -37,6 +50,7 @@ class Pilot:
         except (OSError, ValueError):
             pass
         self.found: list[dict[str, Any]] = []
+        self.floors: list[dict[str, Any]] = []
         self.unplaced: list[str] = []
         self.now: dict[str, dict[str, Any]] = {}
         self.agree = {"same": 0, "checks": 0}
@@ -64,6 +78,13 @@ class Pilot:
         devices = await self.ha.command({"type": "config/device_registry/list"})
         entities = await self.ha.command({"type": "config/entity_registry/list"})
         self.found = discover.find(areas, devices, entities, self.ha.states)
+        try:
+            floors = await self.ha.command({"type": "config/floor_registry/list"})
+        except Exception:  # noqa: BLE001 - older Home Assistant: no floors
+            floors = []
+        self.floors = sorted(({"floor_id": f["floor_id"], "name": f.get("name"),
+                               "level": f.get("level") if f.get("level") is not None else floor_level(f.get("name") or "")} for f in floors),
+                             key=lambda f: -f["level"])
         self.unplaced = discover.unplaced(entities, devices, self.ha.states)
         self.doors = discover.exit_doors(entities, self.ha.states)
         self.meter = supply.find_heat_meter(entities, devices, self.ha.states)
@@ -266,11 +287,54 @@ class Pilot:
             latest = t if latest is None or t > latest else latest
         return latest
 
+    def sentence(self) -> str:
+        """One sentence of what is going on - for the dashboard card and the sensor."""
+        da = str(self.ha.config.get("language") or "").startswith("da")
+        rooms = {r["area_id"]: r for r in self.rooms()}
+        whys = [(rooms[a]["name"], (n.get("want") or {}).get("why"), n.get("heating")) for a, n in self.now.items() if a in rooms]
+        if getattr(self, "summer_now", False):
+            return "Sommer – varmen er slukket." if da else "Summer – heating is off."
+        if getattr(self, "holiday_now", None):
+            return "Ferie – huset holdes køligt." if da else "Holiday – the house is kept cool."
+        parts = []
+        if getattr(self, "away", False):
+            parts.append("Alle er ude – huset er sænket" if da else "Everyone is away – the house is turned down")
+        heat = [n for n, w, h in whys if h]
+        down = [n for n, w, h in whys if w in ("setback", "owner_away")]
+        win = [n for n, w, h in whys if w == "window"]
+        if win:
+            parts.append((f"Vindue åbent i {win[0]}" if da else f"Window open in {win[0]}"))
+        if heat:
+            parts.append((f"{len(heat)} rum varmer" if da else f"{len(heat)} rooms heating") if len(heat) > 1 else (f"{heat[0]} varmer" if da else f"{heat[0]} is heating"))
+        if down:
+            parts.append(f"{len(down)} rum er sænket" if da else f"{len(down)} rooms turned down")
+        return (". ".join(parts) + ".") if parts else ("Alle rum har den rette temperatur." if da else "Every room is as it should be.")
+
+    def month_report(self, now: datetime) -> dict[str, Any] | None:
+        """Last month: degrees turned down, about how much heat that saved, warm on time, district cooling."""
+        first = now.replace(day=1)
+        last_month = (first - __import__("datetime").timedelta(days=1)).strftime("%Y-%m")
+        days = [d for d in self.learning.s["saved"] if d.startswith(last_month)]
+        if not days:
+            return None
+        rooms = [r for r in self.rooms() if not r.get("excluded")]
+        dh = sum(sum(self.learning.s["saved"][d].values()) for d in days)
+        pct = round(dh / (24 * len(days) * max(1, len(rooms))) * 6, 1)
+        cool = self.cooling.period(sorted(d for d in self.cooling.s if d.startswith(last_month))) if self.meter else None
+        return {"month": last_month, "days": len(days), "degree_hours": round(dh), "pct": pct, "cooling": cool,
+                "ontime": self.learning.summary(now, [r["area_id"] for r in rooms]).get("ontime")}
+
     async def send_alerts(self) -> None:
         """Messages for the warnings due now - only to the phones chosen."""
         tz = ZoneInfo(self.ha.config.get("time_zone") or "UTC")
-        due = self.alerts.to_send(self.settings, datetime.now(tz))
+        now = datetime.now(tz)
+        due = self.alerts.to_send(self.settings, now)
         lang = "da" if str(self.ha.config.get("language") or "").startswith("da") else "en"
+        m = self.settings.get("messages") or {}
+        if now.day == 1 and now.hour >= 9 and (m.get("kinds") or {}).get("monthly", True) and m.get("targets") \
+                and self.alerts.s["sent"].get("monthly") != now.strftime("%Y-%m") and (rep := self.month_report(now)):
+            self.alerts.s["sent"]["monthly"] = now.strftime("%Y-%m")
+            due.append({"kind": "monthly", **rep})
         for a in due:
             for target in (self.settings.get("messages") or {}).get("targets") or []:
                 try:
@@ -341,7 +405,7 @@ class Pilot:
         for r in self.rooms():
             n = self.now.get(r["area_id"]) or {}
             rooms.append({k: r[k] for k in ("area_id", "name", "kind", "heating", "temp_sensor", "temp_options", "windows",
-                                            "presence", "humidity", "excluded", "fixed_hours", "owner") if k in r}
+                                            "presence", "humidity", "excluded", "fixed_hours", "owner", "floor_id") if k in r}
                          | {"cfg": r["cfg"], "thermostats": [{k: t[k] for k in ("entity_id", "name", "brand", "platform", "model")}
                                                              for t in r["thermostats"]]} | n)
         a = self.agree
@@ -350,7 +414,8 @@ class Pilot:
         for room in rooms:
             room["timeline"] = self.timelines.get(room["area_id"]) or []
         out_t = self.outdoor()
-        return {"rooms": rooms, "unplaced": self.unplaced, "away": getattr(self, "away", False), "now": now.isoformat(),
+        sun = (self.ha.states.get("sun.sun") or {}).get("state")
+        return {"month": self.month_report(now), "floors": self.floors, "sun": sun, "rooms": rooms, "unplaced": self.unplaced, "away": getattr(self, "away", False), "now": now.isoformat(),
                 "agree": round(100 * a["same"] / a["checks"]) if a["checks"] else None, "outdoor": out_t,
                 "learning": self.learning.summary(now, [r["area_id"] for r in rooms if not r.get("excluded")]),
                 "features": {k: {"found": bool(self.have.get(k)), "on": bool(getattr(self, "on", {}).get(k))}

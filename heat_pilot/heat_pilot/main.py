@@ -9,6 +9,7 @@ from pathlib import Path
 
 from aiohttp import web
 
+from . import cards
 from .engine import Pilot
 from .ha import HomeAssistant
 from .web import make_app
@@ -22,6 +23,11 @@ async def main() -> None:
 
     async def loop() -> None:
         await ha.connected.wait()
+        try:
+            await cards.install(ha)
+        except Exception:  # noqa: BLE001
+            logging.getLogger("heat_pilot").warning("Card not installed", exc_info=True)
+        pub = cards.Publisher()
         rounds = 0
         while True:
             try:
@@ -32,6 +38,7 @@ async def main() -> None:
                 pilot.tick()
                 await pilot.publish()
                 await pilot.send_alerts()
+                await pub.publish(ha, pilot)
             except Exception:  # noqa: BLE001 - tries again next minute
                 logging.getLogger("heat_pilot").warning("Round failed", exc_info=True)
             rounds += 1

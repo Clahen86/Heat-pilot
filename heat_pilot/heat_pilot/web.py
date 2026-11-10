@@ -11,7 +11,10 @@ FRONTEND = Path(__file__).parent / "frontend"
 
 def make_app(pilot) -> web.Application:
     async def index(_req: web.Request) -> web.Response:
-        return web.FileResponse(FRONTEND / "index.html", headers={"Cache-Control": "no-cache"})
+        """The page, in Home Assistant's own language (not the browser's)."""
+        lang = str(pilot.ha.config.get("language") or "en")[:2]
+        html = (FRONTEND / "index.html").read_text().replace("__HA_LANG__", lang)
+        return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
 
     async def status(_req: web.Request) -> web.Response:
         return web.json_response(pilot.status())

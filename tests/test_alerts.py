@@ -55,4 +55,9 @@ def test_sent_only_when_chosen_not_twice_not_at_night_and_kinds_off():
 
 def test_texts():
     assert "Krea" in text({"kind": "air", "room": "Krea", "co2": 1300}, "da")
-    assert text({"kind": "battery", "device": "Termostat", "level": 9}, "en") == "Low battery: Termostat (9 %)."
+    assert text({"kind": "battery", "device": "Termostat", "level": 9}, "en") == "Termostat has 9 % left – change the battery."
+
+
+def test_monthly_text():
+    t = text({"kind": "monthly", "month": "2026-11", "degree_hours": 420, "pct": 8.5, "ontime": 92}, "da")
+    assert "420 gradtimer" in t and "8.5 %" in t

@@ -82,12 +82,18 @@
   .tile { cursor:pointer; }
   .tile rect.bg { stroke-width:1.2; }
   .tile text { font-family:inherit; }
-  .t-nm { font-size:11px; font-weight:650; fill:var(--muted); }
+  .t-nm { font-size:12px; font-weight:650; fill:var(--muted); }
   .t-v { font-size:21px; font-weight:650; fill:var(--text); letter-spacing:-.03em; }
   .t-w { font-size:11px; font-weight:650; }
   .wave { fill:none; stroke:var(--heat); stroke-width:1.6; stroke-linecap:round; opacity:0; animation:rise 2.6s ease-in infinite; }
   .wave.w2 { animation-delay:.9s; } .wave.w3 { animation-delay:1.7s; }
   @keyframes rise { 0% { opacity:0; transform:translateY(6px); } 30% { opacity:.9; } 100% { opacity:0; transform:translateY(-12px); } }
+  .smoke { fill:var(--muted); opacity:0; animation:smoke 4s ease-out infinite; }
+  .smoke.s2 { animation-delay:1.3s; } .smoke.s3 { animation-delay:2.6s; }
+  @keyframes smoke { 0% { opacity:0; transform:translate(0, 10px) scale(.6); } 25% { opacity:.35; } 100% { opacity:0; transform:translate(14px, -26px) scale(1.6); } }
+  .glow { opacity:.08; animation:glow 3s ease-in-out infinite; } @keyframes glow { 50% { opacity:.2; } }
+  .tile { transition:transform .15s; transform-box:fill-box; transform-origin:center; } .tile:hover { transform:scale(1.02); }
+  #app > * { animation:fadein .35s ease both; } @keyframes fadein { from { opacity:0; transform:translateY(6px); } }
   .metrics { display:grid; grid-template-columns:repeat(4, 1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:22px; overflow:hidden; margin-top:12px; }
   .metric { background:var(--surface); padding:15px; }
   .metric .lbl { font-size:10.5px; font-weight:650; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); }
@@ -109,6 +115,10 @@
   .toggle { width:46px; height:28px; border-radius:14px; background:var(--surface2); border:1px solid var(--line2); position:relative; cursor:pointer; flex:none; transition:background .2s; }
   .toggle::after { content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:var(--muted); transition:all .2s; }
   .toggle.on { background:var(--accent); border-color:var(--accent); } .toggle.on::after { left:21px; background:#fff; }
+  .alert { display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-top:1px solid var(--line); }
+  .alert:first-of-type { border-top:0; padding-top:0; }
+  .alert .ai { width:26px; height:26px; flex:none; border-radius:9px; display:grid; place-items:center; font-weight:800; color:var(--warn); background:color-mix(in srgb, var(--warn) 16%, transparent); }
+  .alert b { font-size:14px; }
   .chipb { border:1px solid var(--line2); background:var(--surface2); color:var(--muted); font:inherit; font-size:13px; font-weight:600; padding:7px 12px; border-radius:10px; cursor:pointer; }
   .chipb.on { background:color-mix(in srgb, var(--accent) 18%, var(--surface2)); color:var(--text); border-color:var(--accent); }
   .empty { text-align:center; padding:40px 10px; color:var(--muted); }
@@ -125,7 +135,8 @@
 </main>
 <div class="sheet" id="sheet"><div class="box" id="sheetbox"></div></div>
 <script>
-const L = (navigator.language || "en").slice(0, 2) === "da" ? "da" : "en";
+const HA_LANG = "__HA_LANG__";
+const L = ((HA_LANG.startsWith("__") ? navigator.language : HA_LANG) || "en").slice(0, 2) === "da" ? "da" : "en";
 const T = {
   da: { shadow: "Skygge", hero: "Kører i skygge", heroP: "Den viser, hvad den ville gøre i hvert rum – men styrer intet endnu.",
     agree: "{x} % enig med det, der styrer nu", away: "Alle ude – sænket", rooms: "Rum", why: { comfort: "Komfort", setback: "Sænket", night: "Nat", away: "Alle ude", window: "Vindue åbent", manual: "Skruet i hånden" },
@@ -135,7 +146,7 @@ const T = {
     setback: "Sænket", setbackH: "Om dagen, når det ikke bruges", night: "Nat", hours: "Komfort fra – til", hoursH: "Hvornår rummet bruges", exclude: "Styr ikke dette rum",
     save: "Gem", close: "Luk", found: "Fundet: {n} rum med {t} termostater", unplaced: "Termostater uden rum: {x} – giv dem et område i Home Assistant",
     empty: "Fandt ingen termostater. Giv dine termostater et område (rum) i Home Assistant, så finder Varmepilot dem.", search: "Søg igen", diag: "Hent diagnose",
-    windows: "{n} vinduer/døre", presence: "{n} bevægelsessensorer", same: "Samme som nu", diff: "Anderledes end nu" },
+    windows: "{n} vinduer/døre", presence: "{n} bevægelsessensorer", same: "Samme som nu", diff: "Anderledes" },
   en: { shadow: "Shadow", hero: "Running in shadow", heroP: "It shows what it would do in each room – but controls nothing yet.",
     agree: "{x} % in line with what controls now", away: "Everyone away – turned down", rooms: "Rooms", why: { comfort: "Comfort", setback: "Setback", night: "Night", away: "Everyone away", window: "Window open", manual: "Turned by hand" },
     kinds: { living: "Living room", kitchen: "Kitchen", bedroom: "Bedroom", kids: "Kids' room", bathroom: "Bathroom", office: "Office", other: "Other room" },
@@ -144,7 +155,7 @@ const T = {
     setback: "Setback", setbackH: "Daytime, when not used", night: "Night", hours: "Comfort from – to", hoursH: "When the room is used", exclude: "Don't control this room",
     save: "Save", close: "Close", found: "Found: {n} rooms with {t} thermostats", unplaced: "Thermostats with no room: {x} – give them an area in Home Assistant",
     empty: "No thermostats found. Give your thermostats an area (room) in Home Assistant and Heat Pilot will find them.", search: "Search again", diag: "Download diagnostics",
-    windows: "{n} windows/doors", presence: "{n} motion sensors", same: "Same as now", diff: "Different from now" },
+    windows: "{n} windows/doors", presence: "{n} motion sensors", same: "Same as now", diff: "Different" },
 }[L];
 
 Object.assign(T, L === "da" ? {
@@ -164,7 +175,8 @@ Object.assign(T, L === "da" ? {
     ventilation: ["Ventilation", "Boost ved bad, mere luft ved høj CO₂ eller fugt, gratis køling med bypass – og varmen holder sig væk, når der køles"] },
   aTitle: "Værd at vide", mTitle: "Beskeder", mH: "Advarslerne vises altid her. Vælg, om de også skal sendes som besked – og hvilke.",
   mTo: "Send til", mNobody: "Ingen valgt – vises kun i appen", mNight: "Også om natten (22–7)",
-  kinds: { mold: "Skimmelrisiko", air: "Luft ud (CO₂)", window: "Vindue åbent længe", offline: "Termostat svarer ikke", battery: "Lavt batteri", not_warming: "Rum bliver ikke varmt", cooling: "Fjernvarme-afkøling" },
+  kinds: { mold: "Skimmelrisiko", air: "Luft ud (CO₂)", window: "Vindue åbent længe", offline: "Termostat svarer ikke", battery: "Lavt batteri", not_warming: "Rum bliver ikke varmt", cooling: "Fjernvarme-afkøling", monthly: "Månedsrapport" },
+  repTitle: "Sidste måned", repText: "Sænket {dh} gradtimer – ca. {pct} % mindre varme. Varmt til tiden: {ot}.",
   vTitle: "Ventilation", vLevels: { low: "Lav", normal: "Normal", high: "Høj", boost: "Boost" }, vNow: "Står på", vWant: "Ville sætte",
   vWhy: { shower: "Bad – fjerner fugten", co2: "Høj CO₂", humidity: "Høj fugt", free_cooling: "Gratis køling udefra", away: "Alle er ude", normal: "Normal drift" },
   vEff: "Varmegenvinding", vBypass: "Bypass", vOpen: "åben", vClosed: "lukket", vOut: "Ude", vSup: "Ind", vExt: "Ud af rum", vExh: "Ud af hus",
@@ -198,7 +210,8 @@ Object.assign(T, L === "da" ? {
     ventilation: ["Ventilation", "Boost after a shower, more air with high CO₂ or humidity, free cooling through the bypass – and no heating while it cools"] },
   aTitle: "Worth knowing", mTitle: "Messages", mH: "Warnings are always shown here. Choose whether they are also sent as messages – and which.",
   mTo: "Send to", mNobody: "None chosen – only shown in the app", mNight: "Also at night (22–7)",
-  kinds: { mold: "Mould risk", air: "Air it out (CO₂)", window: "Window open long", offline: "Thermostat not responding", battery: "Low battery", not_warming: "Room not getting warm", cooling: "District heating cooling" },
+  kinds: { mold: "Mould risk", air: "Air it out (CO₂)", window: "Window open long", offline: "Thermostat not responding", battery: "Low battery", not_warming: "Room not getting warm", cooling: "District heating cooling", monthly: "Monthly report" },
+  repTitle: "Last month", repText: "Turned down {dh} degree-hours – about {pct} % less heat. Warm on time: {ot}.",
   vTitle: "Ventilation", vLevels: { low: "Low", normal: "Normal", high: "High", boost: "Boost" }, vNow: "Set now", vWant: "Would set",
   vWhy: { shower: "Shower – removing the humidity", co2: "High CO₂", humidity: "High humidity", free_cooling: "Free cooling from outside", away: "Everyone is out", normal: "Normal" },
   vEff: "Heat recovery", vBypass: "Bypass", vOpen: "open", vClosed: "closed", vOut: "Outdoor", vSup: "Supply", vExt: "Extract", vExh: "Exhaust",
@@ -270,27 +283,60 @@ function sentence(rooms) {
   const night = by("night"); if (night.length) parts.push(T.sNight.replace("{n}", night.length));
   return parts.length ? parts.join(". ") + "." : T.sAllGood + ".";
 }
+function tileColor(r) {
+  const w = r.want || {}, why = w.why || "comfort";
+  if (w.temp == null) return ["var(--off)", 8];
+  if (r.heating) return ["var(--heat)", 26];
+  if (r.temp != null && r.temp < w.temp - 0.5) return ["var(--cool)", 18];
+  return [COL[why] || "var(--heat)", 10];
+}
 function houseSvg(rooms) {
-  const W = 680, cols = rooms.length > 8 ? 4 : 3, tw = 150, th = 92, gx = 14, gy = 14;
-  const rows = Math.ceil(rooms.length / cols), bw = cols * tw + (cols - 1) * gx + 40, bx = (W - bw) / 2, top = 96, bh = rows * th + (rows - 1) * gy + 40;
-  const H = top + bh + 10;
-  let tiles = "";
-  rooms.forEach((r, i) => {
-    const c = i % cols, row = Math.floor(i / cols), x = bx + 20 + c * (tw + gx), y = top + 20 + row * (th + gy);
-    const w = r.want || {}, why = w.why || "comfort", col = COL[why] || "var(--heat)";
-    const cold = r.temp != null && w.temp != null && r.temp < w.temp - 0.5;
-    const waves = r.heating ? [0, 1, 2].map((k) => `<path class="wave w${k + 1}" d="M${x + tw - 34 + k * 9} ${y + 30} q4 -5 0 -10 q-4 -5 0 -10"/>`).join("") : "";
-    tiles += `<g class="tile" data-room="${esc(r.area_id)}"><rect class="bg" x="${x}" y="${y}" width="${tw}" height="${th}" rx="14"
-        fill="color-mix(in srgb, ${col} ${r.heating ? 22 : 10}%, var(--surface2))" stroke="color-mix(in srgb, ${col} 45%, transparent)"/>
-      <text class="t-nm" x="${x + 12}" y="${y + 20}">${esc(r.name.length > 17 ? r.name.slice(0, 16) + "…" : r.name)}</text>
-      <text class="t-v" x="${x + 12}" y="${y + 52}" ${cold ? 'style="fill:var(--cool)"' : ""}>${num(r.temp)}°</text>
-      <text class="t-w" x="${x + 12}" y="${y + 76}" fill="${col}">${w.temp == null ? T.off : "→ " + num(w.temp) + "° · " + esc(T.why[why] || why)}</text>${waves}</g>`;
+  const narrow = (window.innerWidth || 800) < 600;
+  const W = narrow ? 380 : 680, pad = narrow ? 6 : 26, tw0 = 150, th = narrow ? 92 : 96, gx = 10, gy = 10, labelW = 0;
+  const floors = (data.floors || []).filter((f) => rooms.some((r) => r.floor_id === f.floor_id));
+  const bands = floors.map((f) => ({ ...f, rooms: rooms.filter((r) => r.floor_id === f.floor_id) }));
+  const loose = rooms.filter((r) => !floors.some((f) => f.floor_id === r.floor_id));
+  if (loose.length) bands.push({ floor_id: "", name: "", level: 0, rooms: loose });
+  const cols = Math.min(narrow ? 2 : 4, Math.max(...bands.map((b) => b.rooms.length), 1));
+  const inner = narrow ? 24 : 40;
+  const tw = Math.min(narrow ? 999 : tw0, (W - 2 * pad - inner - (cols - 1) * gx) / cols);
+  const bw = cols * tw + (cols - 1) * gx + inner, bx = (W - bw) / 2, roofH = 90;
+  let y = roofH + 20, body = "", ground = null, tiles = "";
+  bands.forEach((b, bi) => {
+    const rows = Math.ceil(b.rooms.length / cols), h = rows * th + (rows - 1) * gy + 36;
+    if (b.level < 0 && ground == null) ground = y;
+    body += `<g><rect x="${bx}" y="${y}" width="${bw}" height="${h}" fill="${b.level < 0 ? "color-mix(in srgb, #8b6b4a 10%, var(--surface))" : "var(--surface)"}" stroke="var(--line2)" stroke-width="1.5"/>
+      ${b.name ? `<text x="${bx + 14}" y="${y + 20}" class="t-nm" style="text-transform:uppercase;letter-spacing:.1em;font-size:10px;fill:var(--faint)">${esc(b.name)}</text>` : ""}</g>`;
+    b.rooms.forEach((r, i) => {
+      const c = i % cols, row = Math.floor(i / cols), x = bx + inner / 2 + c * (tw + gx), ty = y + 28 + row * (th + gy);
+      const w = r.want || {}, why = w.why || "comfort", [col, mix] = tileColor(r);
+      const win = (r.windows || []).length && why === "window";
+      const waves = r.heating ? [0, 1, 2].map((k) => `<path class="wave w${k + 1}" d="M${x + tw - 30 + k * 8} ${ty + 34} q4 -5 0 -10 q-4 -5 0 -10"/>`).join("") : "";
+      const prog = r.temp != null && w.temp != null ? Math.max(0, Math.min(1, 1 - (w.temp - r.temp) / 3)) : 0;
+      const short = r.name.length > 18 ? r.name.slice(0, 17) + "…" : r.name;
+      tiles += `<g class="tile" data-room="${esc(r.area_id)}">
+        <rect class="bg" x="${x}" y="${ty}" width="${tw}" height="${th}" rx="14" fill="color-mix(in srgb, ${col} ${mix}%, var(--surface2))" stroke="color-mix(in srgb, ${col} 50%, transparent)"/>
+        ${r.heating ? `<rect x="${x}" y="${ty}" width="${tw}" height="${th}" rx="14" fill="${col}" class="glow"/>` : ""}
+        <text class="t-nm" x="${x + 12}" y="${ty + 20}">${esc(short)}${r.occupied ? " ●" : ""}</text>
+        <text class="t-v" x="${x + 12}" y="${ty + 52}">${num(r.temp)}°</text>
+        <text class="t-w" x="${x + 12}" y="${ty + 72}" fill="${col}">${w.temp == null ? (win ? "🪟 " : "") + T.off : "→ " + num(w.temp) + "° " + esc(T.why[why] || why)}</text>
+        <rect x="${x + 12}" y="${ty + th - 13}" width="${tw - 24}" height="3" rx="1.5" fill="var(--line2)"/>
+        <rect x="${x + 12}" y="${ty + th - 13}" width="${(tw - 24) * prog}" height="3" rx="1.5" fill="${col}"/>${waves}</g>`;
+    });
+    y += h;
   });
-  const roof = `<path d="M${bx - 18} ${top + 4} L${W / 2} 18 L${bx + bw + 18} ${top + 4}" fill="none" stroke="var(--line2)" stroke-width="2.5" stroke-linejoin="round"/>
-    <rect x="${bx}" y="${top}" width="${bw}" height="${bh}" rx="18" fill="var(--surface)" stroke="var(--line2)" stroke-width="2"/>
-    <rect x="${bx + bw - 70}" y="34" width="22" height="40" rx="3" fill="var(--surface2)" stroke="var(--line2)" stroke-width="2"/>`;
-  const out = data.outdoor != null ? `<text x="${bx - 4}" y="64" font-size="13" font-weight="650" fill="var(--cool)">☁ ${num(data.outdoor)}°</text>` : "";
-  return `<svg viewBox="0 0 ${W} ${H}">${roof}${out}${tiles}</svg>`;
+  const H = y + 16, anyHeat = rooms.some((r) => r.heating), day = data.sun !== "below_horizon";
+  const chx = bx + bw - 90;
+  const smoke = anyHeat ? [0, 1, 2].map((k) => `<circle class="smoke s${k + 1}" cx="${chx + 11}" cy="22" r="${5 + k * 2}"/>`).join("") : "";
+  const sx = narrow ? 22 : bx - 4;
+  const sky = day ? `<circle cx="${sx}" cy="30" r="13" fill="#f5c451"/><circle cx="${sx}" cy="30" r="22" fill="#f5c451" opacity=".15"/>`
+    : `<path d="M${sx + 2} 18 a13 13 0 1 0 10 22 a10 10 0 1 1 -10 -22z" fill="#c9d3ff"/>`;
+  const out = data.outdoor != null ? `<text x="${sx + 22}" y="35" font-size="13" font-weight="650" fill="var(--muted)">${num(data.outdoor)}° ${L === "da" ? "ude" : "outside"}</text>` : "";
+  const roof = `<defs><linearGradient id="roofg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".35"/><stop offset="1" stop-color="var(--accent)" stop-opacity=".06"/></linearGradient></defs>
+    <rect x="${chx}" y="34" width="22" height="46" rx="3" fill="var(--surface2)" stroke="var(--line2)" stroke-width="1.5"/>${smoke}
+    <path d="M${bx - (narrow ? 4 : 22)} ${roofH + 22} L${W / 2} 22 L${bx + bw + (narrow ? 4 : 22)} ${roofH + 22} Z" fill="url(#roofg)" stroke="var(--line2)" stroke-width="2" stroke-linejoin="round"/>`;
+  const gl = ground != null ? `<line x1="0" x2="${W}" y1="${ground}" y2="${ground}" stroke="#8b6b4a" stroke-width="3" stroke-linecap="round" opacity=".7"/>` : "";
+  return `<svg viewBox="0 0 ${W} ${H}">${sky}${out}${roof}${body}${gl}${tiles}</svg>`;
 }
 function msgCard() {
   const m = data.messages || {}, targets = m.targets || [], kinds = m.kinds || {};
@@ -307,7 +353,7 @@ function ventCard() {
   const lv = (k) => T.vLevels[k] || "–", t = v.temps || {};
   const bars = ["low", "normal", "high", "boost"].map((k, i) => `<i style="flex:1;height:${8 + i * 6}px;border-radius:3px;align-self:flex-end;background:${["low", "normal", "high", "boost"].indexOf(v.level) >= i ? "var(--cool)" : "var(--surface2)"}"></i>`).join("");
   const box = (lbl, val, col) => `<div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:650;color:${col}">${num(val)}°</div><div class="muted" style="font-size:11px">${lbl}</div></div>`;
-  return `<div class="card"><p class="eyebrow">${T.vTitle} · ${esc(v.name || "")}<span style="color:${v.same ? "var(--ok)" : "var(--warn)"}">${v.same ? T.same : T.diff}</span></p>
+  return `<div class="card"><p class="eyebrow">${T.vTitle}<span style="color:${v.same ? "var(--ok)" : "var(--warn)"}">${v.same ? T.same : T.diff}</span></p>
     <div style="display:flex;gap:16px;align-items:center"><div style="display:flex;gap:4px;width:64px;height:28px">${bars}</div>
       <div><div style="font-size:18px;font-weight:650">${T.vWant}: ${lv(v.level)}</div><div class="muted">${esc(T.vWhy[v.why] || v.why)} · ${T.vNow}: ${lv(v.current)}</div></div></div>
     <div style="display:flex;gap:6px;margin-top:14px;padding:10px;border-radius:14px;background:var(--surface2)">${box(T.vOut, t.outdoor, "var(--cool)")}${box(T.vSup, t.supply, "var(--ok)")}${box(T.vExt, t.extract, "var(--heat)")}${box(T.vExh, t.exhaust, "var(--muted)")}</div>
@@ -318,18 +364,19 @@ function dhCard() {
   if (!c || !n) return "";
   const need = c.need, ref = c.year ?? c.week ?? c.today ?? n.now, good = need == null || ref >= need;
   const pct = Math.max(0, Math.min(100, (n.now / 45) * 100)), needPct = need ? (need / 45) * 100 : null;
-  return `<div class="card"><p class="eyebrow">${T.dhTitle}<span style="color:${good ? "var(--ok)" : "var(--warn)"}">${good ? T.dhGood : T.dhBad}</span></p>
+  return `<div class="card"><p class="eyebrow">${T.dhTitle}<span style="color:${good ? "var(--ok)" : "var(--warn)"}">${good ? "✓" : "!"}</span></p>
     <div style="display:flex;align-items:baseline;gap:10px"><div class="now">${num(n.now)}<small>°</small></div><span class="muted">${T.dhNow} · ${T.dhSupRet.replace("{s}", num(n.supply, 0)).replace("{r}", num(n.return, 0))}</span></div>
     <div style="position:relative;height:8px;border-radius:4px;background:var(--surface2);margin:12px 0 6px;overflow:visible">
       <div style="height:100%;width:${pct}%;border-radius:4px;background:linear-gradient(90deg, var(--cool), var(--ok))"></div>
       ${needPct ? `<span style="position:absolute;left:${needPct}%;top:-4px;bottom:-4px;width:2px;background:var(--text)"></span>` : ""}</div>
+    <div class="muted" style="color:${good ? "var(--ok)" : "var(--warn)"};font-weight:600">${good ? T.dhGood : T.dhBad}</div>
     <div class="muted">${T.dhToday} ${num(c.today)}° · ${T.dhYear} ${num(c.year)}° · ${T.dhNeed} ${num(need, 0)}°${c.per_mwh != null ? " · " + T.dhPer.replace("{x}", (c.per_mwh > 0 ? "+" : "") + num(c.per_mwh, 2)) : ""}</div></div>`;
 }
 function nowTab(rooms) {
   const lg = data.learning || {}, heating = rooms.filter((r) => r.heating).length;
   const learnRows = rooms.map((r) => `<div class="lrow"><b>${esc(r.name)}</b><span>${r.hours_today == null ? T.learning : r.hours_today.length ? T.uses.replace("{h}", ranges(r.hours_today)) : T.notUsed} · ${r.rate_n ? T.rate.replace("{x}", num(r.rate, 0)) : T.rateDefault}</span></div>`).join("");
   return `<div class="card status"><div class="dotc">${FLAME}</div><div><h2>${esc(sentence(rooms))}</h2><p>${T.heroP}${data.agree != null ? " · " + T.agree.replace("{x}", data.agree) : ""}</p></div></div>
-    ${(data.alerts || []).length ? `<div class="card"><p class="eyebrow">${T.aTitle}</p>${data.alerts.map((a) => `<div class="lrow"><b style="color:var(--warn)">${esc(T.kinds[a.kind] || a.kind)}</b><span>${esc(a.text)}</span></div>`).join("")}</div>` : ""}
+    ${(data.alerts || []).length ? `<div class="card"><p class="eyebrow">${T.aTitle}</p>${data.alerts.map((a) => `<div class="alert"><span class="ai">!</span><div><b>${esc(T.kinds[a.kind] || a.kind)}</b><div class="muted">${esc(a.text)}</div></div></div>`).join("")}</div>` : ""}
     <div class="card house">${houseSvg(rooms)}</div>
     <div class="metrics">
       <div class="metric"><div class="lbl">${T.mSaved}</div><div class="v">${num(lg.today_dh)}<small>${T.dh}</small></div><div class="s">${lg.week_pct != null ? T.mSavedS.replace("{x}", num(lg.week_pct, 0)) : ""}</div></div>
@@ -337,6 +384,7 @@ function nowTab(rooms) {
       <div class="metric"><div class="lbl">${T.mHeating}</div><div class="v">${heating}</div><div class="s">${T.mHeatingS.replace("{n}", rooms.length)}</div></div>
       <div class="metric"><div class="lbl">${T.mOut}</div><div class="v">${num(data.outdoor)}<small>°</small></div><div class="s">${T.mOutS}</div></div>
     </div>
+    ${data.month ? `<div class="card"><p class="eyebrow">${T.repTitle} · ${esc(data.month.month)}</p><div>${T.repText.replace("{dh}", data.month.degree_hours).replace("{pct}", num(data.month.pct, 0)).replace("{ot}", data.month.ontime != null ? data.month.ontime + " %" : "–")}</div></div>` : ""}
     ${ventCard()}
     ${dhCard()}
     ${(data.persons || []).length ? `<div class="card"><p class="eyebrow">${T.who}</p><div style="display:flex;gap:8px;flex-wrap:wrap">${data.persons.map((p) => `<span class="why" style="--c:${p.home ? "var(--ok)" : "var(--off)"}">${esc(p.name)} · ${p.home ? T.home : T.awayP}</span>`).join("")}</div></div>` : ""}
