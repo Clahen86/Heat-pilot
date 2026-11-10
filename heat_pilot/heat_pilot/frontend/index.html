@@ -426,10 +426,11 @@ function dhCard() {
       <div style="height:100%;width:${pct}%;border-radius:4px;background:linear-gradient(90deg, var(--cool), var(--ok))"></div>
       ${needPct ? `<span style="position:absolute;left:${needPct}%;top:-4px;bottom:-4px;width:2px;background:var(--text)"></span>` : ""}</div>
     <div class="muted" style="color:${good ? "var(--ok)" : "var(--warn)"};font-weight:600">${good ? T.dhGood : T.dhBad}</div>
-    <div class="muted">${T.dhToday} ${num(c.today)}° · ${T.dhYear} ${num(c.year)}° · ${T.dhNeed} ${num(need, 0)}°${c.per_mwh != null ? " · " + T.dhPer.replace("{x}", (c.per_mwh > 0 ? "+" : "") + num(c.per_mwh, 2)) : ""}</div></div>`;
+    <div class="muted">${T.dhToday} ${num(c.today)}° · ${T.dhYear} ${num(c.year)}° · ${T.dhNeed} ${num(need, 0)}°${c.per_mwh != null && ((data.district || {}).bonus || (data.district || {}).penalty) ? " · " + T.dhPer.replace("{x}", (c.per_mwh > 0 ? "+" : "") + num(c.per_mwh, 2)) : ""}</div></div>`;
 }
 function nowTab(rooms) {
   const lg = data.learning || {}, heating = rooms.filter((r) => r.heating).length;
+  const anyControl = rooms.some((r) => r.mode === "control");  // in shadow another system heats: not Heat Pilot's result
   const sunMax = (g) => g ? Math.max(...Object.values(g)) : 0;
   const learnRows = rooms.map((r) => `<div class="lrow"><b>${esc(r.name)}</b><span>${r.hours_today == null ? T.learning : r.hours_today.length ? T.uses.replace("{h}", ranges(r.hours_today)) : T.notUsed} · ${r.rate_n ? T.rate.replace("{x}", num(r.rate, 0)) : T.rateDefault}${r.loss ? " · " + T.lossTxt.replace("{x}", num(r.loss * 20, 1)) : ""}${sunMax(r.sun_gain) > 0.2 ? " · " + T.sunTxt.replace("{x}", num(sunMax(r.sun_gain), 1)) : ""}${r.comfort_learned ? " · " + num(r.cfg.comfort) + "° " + T.learnedC : ""}</span></div>`).join("");
   return `<div class="card status"><div class="dotc">${FLAME}</div><div><h2>${esc(sentence(rooms))}</h2><p>${T.heroP}${data.agree != null ? " · " + T.agree.replace("{x}", data.agree) : ""}</p></div></div>
@@ -437,7 +438,7 @@ function nowTab(rooms) {
     <div class="card house">${houseSvg(rooms)}</div>
     <div class="metrics">
       <div class="metric"><div class="lbl">${T.mSaved2}</div><div class="v">≈ ${lg.today_pct ?? 0}<small>%</small></div><div class="s">${T.mSaved2S.replace("{x}", num(lg.today_avg_down ?? 0, 1))}</div></div>
-      <div class="metric"><div class="lbl">${T.mOnTime}</div><div class="v">${lg.ontime != null ? lg.ontime + "<small>%</small>" : "–"}</div><div class="s">${lg.ontime_n ? T.mOnTimeS.replace("{n}", lg.ontime_n) : T.learning}</div></div>
+      <div class="metric"><div class="lbl">${T.mOnTime}</div><div class="v">${anyControl && lg.ontime != null ? lg.ontime + "<small>%</small>" : "–"}</div><div class="s">${anyControl ? (lg.ontime_n ? T.mOnTimeS.replace("{n}", lg.ontime_n) : T.learning) : T.onTimeShadow}</div></div>
       <div class="metric"><div class="lbl">${T.mHeating}</div><div class="v">${heating}</div><div class="s">${T.mHeatingS.replace("{n}", rooms.length)}</div></div>
       <div class="metric"><div class="lbl">${T.mOut}</div><div class="v">${num(data.outdoor)}<small>°</small></div><div class="s">${T.mOutS}</div></div>
     </div>
