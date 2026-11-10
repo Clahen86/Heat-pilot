@@ -4,7 +4,8 @@ The order, highest first:
 1. A window or door open for a few minutes: heating off (no heating the garden).
 2. Someone turned the thermostat: their temperature, for a while.
 3. Everyone away (no movement in the house for an hour, daytime): at most the away temperature.
-4. Night: the night temperature. Day: the room's comfort temperature in its hours, else the setback.
+4. Comfort in the room's hours (learned from when it is used, or as set) - and heating started in time before them,
+   from the learned minutes per degree. Otherwise the setback, and at night the night temperature.
 Always within the frost guard and the room's own limits.
 """
 
@@ -44,8 +45,33 @@ def _minutes_open(states: dict[str, Any], entity: str, now: datetime) -> float |
     return (now - since).total_seconds() / 60
 
 
+def comfort_at(c: dict[str, Any], hours: list[int] | None, t: datetime) -> bool:
+    """A comfort hour: learned when it is, else the room's own hours."""
+    if hours is not None:
+        return t.hour in hours
+    h = t.hour + t.minute / 60
+    return c["day_from"] <= h < c["day_to"]
+
+
+def base(c: dict[str, Any], hours: list[int] | None, t: datetime) -> tuple[float, str]:
+    if comfort_at(c, hours, t):
+        return c["comfort"], "comfort"
+    h = t.hour + t.minute / 60
+    return (c["night"], "night") if (h >= 22 or h < 6) else (c["setback"], "setback")
+
+
+def next_comfort(c: dict[str, Any], hours: list[int] | None, now: datetime, within_h: int = 8) -> datetime | None:
+    t = now.replace(minute=0, second=0, microsecond=0)
+    for _ in range(within_h * 4):
+        t += timedelta(minutes=15)
+        if comfort_at(c, hours, t):
+            return t
+    return None
+
+
 def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], now: datetime,
-           house_away: bool, manual: dict[str, Any] | None) -> dict[str, Any]:
+           house_away: bool, manual: dict[str, Any] | None, hours: list[int] | None = None,
+           temp: float | None = None, rate: float | None = None, occupied: bool = False) -> dict[str, Any]:
     """{"temp": °C or None (off), "why": key, "until": time the reason ends or None}."""
     c = {**defaults(room), **(cfg or {})}
     for w in room.get("windows") or []:
@@ -54,18 +80,47 @@ def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], no
             return {"temp": None, "why": "window", "entity": w}
     if manual and manual.get("until") and now < manual["until"]:
         return {"temp": manual["temp"], "why": "manual", "until": manual["until"].isoformat()}
-    h = now.hour + now.minute / 60
-    day = c["day_from"] <= h < c["day_to"]
-    if day:
-        t, why = c["comfort"], "comfort"
-        until = now.replace(hour=int(c["day_to"]) % 24, minute=0, second=0, microsecond=0)
+    t, why = base(c, hours, now)
+    if occupied and why != "comfort" and 6 <= now.hour < 22 and c["comfort"] > t:
+        t, why = c["comfort"], "occupied"  # someone is in the room now: comfort, whatever the plan said
+    until = None
+    if why in ("comfort", "occupied") and why != "occupied":
+        e = now.replace(second=0, microsecond=0)
+        while comfort_at(c, hours, e) and e < now + timedelta(hours=24):
+            e += timedelta(minutes=15)
+        until = e
     else:
-        t, why = (c["night"], "night") if (h >= 21 or h < 6) else (c["setback"], "setback")
-        nxt = now.replace(hour=int(c["day_from"]), minute=0, second=0, microsecond=0)
-        until = nxt if nxt > now else nxt + timedelta(days=1)
+        nxt = next_comfort(c, hours, now)
+        if nxt is not None:
+            until = nxt
+            # Start in time: warm when the room is used - the learned minutes per degree from where it is now.
+            if temp is not None and rate:
+                lead = max(0.0, c["comfort"] - temp) * rate
+                if now >= nxt - timedelta(minutes=lead) and c["comfort"] > t:
+                    t, why = c["comfort"], "preheat"
     if house_away and 6 <= now.hour < 23 and t > c["away"]:
         t, why, until = c["away"], "away", None
     return {"temp": max(FROST, round(t, 1)), "why": why, "until": until.isoformat() if until else None}
+
+
+def timeline(room: dict[str, Any], cfg: dict[str, Any], now: datetime, hours_by_day: dict[int, list[int] | None],
+             temp: float | None, rate: float | None, steps: int = 96) -> list[dict[str, Any]]:
+    """The next 24 hours in quarters: the temperature and why - with heating started in time before comfort."""
+    c = {**defaults(room), **(cfg or {})}
+    t0 = now.replace(minute=now.minute // 15 * 15, second=0, microsecond=0)
+    out = []
+    for i in range(steps):
+        t = t0 + timedelta(minutes=15 * i)
+        v, why = base(c, hours_by_day.get(t.weekday()), t)
+        out.append({"t": t.isoformat(), "temp": v, "why": why})
+    lead_q = int(round(max(0.0, c["comfort"] - (temp if temp is not None else c["setback"])) * (rate or 12) / 15)) if rate else 0
+    lead_q = max(lead_q, 1)
+    for i in range(len(out)):
+        if out[i]["why"] == "comfort" and i > 0 and out[i - 1]["why"] != "comfort":
+            for j in range(max(0, i - lead_q), i):
+                if out[j]["why"] != "comfort":
+                    out[j] = {**out[j], "temp": c["comfort"], "why": "preheat"}
+    return out
 
 
 def house_away(rooms: list[dict[str, Any]], states: dict[str, Any], now: datetime, last_motion: datetime | None) -> bool:

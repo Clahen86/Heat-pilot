@@ -70,6 +70,42 @@
   .ghost { background:transparent; color:var(--muted); border:1px solid var(--line2); }
   .calls { font:12px ui-monospace, Menlo, monospace; color:var(--faint); white-space:pre-wrap; margin-top:6px; }
   details summary { cursor:pointer; color:var(--muted); font-size:13px; margin-top:10px; }
+  .tabs { position:sticky; top:0; z-index:5; display:flex; gap:4px; background:color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter:blur(12px); padding:6px 0 8px; }
+  .tabs button { flex:1; border:1px solid var(--line); background:var(--surface); color:var(--muted); font:inherit; font-size:14px; font-weight:650; padding:10px; border-radius:14px; cursor:pointer; }
+  .tabs button.on { color:var(--text); border-color:color-mix(in srgb, var(--accent) 50%, transparent); background:color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+  .status { display:flex; gap:14px; align-items:flex-start; position:relative; overflow:hidden; }
+  .status::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; border-radius:3px; background:var(--accent); }
+  .dotc { width:38px; height:38px; flex:none; border-radius:12px; display:grid; place-items:center; color:var(--accent); background:color-mix(in srgb, var(--accent) 14%, transparent); margin-left:6px; }
+  .status h2 { margin:0 0 4px; font-size:17px; font-weight:650; letter-spacing:-.015em; line-height:1.35; }
+  .status p { margin:0; color:var(--muted); font-size:13.5px; }
+  .house svg { width:100%; height:auto; display:block; }
+  .tile { cursor:pointer; }
+  .tile rect.bg { stroke-width:1.2; }
+  .tile text { font-family:inherit; }
+  .t-nm { font-size:11px; font-weight:650; fill:var(--muted); }
+  .t-v { font-size:21px; font-weight:650; fill:var(--text); letter-spacing:-.03em; }
+  .t-w { font-size:11px; font-weight:650; }
+  .wave { fill:none; stroke:var(--heat); stroke-width:1.6; stroke-linecap:round; opacity:0; animation:rise 2.6s ease-in infinite; }
+  .wave.w2 { animation-delay:.9s; } .wave.w3 { animation-delay:1.7s; }
+  @keyframes rise { 0% { opacity:0; transform:translateY(6px); } 30% { opacity:.9; } 100% { opacity:0; transform:translateY(-12px); } }
+  .metrics { display:grid; grid-template-columns:repeat(4, 1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:22px; overflow:hidden; margin-top:12px; }
+  .metric { background:var(--surface); padding:15px; }
+  .metric .lbl { font-size:10.5px; font-weight:650; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); }
+  .metric .v { font-size:24px; font-weight:650; letter-spacing:-.03em; margin-top:7px; line-height:1.1; }
+  .metric .v small { font-size:12px; font-weight:500; color:var(--muted); margin-left:2px; }
+  .metric .s { font-size:11.5px; color:var(--muted); margin-top:4px; }
+  .learn { display:grid; gap:8px; }
+  .lrow { display:flex; justify-content:space-between; gap:10px; font-size:13.5px; padding:8px 0; border-top:1px solid var(--line); }
+  .lrow:first-child { border-top:0; } .lrow b { font-weight:600; } .lrow span { color:var(--muted); text-align:right; }
+  .tl { display:grid; grid-template-columns:96px 1fr; gap:8px 10px; align-items:center; }
+  .tl .nm { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bars { position:relative; height:22px; border-radius:7px; overflow:hidden; display:flex; background:var(--surface2); }
+  .bars i { display:block; height:100%; }
+  .nowline { position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--text); border-radius:1px; }
+  .axis { display:flex; justify-content:space-between; font-size:10.5px; color:var(--faint); margin-left:106px; margin-top:4px; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-top:14px; }
+  .legend i { display:inline-block; width:12px; height:12px; border-radius:4px; margin-right:6px; vertical-align:-2px; }
+  @media (max-width:520px) { .metrics { grid-template-columns:1fr 1fr; } .tl { grid-template-columns:74px 1fr; } .axis { margin-left:84px; } }
   .empty { text-align:center; padding:40px 10px; color:var(--muted); }
   @media (max-width:520px) { .rooms { grid-template-columns:1fr 1fr; gap:10px; } .room { padding:13px; border-radius:18px; } .now { font-size:30px; } .want { font-size:16px; } .devs { display:none; } }
 </style>
@@ -105,12 +141,32 @@ const T = {
     empty: "No thermostats found. Give your thermostats an area (room) in Home Assistant and Heat Pilot will find them.", search: "Search again", diag: "Download diagnostics",
     windows: "{n} windows/doors", presence: "{n} motion sensors", same: "Same as now", diff: "Different from now" },
 }[L];
+
+Object.assign(T, L === "da" ? {
+  tabs: { now: "Nu", plan: "Plan", rooms: "Rum" }, sHeat: "{r} varmes op til kl. {t}", sHeatN: "{n} rum varmes op", sPre: "{r} varmes op, så det er varmt kl. {t}",
+  sDown: "{n} rum er sænket, fordi ingen bruger dem", sDown1: "{r} er sænket, fordi ingen bruger det", sWin: "Vinduet i {r} er åbent – varmen er slukket",
+  sAway: "Alle er ude – huset er sænket", sAllGood: "Alle rum har den temperatur, de skal have", sNight: "Natsænkning i {n} rum",
+  mSaved: "Sænket i dag", mSavedS: "≈ {x} % mindre varme denne uge", mOnTime: "Varmt til tiden", mOnTimeS: "{n} gange målt", mHeating: "Varmer nu", mHeatingS: "af {n} rum", mOut: "Ude", mOutS: "fra vejret",
+  dh: "°·t", learned: "Det har den lært", uses: "bruges {h}", notUsed: "bruges sjældent", rate: "{x} min pr. grad", rateDefault: "lærer opvarmningstid", learning: "lærer stadig",
+  planTitle: "De næste 24 timer", planHint: "Varmen starter i god tid, så rummet er varmt, når det bruges.",
+  why2: { preheat: "Varmer op i tide", occupied: "Nogen er her" }, fixed: "Brug faste tider", fixedH: "I stedet for de lærte",
+} : {
+  tabs: { now: "Now", plan: "Plan", rooms: "Rooms" }, sHeat: "{r} heats until {t}", sHeatN: "{n} rooms are heating", sPre: "{r} heats up to be warm at {t}",
+  sDown: "{n} rooms are turned down because nobody uses them", sDown1: "{r} is turned down because nobody uses it", sWin: "The window in {r} is open – heating is off",
+  sAway: "Everyone is away – the house is turned down", sAllGood: "Every room is at the temperature it should be", sNight: "Night setback in {n} rooms",
+  mSaved: "Turned down today", mSavedS: "≈ {x} % less heat this week", mOnTime: "Warm on time", mOnTimeS: "measured {n} times", mHeating: "Heating now", mHeatingS: "of {n} rooms", mOut: "Outside", mOutS: "from the weather",
+  dh: "°·h", learned: "What it has learned", uses: "used {h}", notUsed: "rarely used", rate: "{x} min per degree", rateDefault: "learning heat-up time", learning: "still learning",
+  planTitle: "The next 24 hours", planHint: "Heating starts in good time, so the room is warm when it is used.",
+  why2: { preheat: "Heating up in time", occupied: "Someone is here" }, fixed: "Use fixed hours", fixedH: "Instead of the learned ones",
+});
+Object.assign(T.why, T.why2);
 document.getElementById("title").textContent = L === "da" ? "Varmepilot" : "Heat Pilot";
 document.getElementById("mode").textContent = T.shadow;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const num = (v, d = 1) => v == null ? "–" : Number(v).toFixed(d).replace(".", L === "da" ? "," : ".");
 const api = (p, body) => fetch(p.replace(/^\//, ""), body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}).then((r) => r.json());
-const COL = { comfort: "var(--heat)", setback: "var(--cool)", night: "#8b7bff", away: "var(--cool)", window: "var(--off)", manual: "var(--warn)" };
+const COL = { comfort: "var(--heat)", preheat: "#ffb347", occupied: "var(--heat)", setback: "var(--cool)", night: "#8b7bff", away: "var(--cool)", window: "var(--off)", manual: "var(--warn)" };
+let tab = location.hash.slice(1) || "now";
 const FLAME = `<svg class="flame" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c2.5 3.5 6 6 6 11a6 6 0 0 1-12 0c0-2.4 1.2-3.9 2.4-5 0 2.3 1.2 3.6 2.4 3.6 0-3.6-1.2-6 1.2-9.6z"/></svg>`;
 let data = null;
 
@@ -131,6 +187,77 @@ function roomCard(r) {
     <span class="why">${esc(T.why[why] || why)}${w.until && why !== "window" ? ` · ${T.until.replace("{t}", hhmm(w.until))}` : ""}</span>
     <div class="devs">${devs}</div></div>`;
 }
+function ranges(h) {
+  if (!h || !h.length) return "";
+  const out = []; let a = h[0], b = h[0];
+  for (const x of h.slice(1).concat([null])) { if (x === b + 1) { b = x; continue; } out.push(a === b ? `${a}` : `${a}–${b + 1}`); if (x != null) a = b = x; }
+  return out.join(", ");
+}
+function sentence(rooms) {
+  const by = (w) => rooms.filter((r) => (r.want || {}).why === w);
+  const parts = [];
+  if (data.away) parts.push(T.sAway);
+  const win = by("window"); win.forEach((r) => parts.push(T.sWin.replace("{r}", r.name)));
+  const heat = rooms.filter((r) => r.heating && ["comfort", "occupied", "preheat", "manual"].includes((r.want || {}).why));
+  const pre = by("preheat");
+  if (pre.length) parts.push(T.sPre.replace("{r}", pre[0].name).replace("{t}", hhmm(pre[0].want.until)));
+  else if (heat.length === 1) parts.push(T.sHeat.replace("{r}", heat[0].name).replace("{t}", hhmm(heat[0].want.until) || "–"));
+  else if (heat.length > 1) parts.push(T.sHeatN.replace("{n}", heat.length));
+  const down = by("setback");
+  if (down.length === 1) parts.push(T.sDown1.replace("{r}", down[0].name)); else if (down.length > 1) parts.push(T.sDown.replace("{n}", down.length));
+  const night = by("night"); if (night.length) parts.push(T.sNight.replace("{n}", night.length));
+  return parts.length ? parts.join(". ") + "." : T.sAllGood + ".";
+}
+function houseSvg(rooms) {
+  const W = 680, cols = rooms.length > 8 ? 4 : 3, tw = 150, th = 92, gx = 14, gy = 14;
+  const rows = Math.ceil(rooms.length / cols), bw = cols * tw + (cols - 1) * gx + 40, bx = (W - bw) / 2, top = 96, bh = rows * th + (rows - 1) * gy + 40;
+  const H = top + bh + 10;
+  let tiles = "";
+  rooms.forEach((r, i) => {
+    const c = i % cols, row = Math.floor(i / cols), x = bx + 20 + c * (tw + gx), y = top + 20 + row * (th + gy);
+    const w = r.want || {}, why = w.why || "comfort", col = COL[why] || "var(--heat)";
+    const cold = r.temp != null && w.temp != null && r.temp < w.temp - 0.5;
+    const waves = r.heating ? [0, 1, 2].map((k) => `<path class="wave w${k + 1}" d="M${x + tw - 34 + k * 9} ${y + 30} q4 -5 0 -10 q-4 -5 0 -10"/>`).join("") : "";
+    tiles += `<g class="tile" data-room="${esc(r.area_id)}"><rect class="bg" x="${x}" y="${y}" width="${tw}" height="${th}" rx="14"
+        fill="color-mix(in srgb, ${col} ${r.heating ? 22 : 10}%, var(--surface2))" stroke="color-mix(in srgb, ${col} 45%, transparent)"/>
+      <text class="t-nm" x="${x + 12}" y="${y + 20}">${esc(r.name.length > 17 ? r.name.slice(0, 16) + "…" : r.name)}</text>
+      <text class="t-v" x="${x + 12}" y="${y + 52}" ${cold ? 'style="fill:var(--cool)"' : ""}>${num(r.temp)}°</text>
+      <text class="t-w" x="${x + 12}" y="${y + 76}" fill="${col}">${w.temp == null ? T.off : "→ " + num(w.temp) + "° · " + esc(T.why[why] || why)}</text>${waves}</g>`;
+  });
+  const roof = `<path d="M${bx - 18} ${top + 4} L${W / 2} 18 L${bx + bw + 18} ${top + 4}" fill="none" stroke="var(--line2)" stroke-width="2.5" stroke-linejoin="round"/>
+    <rect x="${bx}" y="${top}" width="${bw}" height="${bh}" rx="18" fill="var(--surface)" stroke="var(--line2)" stroke-width="2"/>
+    <rect x="${bx + bw - 70}" y="34" width="22" height="40" rx="3" fill="var(--surface2)" stroke="var(--line2)" stroke-width="2"/>`;
+  const out = data.outdoor != null ? `<text x="${bx - 4}" y="64" font-size="13" font-weight="650" fill="var(--cool)">☁ ${num(data.outdoor)}°</text>` : "";
+  return `<svg viewBox="0 0 ${W} ${H}">${roof}${out}${tiles}</svg>`;
+}
+function nowTab(rooms) {
+  const lg = data.learning || {}, heating = rooms.filter((r) => r.heating).length;
+  const learnRows = rooms.map((r) => `<div class="lrow"><b>${esc(r.name)}</b><span>${r.hours_today == null ? T.learning : r.hours_today.length ? T.uses.replace("{h}", ranges(r.hours_today)) : T.notUsed} · ${r.rate_n ? T.rate.replace("{x}", num(r.rate, 0)) : T.rateDefault}</span></div>`).join("");
+  return `<div class="card status"><div class="dotc">${FLAME}</div><div><h2>${esc(sentence(rooms))}</h2><p>${T.heroP}${data.agree != null ? " · " + T.agree.replace("{x}", data.agree) : ""}</p></div></div>
+    <div class="card house">${houseSvg(rooms)}</div>
+    <div class="metrics">
+      <div class="metric"><div class="lbl">${T.mSaved}</div><div class="v">${num(lg.today_dh)}<small>${T.dh}</small></div><div class="s">${lg.week_pct != null ? T.mSavedS.replace("{x}", num(lg.week_pct, 0)) : ""}</div></div>
+      <div class="metric"><div class="lbl">${T.mOnTime}</div><div class="v">${lg.ontime != null ? lg.ontime + "<small>%</small>" : "–"}</div><div class="s">${lg.ontime_n ? T.mOnTimeS.replace("{n}", lg.ontime_n) : T.learning}</div></div>
+      <div class="metric"><div class="lbl">${T.mHeating}</div><div class="v">${heating}</div><div class="s">${T.mHeatingS.replace("{n}", rooms.length)}</div></div>
+      <div class="metric"><div class="lbl">${T.mOut}</div><div class="v">${num(data.outdoor)}<small>°</small></div><div class="s">${T.mOutS}</div></div>
+    </div>
+    <div class="card"><p class="eyebrow">${T.learned}</p><div class="learn">${learnRows}</div></div>`;
+}
+function planTab(rooms) {
+  const now = new Date(data.now);
+  const rowsHtml = rooms.map((r) => {
+    const tl = r.timeline || [];
+    const runs = [];
+    tl.forEach((q) => { const last = runs[runs.length - 1]; if (last && last.why === q.why && last.temp === q.temp) last.n++; else runs.push({ ...q, n: 1 }); });
+    const segs = runs.map((q) => `<i style="width:${100 * q.n / tl.length}%;background:color-mix(in srgb, ${COL[q.why] || "var(--heat)"} ${q.why === "comfort" ? 85 : q.why === "preheat" ? 70 : 35}%, transparent)" title="${hhmm(q.t)} ${num(q.temp)}°"></i>`).join("");
+    return `<div class="nm">${esc(r.name)}</div><div class="bars">${segs}<span class="nowline" style="left:0"></span></div>`;
+  }).join("");
+  const t0 = now.getHours();
+  const ticks = [0, 6, 12, 18, 24].map((h) => `<span>${String((t0 + h) % 24).padStart(2, "0")}</span>`).join("");
+  const legend = ["comfort", "preheat", "setback", "night"].map((k) => `<span><i style="background:${COL[k]}"></i>${esc(T.why[k])}</span>`).join("");
+  return `<div class="card"><p class="eyebrow">${T.planTitle}</p><p class="muted" style="margin:-4px 0 14px">${T.planHint}</p>
+    <div class="tl">${rowsHtml}</div><div class="axis">${ticks}</div><div class="legend">${legend}</div></div>`;
+}
 function render() {
   const app = document.getElementById("app");
   if (!data) return;
@@ -141,11 +268,15 @@ function render() {
     return;
   }
   const nT = rooms.reduce((s, r) => s + r.thermostats.length, 0);
-  app.innerHTML = `<div class="card hero">${ring(data.agree)}<div><h2>${T.hero}</h2><p>${T.heroP}</p>
-      <p class="muted" style="margin-top:6px">${data.agree != null ? T.agree.replace("{x}", data.agree) : ""}${data.away ? " · " + T.away : ""}</p></div></div>
-    <div class="rooms">${data.rooms.map(roomCard).join("")}</div>
+  const tabs = `<div class="tabs">${["now", "plan", "rooms"].map((k) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${T.tabs[k]}</button>`).join("")}</div>`;
+  let body = "";
+  if (tab === "plan") body = planTab(rooms);
+  else if (tab === "rooms") body = `<div class="rooms">${data.rooms.map(roomCard).join("")}</div>
     <p class="muted" style="margin-top:14px">${T.found.replace("{n}", rooms.length).replace("{t}", nT)}${data.unplaced.length ? "<br>" + T.unplaced.replace("{x}", data.unplaced.map(esc).join(", ")) : ""}</p>
     <p class="muted"><a href="api/diagnostics" style="color:var(--muted)">${T.diag}</a></p>`;
+  else body = nowTab(rooms);
+  app.innerHTML = tabs + body;
+  document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; location.hash = tab; render(); });
   document.querySelectorAll("[data-room]").forEach((el) => el.onclick = () => openRoom(el.dataset.room));
 }
 function openRoom(id) {
@@ -160,6 +291,7 @@ function openRoom(id) {
     <div class="row"><div class="t"><b>${T.sensor}</b><span>${T.sensorH}</span></div><select data-k="temp_sensor"><option value="">${T.none}</option>${(r.temp_options || []).map((e) => `<option value="${esc(e)}" ${r.temp_sensor === e ? "selected" : ""}>${esc(e)}</option>`).join("")}</select></div>
     <div class="row"><div class="t"><b>${T.comfort}</b><span>${T.comfortH}</span></div>${numIn("comfort", c.comfort)}</div>
     <div class="row"><div class="t"><b>${T.hours}</b><span>${T.hoursH}</span></div><span><input class="num" type="number" min="0" max="24" data-k="day_from" value="${c.day_from}"> – <input class="num" type="number" min="0" max="24" data-k="day_to" value="${c.day_to}"></span></div>
+    <div class="row"><div class="t"><b>${T.fixed}</b><span>${T.fixedH}${r.hours_today ? " · " + T.uses.replace("{h}", ranges(r.hours_today)) : ""}</span></div><input type="checkbox" data-k="fixed_hours" ${r.fixed_hours ? "checked" : ""}></div>
     <div class="row"><div class="t"><b>${T.setback}</b><span>${T.setbackH}</span></div>${numIn("setback", c.setback)}</div>
     <div class="row"><div class="t"><b>${T.night}</b></div>${numIn("night", c.night)}</div>
     <div class="row"><div class="t"><b>${T.exclude}</b></div><input type="checkbox" data-k="excluded" ${r.excluded ? "checked" : ""}></div>

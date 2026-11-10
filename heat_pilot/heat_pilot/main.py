@@ -27,6 +27,8 @@ async def main() -> None:
             try:
                 if rounds % 60 == 0 or not pilot.found:
                     await pilot.discover()
+                    if rounds == 0:
+                        await pilot.seed_history()
                 pilot.tick()
             except Exception:  # noqa: BLE001 - tries again next minute
                 logging.getLogger("heat_pilot").warning("Round failed", exc_info=True)
