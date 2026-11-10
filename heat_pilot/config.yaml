@@ -1,0 +1,14 @@
+name: Varmepilot
+version: "0.1.0"
+slug: heat_pilot
+description: Varmen i hvert rum - finder selv termostater og følere, starter i skygge.
+url: https://github.com/Clahen86/heat-pilot
+arch:
+  - amd64
+  - aarch64
+init: false
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:radiator
+panel_title: Varmepilot
+homeassistant_api: true
