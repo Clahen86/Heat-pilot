@@ -145,7 +145,7 @@ def decide(rooms: list[dict[str, Any]], states: dict[str, Any], shower: bool, aw
     hum = [v for r in rooms if r.get("kind") != "bathroom" for e in r.get("humidity") or [] if (v := _num(states, e)) is not None]
     if shower:
         return {"level": "boost", "why": "shower", "cooling": False}
-    if co2 and max(co2) >= CO2_BOOST:
+    if co2 and max(co2) >= CO2_HIGH + 400:
         return {"level": "boost", "why": "co2", "cooling": False}
     if co2 and max(co2) >= CO2_HIGH:
         return {"level": "high", "why": "co2", "cooling": False}

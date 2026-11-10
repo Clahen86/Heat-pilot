@@ -115,6 +115,12 @@
   .toggle { width:46px; height:28px; border-radius:14px; background:var(--surface2); border:1px solid var(--line2); position:relative; cursor:pointer; flex:none; transition:background .2s; }
   .toggle::after { content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:var(--muted); transition:all .2s; }
   .toggle.on { background:var(--accent); border-color:var(--accent); } .toggle.on::after { left:21px; background:#fff; }
+  .tunerow { display:flex; flex-direction:column; gap:8px; padding:4px 0 14px 0; margin-top:-4px; }
+  .tunerow > span { font-size:12.5px; color:var(--muted); }
+  .seg.mini button { padding:6px 11px; font-size:12.5px; }
+  .stepper { display:flex; align-items:center; gap:6px; }
+  .stepper button { width:34px; height:34px; border-radius:10px; border:1px solid var(--line2); background:var(--surface2); color:var(--text); font-size:18px; font-weight:600; cursor:pointer; }
+  .stepper b { min-width:52px; text-align:center; font-size:16px; }
   .alert { display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-top:1px solid var(--line); }
   .alert:first-of-type { border-top:0; padding-top:0; }
   .alert .ai { width:26px; height:26px; flex:none; border-radius:9px; display:grid; place-items:center; font-weight:800; color:var(--warn); background:color-mix(in srgb, var(--warn) 16%, transparent); }
@@ -162,17 +168,21 @@ Object.assign(T, L === "da" ? {
   tabs: { now: "Nu", plan: "Plan", rooms: "Rum", settings: "Indstillinger" },
   feat: { title: "Det kan den – fundet i dit hjem", hint: "Slår selv til, når udstyret findes. Det, du ikke har, vises ikke.",
     signals: ["Nogen er i rummet", "CO₂, fugt og lys holder rummet varmt, når man sidder stille"],
-    shower: ["Bruser-hold", "Badeværelset holdes varmt en time efter et bad (fugten stiger)"],
+    shower: ["Bruser-hold", "Badeværelset holdes varmt efter et bad (fugten stiger)"],
     sun: ["Solen varmer gratis", "Venter med at varme op, når solen allerede varmer rummet"],
     weather: ["Vejret", "Lærer opvarmningstid efter udetemperaturen – starter tidligere, når det er koldt"],
-    door: ["Hoveddøren", "Døren åbnes og ingen bevægelse i 10 min: alle er ude – huset sænkes"],
-    manual: ["Skruet i hånden", "Når nogen drejer på en termostat, holdes deres temperatur en time"],
+    door: ["Hoveddøren", "Døren åbnes og ingen bevægelse bagefter: alle er ude – huset sænkes"],
+    manual: ["Skruet i hånden", "Når nogen drejer på en termostat, holdes deres temperatur et stykke tid"],
     people: ["Personer", "Alle telefoner væk: huset sænkes – også om natten. På vej hjem: varmer op i forvejen. Et værelse sænkes, når dets person er væk"],
     holiday: ["Ferie", "Alle væk over et døgn, eller \"ferie\" i kalenderen: ferie-temperatur"],
-    summer: ["Sommer", "Tre varme dage i træk (over 16° i snit): varmen slukker, til det bliver koldere"],
+    summer: ["Sommer", "Tre varme dage i træk: varmen slukker, til det bliver koldere"],
     district: ["Fjernvarme-afkøling", "Følger afkølingen fra din varmemåler. Er den dårlig, varmes rummene op i ro og mag – det giver lavere retur"],
     price: ["Elpris", "Rum med elvarme eller varmepumpe er lidt varmere i de billigste timer og lidt køligere i de dyreste"],
     ventilation: ["Ventilation", "Boost ved bad, mere luft ved høj CO₂ eller fugt, gratis køling med bypass – og varmen holder sig væk, når der køles"] },
+  general: "Generelt", tune: { window_min: "Sluk ved åbent vindue efter", away_temp: "Temperatur når alle er ude", shower_min: "Hold varmt efter bad i",
+    door_min: "Alle ude efter", manual_min: "Hold egen temperatur i", near_km: "På vej hjem fra", holiday_temp: "Ferie-temperatur", holiday_after: "Ferie når alle har været væk i",
+    summer_c: "Sluk når snittet er over", price_flex: "Op/ned efter elprisen", co2_high: "Mere luft ved CO₂ over", hum_high: "Mere luft ved fugt over" },
+  units: { min: "min", "°": "°", km: "km", h: "t", ppm: "", "%": "%" },
   aTitle: "Værd at vide", mTitle: "Beskeder", mH: "Advarslerne vises altid her. Vælg, om de også skal sendes som besked – og hvilke.",
   mTo: "Send til", mNobody: "Ingen valgt – vises kun i appen", mNight: "Også om natten (22–7)",
   kinds: { mold: "Skimmelrisiko", air: "Luft ud (CO₂)", window: "Vindue åbent længe", offline: "Termostat svarer ikke", battery: "Lavt batteri", not_warming: "Rum bliver ikke varmt", cooling: "Fjernvarme-afkøling", monthly: "Månedsrapport" },
@@ -197,17 +207,21 @@ Object.assign(T, L === "da" ? {
   tabs: { now: "Now", plan: "Plan", rooms: "Rooms", settings: "Settings" },
   feat: { title: "What it can do – found in your home", hint: "Turns itself on when the equipment is found. What you don't have isn't shown.",
     signals: ["Someone is in the room", "CO₂, humidity and lights keep the room warm when people sit still"],
-    shower: ["Shower hold", "The bathroom is kept warm for an hour after a shower (humidity rises)"],
+    shower: ["Shower hold", "The bathroom is kept warm after a shower (humidity rises)"],
     sun: ["Free heat from the sun", "Waits with heating up when the sun is already warming the room"],
     weather: ["The weather", "Learns heat-up time by the outdoor temperature – starts earlier when it's cold"],
-    door: ["The front door", "Door opened and no movement for 10 min: everyone is out – the house is turned down"],
-    manual: ["Turned by hand", "When someone turns a thermostat, their temperature holds for an hour"],
+    door: ["The front door", "Door opened and no movement after: everyone is out – the house is turned down"],
+    manual: ["Turned by hand", "When someone turns a thermostat, their temperature holds for a while"],
     people: ["People", "Every phone away: the house is turned down – at night too. On the way home: heats up ahead. A room is turned down while its person is away"],
     holiday: ["Holiday", "Everyone away for over a day, or \"holiday\" in the calendar: holiday temperature"],
-    summer: ["Summer", "Three warm days in a row (over 16° on average): heating off until it gets colder"],
+    summer: ["Summer", "Three warm days in a row: heating off until it gets colder"],
     district: ["District heating cooling", "Follows the cooling from your heat meter. When it's poor, rooms warm up gently – a lower return temperature"],
     price: ["Electricity price", "Rooms with electric heating or a heat pump are a little warmer in the cheapest hours and cooler in the dearest"],
     ventilation: ["Ventilation", "Boost after a shower, more air with high CO₂ or humidity, free cooling through the bypass – and no heating while it cools"] },
+  general: "General", tune: { window_min: "Off when a window is open for", away_temp: "Temperature when everyone is out", shower_min: "Keep warm after a shower for",
+    door_min: "Everyone out after", manual_min: "Hold a person's temperature for", near_km: "On the way home from", holiday_temp: "Holiday temperature", holiday_after: "Holiday when everyone has been away",
+    summer_c: "Off when the average is above", price_flex: "Up/down by the price", co2_high: "More air above CO₂", hum_high: "More air above humidity" },
+  units: { min: "min", "°": "°", km: "km", h: "h", ppm: "", "%": "%" },
   aTitle: "Worth knowing", mTitle: "Messages", mH: "Warnings are always shown here. Choose whether they are also sent as messages – and which.",
   mTo: "Send to", mNobody: "None chosen – only shown in the app", mNight: "Also at night (22–7)",
   kinds: { mold: "Mould risk", air: "Air it out (CO₂)", window: "Window open long", offline: "Thermostat not responding", battery: "Low battery", not_warming: "Room not getting warm", cooling: "District heating cooling", monthly: "Monthly report" },
@@ -338,6 +352,15 @@ function houseSvg(rooms) {
   const gl = ground != null ? `<line x1="0" x2="${W}" y1="${ground}" y2="${ground}" stroke="#8b6b4a" stroke-width="3" stroke-linecap="round" opacity=".7"/>` : "";
   return `<svg viewBox="0 0 ${W} ${H}">${sky}${out}${roof}${body}${gl}${tiles}</svg>`;
 }
+function tuneLabel(v, u) {
+  if (u === "min" && v >= 60) return (v / 60) + (L === "da" ? " t" : " h");
+  return `${num(v, v % 1 ? 1 : 0)}${u === "°" ? "°" : u === "ppm" ? "" : " " + (T.units[u] || u)}`;
+}
+function tuneRows(feature) {
+  const tn = data.tune || {};
+  return Object.entries(tn).filter(([, t]) => t.feature === feature).map(([k, t]) => `<div class="tunerow"><span>${esc(T.tune[k] || k)}</span>
+    <div class="seg mini">${t.choices.map((c) => `<button class="${c === t.value ? "on" : ""}" data-tune="${k}" data-v="${c}">${tuneLabel(c, t.unit)}</button>`).join("")}</div></div>`).join("");
+}
 function msgCard() {
   const m = data.messages || {}, targets = m.targets || [], kinds = m.kinds || {};
   const nice = (n) => n.replace(/^mobile_app_/, "").replace(/_/g, " ");
@@ -424,7 +447,8 @@ function render() {
   else if (tab === "settings") {
     const f = data.features || {};
     body = `<div class="card"><p class="eyebrow">${T.feat.title}</p><p class="muted" style="margin:-4px 0 6px">${T.feat.hint}</p>
-      ${Object.keys(f).map((k) => `<div class="row"><div class="t"><b>${esc(T.feat[k][0])}</b><span>${esc(T.feat[k][1])}</span></div><button class="toggle ${f[k].on ? "on" : ""}" data-feat="${k}"></button></div>`).join("")}</div>
+      ${Object.keys(f).map((k) => `<div class="row"><div class="t"><b>${esc(T.feat[k][0])}</b><span>${esc(T.feat[k][1])}</span></div><button class="toggle ${f[k].on ? "on" : ""}" data-feat="${k}"></button></div>${f[k].on ? tuneRows(k) : ""}`).join("")}</div>
+      <div class="card"><p class="eyebrow">${T.general}</p>${tuneRows(null)}</div>
       ${msgCard()}
       ${f.ventilation && f.ventilation.on ? `<div class="card"><p class="eyebrow">${T.vTitle}</p>
         <div class="row"><div class="t"><b>${T.vCool}</b><span>${T.vCoolH}</span></div><select data-vcool><option value="">${T.vNone}</option>${(data.cooling_options || []).map((o) => `<option value="${esc(o.entity_id)}" ${data.ventilation.cooling_entity === o.entity_id ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select></div></div>` : ""}
@@ -437,6 +461,7 @@ function render() {
   app.innerHTML = tabs + body;
   document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; location.hash = tab; render(); });
   document.querySelectorAll("[data-room]").forEach((el) => el.onclick = () => openRoom(el.dataset.room));
+  document.querySelectorAll("[data-tune]").forEach((b) => b.onclick = async () => { await api("/api/tune", { key: b.dataset.tune, value: Number(b.dataset.v) }); load(); });
   document.querySelectorAll("[data-target]").forEach((b) => b.onclick = async () => { const t = new Set((data.messages || {}).targets || []); t.has(b.dataset.target) ? t.delete(b.dataset.target) : t.add(b.dataset.target); await api("/api/messages", { targets: [...t] }); load(); });
   document.querySelectorAll("[data-mnight]").forEach((b) => b.onclick = async () => { await api("/api/messages", { night: !b.classList.contains("on") }); load(); });
   document.querySelectorAll("[data-mkind]").forEach((b) => b.onclick = async () => { await api("/api/messages", { kind: b.dataset.mkind, on: !b.classList.contains("on") }); load(); });
@@ -447,7 +472,8 @@ function render() {
 function openRoom(id) {
   const r = data.rooms.find((x) => x.area_id === id), c = r.cfg;
   const seg = (key, opts, cur, labels) => `<div class="seg" data-seg="${key}">${opts.map((o) => `<button data-v="${o}" class="${cur === o ? "on" : ""}">${esc(labels[o])}</button>`).join("")}</div>`;
-  const numIn = (key, v) => `<input class="num" type="number" step="0.5" inputmode="decimal" data-k="${key}" value="${v}">`;
+  const numIn = (key, v) => `<div class="stepper" data-step="${key}" data-val="${v}"><button data-d="-0.5">−</button><b>${num(v)}°</b><button data-d="0.5">+</button></div>`;
+  const hourSel = (key, v) => `<select data-k="${key}">${Array.from({ length: 25 }, (_, h) => `<option value="${h}" ${Number(v) === h ? "selected" : ""}>${String(h).padStart(2, "0")}:00</option>`).join("")}</select>`;
   const now = (r.devices || []).map((d) => `${esc(d.name)}: ${d.state === "off" ? T.off : num(d.setpoint) + "°"}`).join("<br>");
   const calls = (r.calls || []).map((x) => `${x.domain}.${x.service} ${JSON.stringify(Object.fromEntries(Object.entries(x.data).filter(([k]) => k !== "entity_id")))}`).join("\n");
   document.getElementById("sheetbox").innerHTML = `<h3>${esc(r.name)}</h3><p class="muted">${T.windows.replace("{n}", r.windows.length)} · ${T.presence.replace("{n}", r.presence.length)} · <span class="${r.same ? "agreeok" : "agreeno"}">${r.same ? T.same : T.diff}</span></p>
@@ -455,7 +481,7 @@ function openRoom(id) {
     <div class="row"><div class="t"><b>${T.heat}</b></div>${seg("heating", ["radiator", "floor", "heatpump", "electric"], r.heating, T.heating)}</div>
     <div class="row"><div class="t"><b>${T.sensor}</b><span>${T.sensorH}</span></div><select data-k="temp_sensor"><option value="">${T.none}</option>${(r.temp_options || []).map((e) => `<option value="${esc(e)}" ${r.temp_sensor === e ? "selected" : ""}>${esc(e)}</option>`).join("")}</select></div>
     <div class="row"><div class="t"><b>${T.comfort}</b><span>${T.comfortH}</span></div>${numIn("comfort", c.comfort)}</div>
-    <div class="row"><div class="t"><b>${T.hours}</b><span>${T.hoursH}</span></div><span><input class="num" type="number" min="0" max="24" data-k="day_from" value="${c.day_from}"> – <input class="num" type="number" min="0" max="24" data-k="day_to" value="${c.day_to}"></span></div>
+    <div class="row"><div class="t"><b>${T.hours}</b><span>${T.hoursH}</span></div><span>${hourSel("day_from", c.day_from)} – ${hourSel("day_to", c.day_to)}</span></div>
     ${(data.persons || []).length ? `<div class="row"><div class="t"><b>${T.owner}</b><span>${T.ownerH}</span></div><select data-k="owner"><option value="">${T.nobody}</option>${(r.owner || "").includes(",") ? `<option value="${esc(r.owner)}" selected>${esc(r.owner.split(",").map((e) => (data.persons.find((p) => p.entity_id === e) || {}).name || e).join(" & "))}</option>` : ""}${data.persons.map((p) => `<option value="${esc(p.entity_id)}" ${r.owner === p.entity_id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>` : ""}
     <div class="row"><div class="t"><b>${T.fixed}</b><span>${T.fixedH}${r.hours_today ? " · " + T.uses.replace("{h}", ranges(r.hours_today)) : ""}</span></div><input type="checkbox" data-k="fixed_hours" ${r.fixed_hours ? "checked" : ""}></div>
     <div class="row"><div class="t"><b>${T.setback}</b><span>${T.setbackH}</span></div>${numIn("setback", c.setback)}</div>
@@ -467,7 +493,11 @@ function openRoom(id) {
   sheet.classList.add("open");
   const vals = {};
   sheet.querySelectorAll("[data-seg] button").forEach((b) => b.onclick = () => { const s = b.parentElement; s.querySelectorAll("button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); vals[s.dataset.seg] = b.dataset.v; });
-  sheet.querySelectorAll("[data-k]").forEach((el) => el.onchange = () => { vals[el.dataset.k] = el.type === "checkbox" ? el.checked : el.type === "number" ? (el.value === "" ? null : Number(el.value.replace(",", "."))) : el.dataset.k === "owner" ? el.value : el.value || null; });
+  sheet.querySelectorAll("[data-step]").forEach((st) => st.querySelectorAll("button").forEach((b) => b.onclick = () => {
+    const v = Math.max(5, Math.min(30, Number(st.dataset.val) + Number(b.dataset.d)));
+    st.dataset.val = v; st.querySelector("b").textContent = num(v) + "°"; vals[st.dataset.step] = v;
+  }));
+  sheet.querySelectorAll("[data-k]").forEach((el) => el.onchange = () => { vals[el.dataset.k] = el.type === "checkbox" ? el.checked : el.type === "number" ? (el.value === "" ? null : Number(el.value.replace(",", "."))) : el.dataset.k === "owner" ? el.value : ["day_from", "day_to"].includes(el.dataset.k) ? Number(el.value) : el.value || null; });
   document.getElementById("close").onclick = () => sheet.classList.remove("open");
   sheet.onclick = (e) => { if (e.target === sheet) sheet.classList.remove("open"); };
   document.getElementById("save").onclick = async () => { await api("/api/room", { area_id: id, ...vals }); sheet.classList.remove("open"); load(); };

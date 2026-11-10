@@ -48,6 +48,12 @@ def make_app(pilot) -> web.Application:
         pilot.set_messages(await req.json())
         return web.json_response({"ok": True})
 
+    async def tune(req: web.Request) -> web.Response:
+        body = await req.json()
+        pilot.set_tune(str(body.get("key")), body.get("value"))
+        pilot.tick()
+        return web.json_response({"ok": True})
+
     async def rediscover(_req: web.Request) -> web.Response:
         await pilot.discover()
         pilot.tick()
@@ -70,5 +76,6 @@ def make_app(pilot) -> web.Application:
     app.router.add_post("/api/district", district)
     app.router.add_post("/api/ventilation", vent)
     app.router.add_post("/api/messages", messages)
+    app.router.add_post("/api/tune", tune)
     app.router.add_get("/api/diagnostics", diagnostics)
     return app

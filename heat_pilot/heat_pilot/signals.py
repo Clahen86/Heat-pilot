@@ -22,6 +22,7 @@ ECHO_S = 120
 FROST_FALLBACK = 8.0
 MANUAL_MIN = 60
 DOOR_AWAY_MIN = 10
+SHOWER_MIN = 60
 
 
 def _num(s: dict[str, Any] | None) -> float | None:
@@ -49,7 +50,7 @@ class Watch:
         if room.get("kind") == "bathroom" and hum is not None:
             old = self._ago(h, 15, 2)
             if old is not None and hum - old >= 8:
-                self.shower_until[room["area_id"]] = now + timedelta(minutes=60)
+                self.shower_until[room["area_id"]] = now + timedelta(minutes=SHOWER_MIN)
 
     @staticmethod
     def _ago(h: deque, minutes: int, idx: int) -> float | None:

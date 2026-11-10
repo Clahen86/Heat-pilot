@@ -174,6 +174,7 @@ class Pilot:
         now = datetime.now(tz)
         st = self.ha.states
         rooms = [r for r in self.rooms() if not r.get("excluded")]
+        features.apply_tune(self.settings)
         ps = people.persons(st)
         self.have = features.found(rooms, st, self.doors, ps, self.meter, self.price_entity, self.vent)
         on = features.active(self.settings, self.have)
@@ -387,6 +388,12 @@ class Pilot:
                 v.pop("cooling_entity", None)
         self.save()
 
+    def set_tune(self, key: str, value: Any) -> None:
+        spec = features.TUNE.get(key)
+        if spec and value in spec[3]:
+            self.settings.setdefault("tune", {})[key] = value
+            self.save()
+
     def set_feature(self, key: str, on: bool) -> None:
         if key in features.FEATURES:
             self.settings.setdefault("features", {})[key] = bool(on)
@@ -415,7 +422,7 @@ class Pilot:
             room["timeline"] = self.timelines.get(room["area_id"]) or []
         out_t = self.outdoor()
         sun = (self.ha.states.get("sun.sun") or {}).get("state")
-        return {"month": self.month_report(now), "floors": self.floors, "sun": sun, "rooms": rooms, "unplaced": self.unplaced, "away": getattr(self, "away", False), "now": now.isoformat(),
+        return {"tune": features.tune_view(self.settings), "month": self.month_report(now), "floors": self.floors, "sun": sun, "rooms": rooms, "unplaced": self.unplaced, "away": getattr(self, "away", False), "now": now.isoformat(),
                 "agree": round(100 * a["same"] / a["checks"]) if a["checks"] else None, "outdoor": out_t,
                 "learning": self.learning.summary(now, [r["area_id"] for r in rooms if not r.get("excluded")]),
                 "features": {k: {"found": bool(self.have.get(k)), "on": bool(getattr(self, "on", {}).get(k))}
