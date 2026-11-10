@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 # key: (what it needs, on by default)
-FEATURES = ["signals", "shower", "sun", "weather", "door", "manual", "people", "holiday", "summer", "district", "price", "ventilation"]
+FEATURES = ["signals", "shower", "sun", "weather", "door", "manual", "people", "holiday", "summer", "district", "price", "ventilation", "strategy", "floor", "doors"]
 
 
 def found(rooms: list[dict[str, Any]], states: dict[str, Any], doors: list[str], persons: list[str] | None = None,
@@ -25,6 +25,9 @@ def found(rooms: list[dict[str, Any]], states: dict[str, Any], doors: list[str],
         "summer": any(e.startswith("weather.") for e in states),
         "district": bool(meter),
         "ventilation": bool(vent),
+        "strategy": any(r.get("thermostats") for r in rooms),
+        "floor": any(r.get("heating") == "floor" for r in rooms),
+        "doors": any(r.get("doors") for r in rooms),
         "price": bool(price) and any(is_electric(r) for r in rooms),
     }
 

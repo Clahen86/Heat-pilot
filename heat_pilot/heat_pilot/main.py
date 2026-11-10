@@ -35,6 +35,8 @@ async def main() -> None:
                     await pilot.discover()
                     if rounds == 0:
                         await pilot.seed_history()
+                if rounds % 30 == 0:
+                    await pilot.refresh_forecast()
                 pilot.tick()
                 await pilot.publish()
                 await pilot.send_alerts()

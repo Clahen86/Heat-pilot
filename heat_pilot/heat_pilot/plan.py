@@ -57,6 +57,9 @@ def comfort_at(c: dict[str, Any], hours: list[int] | None, t: datetime) -> bool:
 
 def base(c: dict[str, Any], hours: list[int] | None, t: datetime) -> tuple[float, str]:
     if comfort_at(c, hours, t):
+        ev = c.get("evening")
+        if ev is not None and c.get("evening_from", 15) <= t.hour < c.get("evening_to", 22):
+            return float(ev), "evening"  # a warmer (or cooler) evening, e.g. the living room at 22° from 15 to 22
         return c["comfort"], "comfort"
     h = t.hour + t.minute / 60
     return (c["night"], "night") if (h >= 22 or h < 6) else (c["setback"], "setback")
@@ -75,8 +78,15 @@ def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], no
            house_away: bool, manual: dict[str, Any] | None, hours: list[int] | None = None,
            temp: float | None = None, rate: float | None = None, occupied: bool = False, shower: bool = False,
            sun: bool = False, summer: bool = False, holiday: str | None = None, owner_away: bool = False,
-           coming: bool = False, price: str | None = None, spread: bool = False, cooling: bool = False) -> dict[str, Any]:
-    """{"temp": °C or None (off), "why": key, "until": time the reason ends or None}."""
+           coming: bool = False, price: str | None = None, spread: bool = False, cooling: bool = False,
+           extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    """{"temp": °C or None (off), "why": key, "until": time the reason ends or None}.
+
+    extra (all optional, from what was learned and seen): door (a door in the room open a while), noshow (nobody in
+    the room today, afternoon), sun_ahead (°C the sun will give before comfort), arm (today's strategy), cold_snap,
+    floor_active (someone on the same floor - floor heating), buffer (district cooling poor - floors take heat),
+    hold_warm (the gap to the next comfort is too short for setting back to pay)."""
+    x = extra or {}
     c = {**defaults(room), **(cfg or {})}
     for w in room.get("windows") or []:
         m = _minutes_open(states, w, now)
@@ -89,12 +99,18 @@ def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], no
     if manual and manual.get("until") and now < manual["until"]:
         return {"temp": manual["temp"], "why": "manual", "until": manual["until"].isoformat()}
     t, why = base(c, hours, now)
+    if why == "evening":
+        why = "comfort_evening"
+    if x.get("floor_active") and room.get("heating") == "floor" and 6 <= now.hour < 22 and c["comfort"] > t:
+        t, why = c["comfort"], "floor"  # floor heating is slow: warm while someone is on the same floor
+    if x.get("hold_warm") and why in ("setback",) and c["comfort"] > t:
+        t, why = c["comfort"], "hold"  # a short gap: setting back wouldn't pay (it hardly cools)
     if shower and c["comfort"] > t:
         t, why = c["comfort"], "shower"  # warm during and after the shower
     elif occupied and why != "comfort" and 6 <= now.hour < 22 and c["comfort"] > t:
         t, why = c["comfort"], "occupied"  # someone is in the room now: comfort, whatever the plan said
     until = None
-    if why == "comfort":
+    if why in ("comfort", "comfort_evening"):
         e = now.replace(second=0, microsecond=0)
         while comfort_at(c, hours, e) and e < now + timedelta(hours=24):
             e += timedelta(minutes=15)
@@ -106,20 +122,33 @@ def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], no
             # Start in time: warm when the room is used - the learned minutes per degree from where it is now.
             if temp is not None and rate:
                 lead = max(0.0, c["comfort"] - temp) * rate
-                if spread:
-                    lead *= 1.5  # district heating cooling poor: start earlier, warm gently
+                gentle = spread or x.get("arm") == "gentle"
+                if gentle:
+                    lead *= 1.5  # district cooling poor (or today's strategy): start earlier, warm gently
+                if x.get("arm") == "early":
+                    lead *= 1.4
+                if x.get("cold_snap"):
+                    lead *= 1.3  # much colder weather coming: start earlier
+                if x.get("noshow"):
+                    lead = 0  # nobody has been in the room today: warm it when someone comes
+                if x.get("sun_ahead", 0) >= max(0.3, (c["comfort"] - temp) * 0.6):
+                    sun = True  # the sun will do most of it before the room is used
                 if now >= nxt - timedelta(minutes=lead) and c["comfort"] > t:
                     if sun:
                         t, why = t, "sun"  # the sun warms it for free
-                    elif spread:
+                    elif gentle:
                         t, why = min(c["comfort"], temp + 0.5), "spread"  # a little at a time: low return temperature
                     else:
                         t, why = c["comfort"], "preheat"
+    if x.get("door") and t is not None and why not in ("shower",):
+        t, why = t - 2.0, "door"  # a door open to the outside or a cold room: a little lower, not off
+    if x.get("buffer") and room.get("heating") == "floor" and why not in ("setback", "night"):
+        t, why = min(c["comfort"] + 1.0, 23.0), "buffer"  # floors take the heat: lower district return temperature
     # Electric heating / heat pump: warmer in the cheapest hours (heat stored in the house), cooler in the dearest.
     flex = float(c.get("price_flex", PRICE_FLEX))
-    if price == "cheap" and why in ("comfort", "occupied", "preheat", "setback"):
+    if price == "cheap" and why in ("comfort", "comfort_evening", "occupied", "preheat", "setback"):
         t, why = t + flex, "cheap"
-    elif price == "dear" and why in ("comfort", "occupied") and why != "shower":
+    elif price == "dear" and why in ("comfort", "comfort_evening", "occupied"):
         t, why = t - flex, "dear"
     if holiday and not coming:
         return {"temp": max(FROST, c.get("holiday", HOLIDAY)), "why": "holiday", "kind": holiday}
@@ -139,7 +168,7 @@ def timeline(room: dict[str, Any], cfg: dict[str, Any], now: datetime, hours_by_
     for i in range(steps):
         t = t0 + timedelta(minutes=15 * i)
         v, why = base(c, hours_by_day.get(t.weekday()), t)
-        out.append({"t": t.isoformat(), "temp": v, "why": why})
+        out.append({"t": t.isoformat(), "temp": v, "why": "comfort" if why == "evening" else why})
     lead_q = int(round(max(0.0, c["comfort"] - (temp if temp is not None else c["setback"])) * (rate or 12) / 15)) if rate else 0
     lead_q = max(lead_q, 1)
     for i in range(len(out)):

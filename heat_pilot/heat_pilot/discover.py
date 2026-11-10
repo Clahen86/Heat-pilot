@@ -23,6 +23,7 @@ NOT_ROOM_TEMP = re.compile(r"outdoor|outside|ude|udendørs|udeluft|exterior|gard
                            r"forecast|prognose|setpoint|target|apparent|feels", re.I)
 # A sensor made to steer the heating (Aqara W100 "temperature control", a "thermostat sensor") is the room's.
 CONTROL_SENSOR = re.compile(r"termostat|thermostat|styring|control|climate_sensor|regler", re.I)
+WINDOW_WORDS = re.compile(r"vindue|window|fenster|fönster|fonster|vindu|fenêtre|fenetre|raam|velux|ovenlys", re.I)
 ROOM_KINDS = [
     ("bathroom", r"bad|bath|wc|toilet|douche|dusch|salle de bain"),
     ("bedroom", r"sove|bedroom|schlaf|sovrum|soverom|chambre|slaapkamer"),
@@ -84,7 +85,12 @@ def find(areas: list[dict[str, Any]], devices_list: list[dict[str, Any]], entiti
         temps = pick(lambda e, a: e["entity_id"].startswith("sensor.") and a.get("device_class") == "temperature"
                      and e.get("device_id") not in climate_devs and not NOT_ROOM_TEMP.search(f"{e['entity_id']} {a.get('friendly_name', '')}"))
         temps.sort(key=lambda x: not CONTROL_SENSOR.search(x + " " + str((states[x].get("attributes") or {}).get("friendly_name", ""))))
-        windows = pick(lambda e, a: e["entity_id"].startswith("binary_sensor.") and a.get("device_class") in ("window", "door", "opening", "garage_door"))
+        openings = pick(lambda e, a: e["entity_id"].startswith("binary_sensor.") and a.get("device_class") in ("window", "door", "opening", "garage_door"))
+        # A contact sensor is often "door" whatever it sits on - the name tells a window ("vindue") from a door.
+        is_window = lambda x: (states[x].get("attributes") or {}).get("device_class") in ("window", "opening") or WINDOW_WORDS.search(
+            x + " " + str((states[x].get("attributes") or {}).get("friendly_name", "")))
+        windows = [x for x in openings if is_window(x)]
+        doors = [x for x in openings if not is_window(x)]
         presence = pick(lambda e, a: e["entity_id"].startswith("binary_sensor.") and a.get("device_class") in ("motion", "occupancy", "presence"))
         humidity = pick(lambda e, a: e["entity_id"].startswith("sensor.") and a.get("device_class") == "humidity"
                         and e.get("device_id") not in climate_devs)
@@ -98,7 +104,7 @@ def find(areas: list[dict[str, Any]], devices_list: list[dict[str, Any]], entiti
         floor = all(t["floor"] for t in thermostats) or (room_kind(name) == "bathroom" and any(t["floor"] for t in thermostats))
         rooms.append({"area_id": area, "name": name, "kind": room_kind(name), "floor_id": area_floor.get(area), "heating": "floor" if floor else "radiator",
                       "thermostats": thermostats, "temp_sensor": temps[0] if temps else None, "temp_options": temps,
-                      "windows": windows, "presence": presence, "humidity": humidity[:1], "co2": co2[:1], "lights": lights, "batteries": batteries})
+                      "windows": windows, "doors": doors, "presence": presence, "humidity": humidity[:1], "co2": co2[:1], "lights": lights, "batteries": batteries})
     return rooms
 
 
@@ -124,3 +130,10 @@ def exit_doors(entities: list[dict[str, Any]], states: dict[str, Any]) -> list[s
         if a.get("device_class") in ("door", "opening") and EXIT_WORDS.search(f"{eid} {str(a.get('friendly_name', '')).lower().replace(' ', '_')}"):
             out.append(eid)
     return sorted(out)
+
+
+def all_doors(entities: list[dict[str, Any]], states: dict[str, Any]) -> list[str]:
+    """Every door sensor in the house (to choose a door that affects a room, e.g. to a conservatory)."""
+    return sorted(e["entity_id"] for e in entities if e["entity_id"].startswith("binary_sensor.") and not e.get("disabled_by")
+                  and e["entity_id"] in states and (states[e["entity_id"]].get("attributes") or {}).get("device_class") in ("door", "garage_door", "opening")
+                  and not WINDOW_WORDS.search(e["entity_id"]))

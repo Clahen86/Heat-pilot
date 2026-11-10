@@ -5,7 +5,7 @@ Each room starts in shadow: worked out and shown, nothing sent. Control is turne
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import logging
 from pathlib import Path
@@ -14,10 +14,10 @@ from zoneinfo import ZoneInfo
 
 from . import alerts, brands, discover, features, people, plan, pricefeed, supply, ventilation
 from .signals import Watch
-from .learning import Learning, seed
+from .learning import Learning, Model, seed
 
 _LOGGER = logging.getLogger(__name__)
-ROOM_KEYS = {"price_flex", "kind", "heating", "temp_sensor", "comfort", "setback", "night", "away", "day_from", "day_to", "excluded", "fixed_hours", "owner"}
+ROOM_KEYS = {"doors_extra", "evening", "evening_from", "evening_to", "price_flex", "kind", "heating", "temp_sensor", "comfort", "setback", "night", "away", "day_from", "day_to", "excluded", "fixed_hours", "owner"}
 
 
 def floor_level(name: str) -> int:
@@ -57,6 +57,7 @@ class Pilot:
         self.learning = Learning(data_dir)
         self.watch = Watch()
         self.doors: list[str] = []
+        self.all_doors: list[str] = []
         self.have: dict[str, bool] = {}
         self.meter: dict[str, str] | None = None
         self.price_entity: str | None = None
@@ -64,6 +65,8 @@ class Pilot:
         self.vent_now: dict[str, Any] | None = None
         self.cooling_options: list[str] = []
         self.alerts = alerts.Alerts(self.learning.s)
+        self.model = Model(self.learning.s)
+        self.forecast: list[tuple[datetime, float, str]] = []
         self.notify: list[str] = []
         self.cooling = supply.Cooling(self.learning.s)
         self.timelines: dict[str, list] = {}
@@ -87,6 +90,7 @@ class Pilot:
                              key=lambda f: -f["level"])
         self.unplaced = discover.unplaced(entities, devices, self.ha.states)
         self.doors = discover.exit_doors(entities, self.ha.states)
+        self.all_doors = discover.all_doors(entities, self.ha.states)
         self.meter = supply.find_heat_meter(entities, devices, self.ha.states)
         self.vent = ventilation.find(entities, devices, self.ha.states)
         try:
@@ -137,8 +141,13 @@ class Pilot:
         for r in self.found:
             own = (self.settings.get("rooms") or {}).get(r["area_id"]) or {}
             room = {**r, **{k: v for k, v in own.items() if k in ("kind", "heating", "temp_sensor", "excluded")}}
-            room["cfg"] = {**plan.defaults(room), **{k: v for k, v in own.items() if k in ROOM_KEYS - {"kind", "heating", "temp_sensor", "excluded", "fixed_hours", "owner"}}}
+            room["cfg"] = {**plan.defaults(room), **{k: v for k, v in own.items() if k in ROOM_KEYS - {"kind", "heating", "temp_sensor", "excluded", "fixed_hours", "owner", "doors_extra"}}}
+            if "comfort" not in own and (learned := self.model.comfort(r["area_id"])) is not None:
+                room["cfg"]["comfort"] = learned
+                room["comfort_learned"] = True
             room["fixed_hours"] = bool(own.get("fixed_hours"))
+            room["doors_extra"] = list(own.get("doors_extra") or [])
+            room["doors"] = sorted(set(r.get("doors") or []) | set(room["doors_extra"]))
             # Whose room it is: chosen, or the person it is named after ("" = nobody's).
             room["owner"] = own["owner"] if "owner" in own else people.owner_of(r["name"], people.persons(self.ha.states), self.ha.states)
             out.append(room)
@@ -206,6 +215,20 @@ class Pilot:
             prices, _ = pricefeed.collect(st, self.price_entity, [], tz)
             level = supply.price_level(prices, now)
         self.price_level = level
+        sun_attr = (st.get("sun.sun") or {}).get("attributes") or {}
+        try:
+            sun_up = float(sun_attr.get("elevation", 0)) > 5
+        except (TypeError, ValueError):
+            sun_up = False
+        sunny = any(v.get("state") in ("sunny", "partlycloudy") for e, v in st.items() if e.startswith("weather."))
+        arm = self.model.arm_today(now) if on["strategy"] else "normal"
+        self.arm = arm
+        cold_snap = on["weather"] and outdoor_now is not None and any(
+            t <= outdoor_now - 8 for when, t, _c in self.forecast if now <= when <= now + timedelta(hours=48))
+        self.cold_snap = cold_snap
+        occupied_floors = {r.get("floor_id") for r in rooms if r.get("floor_id") and (
+            any((st.get(p) or {}).get("state") == "on" or self._recent_on(st.get(p), now) for p in r["presence"]))}
+        radiators_heating = any((self.now.get(r["area_id"]) or {}).get("heating") for r in rooms if r.get("heating") != "floor")
         cooling = ventilation.other_cooling(st, (self.settings.get("ventilation") or {}).get("cooling_entity"))
         self.vent_now = None
         if on["ventilation"] and self.vent:
@@ -222,6 +245,7 @@ class Pilot:
             cooling = cooling or want_v["cooling"]
         self.cooling_flag = cooling
         out = {}
+        heat_n = cold_n = 0
         for r in rooms:
             a_id = r["area_id"]
             temp = self.room_temp(r)
@@ -238,10 +262,32 @@ class Pilot:
                 self.watch.see_setpoint(a_id, th["entity_id"], float(sp) if isinstance(sp, (int, float)) else None, now,
                                         controlled and on["manual"])
             manual = self.watch.manual_for(a_id, now) if on["manual"] else None
-            want = plan.target(r, r["cfg"], st, now, away, manual, by_day[now.weekday()], temp, rate, moving or signs,
+            hours_today = by_day[now.weekday()]
+            self.model.see(a_id, now, temp, outdoor_now, heating_now, sunny, sun_up)
+            nxt = plan.next_comfort({**plan.defaults(r), **r["cfg"]}, hours_today, now)
+            gap_h = (nxt - now).total_seconds() / 3600 if nxt else None
+            drop = self.model.drop(a_id, temp, outdoor_now, gap_h) if (temp is not None and gap_h is not None and gap_h <= 3) else None
+            today = now.date().isoformat()
+            seen_today = any(((st.get(p) or {}).get("last_changed") or "")[:10] == today or (st.get(p) or {}).get("state") == "on" for p in r["presence"])
+            extra = {
+                "door": on["doors"] and any((st.get(d) or {}).get("state") == "on" and not self._recent_on_since(st.get(d), now, 10) for d in r.get("doors") or []),
+                "noshow": bool(r["presence"]) and now.hour >= 12 and not seen_today,
+                "sun_ahead": self.model.sun_gain(a_id, now, gap_h) if (on["sun"] and sunny and gap_h) else 0.0,
+                "arm": arm, "cold_snap": cold_snap,
+                "floor_active": on["floor"] and r.get("floor_id") in occupied_floors,
+                "buffer": on["floor"] and on["district"] and radiators_heating and supply.poor_cooling(getattr(self, "cooling_info", None), float((self.settings.get("district") or {}).get("need", 25.0))),
+                "hold_warm": drop is not None and drop < 0.5,
+            }
+            want = plan.target(r, r["cfg"], st, now, away, manual, hours_today, temp, rate, moving or signs,
                                on["shower"] and self.watch.shower(a_id, now), on["sun"] and self.watch.sun_warms(r, st, now),
                                is_summer, holiday, bool(on["people"] and people.owners_away(st, r.get("owner"))),
-                               bool(coming), level if supply.is_electric(r) else None, spread, cooling)
+                               bool(coming), level if supply.is_electric(r) else None, spread, cooling, extra)
+            if manual and r["cfg"].get("comfort") and 6 <= now.hour < 22 and not self.watch.manual.get(a_id, {}).get("learned"):
+                self.model.learn_comfort(a_id, manual["temp"], r["cfg"]["comfort"])  # turned by hand: comfort moves a little
+                self.watch.manual[a_id]["learned"] = True
+            if want["temp"] is not None and temp is not None:
+                cold_n += int(want["why"] in ("comfort", "comfort_evening", "occupied") and temp < want["temp"] - 0.5)
+            heat_n += int(heating_now)
             if r["presence"]:
                 self.learning.see_presence(a_id, now, moving)
             self.learning.see_heating(a_id, now, heating_now, temp, want["temp"], r["heating"], outdoor)
@@ -269,10 +315,13 @@ class Pilot:
             self.agree["same"] += int(same)
             out[a_id] = {"want": want, "temp": temp, "devices": devs, "calls": calls, "same": same, "mode": self.mode(a_id),
                          "heating": heating_now, "occupied": moving or signs, "signs": signs, "rate": rate, "rate_n": _n,
-                         "learned": self.learning.known(a_id), "hours_today": by_day[now.weekday()]}
+                         "learned": self.learning.known(a_id), "hours_today": by_day[now.weekday()],
+                         "loss": self.model.loss(a_id), "sun_gain": self.model.s["sun"].get(a_id), "extra": {k: v for k, v in extra.items() if v}}
         self.now = out
         self.away = away
         self.alerts.check(rooms, out, st, now, outdoor_now, getattr(self, "cooling_info", None))
+        if on["strategy"]:
+            self.model.see_day(heat_n, cold_n)
         if now.minute % 10 == 0:
             self.learning.save()
 
@@ -400,6 +449,27 @@ class Pilot:
             self.save()
 
     @staticmethod
+    def _recent_on_since(s: dict[str, Any] | None, now: datetime, minutes: float) -> bool:
+        """True while the state changed less than `minutes` ago."""
+        try:
+            return (now - datetime.fromisoformat((s or {})["last_changed"])).total_seconds() < minutes * 60
+        except (KeyError, ValueError, TypeError):
+            return False
+
+    async def refresh_forecast(self) -> None:
+        """The weather's hourly forecast (for a cold snap coming)."""
+        w = next((e for e in self.ha.states if e.startswith("weather.")), None)
+        if not w:
+            return
+        try:
+            res = await self.ha.call_service("weather", "get_forecasts", {"entity_id": w, "type": "hourly"}, response=True)
+            fc = ((res or {}).get("response") or {}).get(w, {}).get("forecast") or []
+            self.forecast = [(datetime.fromisoformat(f["datetime"]), float(f["temperature"]), f.get("condition") or "")
+                             for f in fc if f.get("temperature") is not None]
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("No forecast", exc_info=True)
+
+    @staticmethod
     def _recent_on(s: dict[str, Any] | None, now: datetime) -> bool:
         from .learning import HOLD_MIN
         try:
@@ -412,7 +482,7 @@ class Pilot:
         for r in self.rooms():
             n = self.now.get(r["area_id"]) or {}
             rooms.append({k: r[k] for k in ("area_id", "name", "kind", "heating", "temp_sensor", "temp_options", "windows",
-                                            "presence", "humidity", "excluded", "fixed_hours", "owner", "floor_id") if k in r}
+                                            "presence", "humidity", "excluded", "fixed_hours", "owner", "floor_id", "doors", "doors_extra", "comfort_learned") if k in r}
                          | {"cfg": r["cfg"], "thermostats": [{k: t[k] for k in ("entity_id", "name", "brand", "platform", "model")}
                                                              for t in r["thermostats"]]} | n)
         a = self.agree
@@ -422,7 +492,8 @@ class Pilot:
             room["timeline"] = self.timelines.get(room["area_id"]) or []
         out_t = self.outdoor()
         sun = (self.ha.states.get("sun.sun") or {}).get("state")
-        return {"tune": features.tune_view(self.settings), "month": self.month_report(now), "floors": self.floors, "sun": sun, "rooms": rooms, "unplaced": self.unplaced, "away": getattr(self, "away", False), "now": now.isoformat(),
+        return {"all_doors": [{"entity_id": e, "name": (self.ha.states.get(e) or {}).get("attributes", {}).get("friendly_name") or e} for e in self.all_doors],
+                "arm": getattr(self, "arm", None), "cold_snap": getattr(self, "cold_snap", False), "tune": features.tune_view(self.settings), "month": self.month_report(now), "floors": self.floors, "sun": sun, "rooms": rooms, "unplaced": self.unplaced, "away": getattr(self, "away", False), "now": now.isoformat(),
                 "agree": round(100 * a["same"] / a["checks"]) if a["checks"] else None, "outdoor": out_t,
                 "learning": self.learning.summary(now, [r["area_id"] for r in rooms if not r.get("excluded")]),
                 "features": {k: {"found": bool(self.have.get(k)), "on": bool(getattr(self, "on", {}).get(k))}

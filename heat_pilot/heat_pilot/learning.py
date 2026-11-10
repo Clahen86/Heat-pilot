@@ -200,3 +200,115 @@ def seed(learning: Learning, room: str, intervals: list[tuple[datetime, datetime
         for i, sh in enumerate(s["shares"]):
             p = sh if i == 0 else 0.7 * p + 0.3 * sh
         use[key] = {"m": 0, "on": 0, "days": s["days"][-8:], "p": round(p, 3)}
+
+
+# ---------- the room model, the sun, comfort and strategies (learned, nothing to set up) ----------
+
+def _ema(old: float | None, new: float, a: float) -> float:
+    return new if old is None else old + a * (new - old)
+
+
+class Model:
+    """Per room, from what really happens:
+    - heat loss: how fast the room cools with the heating off, per degree it is warmer than outside (k, per hour).
+      Used to know when setting back is worth it - a room that barely cools over a short gap stays warm instead.
+    - the sun: how much each hour of the day warms the room by itself on sunny days (°C per hour) - so heating that
+      the sun will do anyway is skipped before it starts.
+    - comfort: when people turn a thermostat, the room's comfort moves a little towards it.
+    - strategy: each day one way of heating up (normal, early, gentle) is used; the one with the fewest cold
+      minutes for the least heating wins - with a day now and then to keep checking."""
+
+    def __init__(self, state: dict[str, Any]) -> None:
+        self.s = state.setdefault("model", {"k": {}, "sun": {}, "comfort": {}, "policy": {}})
+        for key in ("k", "sun", "comfort", "policy"):
+            self.s.setdefault(key, {})
+        self._hist: dict[str, list[tuple[datetime, float, bool]]] = {}
+
+    def see(self, room: str, now: datetime, temp: float | None, outdoor: float | None, heating: bool, sunny: bool, sun_up: bool) -> None:
+        if temp is None:
+            return
+        h = self._hist.setdefault(room, [])
+        h.append((now, temp, heating))
+        while h and (now - h[0][0]).total_seconds() > 3600:
+            h.pop(0)
+        if len(h) < 20 or (now - h[0][0]).total_seconds() < 1700 or any(x[2] for x in h):
+            return
+        old = next((x for x in h if (now - x[0]).total_seconds() <= 1900), None)
+        if old is None:
+            return
+        hours = (now - old[0]).total_seconds() / 3600
+        rate = (temp - old[1]) / hours  # °C per hour, heating off for the whole half hour
+        if not sun_up and outdoor is not None and temp - outdoor >= 5 and rate < 0:
+            k = -rate / (temp - outdoor)
+            if k < 0.2:
+                cur = self.s["k"].get(room)
+                self.s["k"][room] = round(_ema(cur, k, 0.1), 4)
+        elif sun_up and sunny and rate > 0:
+            slot = str(now.hour)
+            g = self.s["sun"].setdefault(room, {})
+            g[slot] = round(_ema(g.get(slot), min(rate, 3.0), 0.2), 3)
+        if len(h) > 5:
+            del h[: len(h) - 5]  # next measurement over a fresh half hour
+
+    def loss(self, room: str) -> float | None:
+        return self.s["k"].get(room)
+
+    def drop(self, room: str, temp: float, outdoor: float | None, hours: float) -> float | None:
+        """How much the room cools over `hours` with the heating off (None while not learned)."""
+        k = self.loss(room)
+        if k is None or outdoor is None:
+            return None
+        import math
+        return (temp - outdoor) * (1 - math.exp(-k * hours))
+
+    def sun_gain(self, room: str, start: datetime, hours: float) -> float:
+        """The sun's free warming over the coming hours (sunny days)."""
+        g = self.s["sun"].get(room) or {}
+        total, t = 0.0, start
+        while hours > 0:
+            step = min(1.0, hours)
+            total += (g.get(str(t.hour)) or 0.0) * step
+            t += timedelta(hours=step)
+            hours -= step
+        return round(total, 2)
+
+    def learn_comfort(self, room: str, temp: float, current: float) -> float:
+        new = round(_ema(self.s["comfort"].get(room, current), temp, 0.3), 1)
+        self.s["comfort"][room] = new
+        return new
+
+    def comfort(self, room: str) -> float | None:
+        return self.s["comfort"].get(room)
+
+    # strategies
+    ARMS = ("normal", "early", "gentle")
+
+    def arm_today(self, now: datetime) -> str:
+        p = self.s["policy"]
+        day = now.date().isoformat()
+        if p.get("day") != day:
+            self._finish(p)
+            kind = "weekend" if now.weekday() >= 5 else "workday"
+            stats = p.setdefault("stats", {}).setdefault(kind, {})
+            import random
+            untried = [a for a in self.ARMS if stats.get(a, {}).get("n", 0) < 3]
+            if untried:
+                arm = untried[0]
+            elif random.random() < 0.1:
+                arm = random.choice(self.ARMS)
+            else:
+                arm = min(self.ARMS, key=lambda a: stats[a]["cost"] / stats[a]["n"])
+            p.update({"day": day, "kind": kind, "arm": arm, "heat_min": 0, "cold_min": 0})
+        return p["arm"]
+
+    def _finish(self, p: dict[str, Any]) -> None:
+        if not p.get("day") or not p.get("arm"):
+            return
+        st = p.setdefault("stats", {}).setdefault(p["kind"], {}).setdefault(p["arm"], {"cost": 0.0, "n": 0})
+        st["cost"] += p.get("heat_min", 0) + 30 * p.get("cold_min", 0)  # a cold minute counts like half an hour of heating
+        st["n"] += 1
+
+    def see_day(self, heating_rooms: int, cold_rooms: int) -> None:
+        p = self.s["policy"]
+        p["heat_min"] = p.get("heat_min", 0) + heating_rooms
+        p["cold_min"] = p.get("cold_min", 0) + cold_rooms
