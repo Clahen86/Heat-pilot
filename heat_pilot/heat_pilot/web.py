@@ -41,6 +41,10 @@ def make_app(pilot) -> web.Application:
         pilot.tick()
         return web.json_response({"ok": True})
 
+    async def messages(req: web.Request) -> web.Response:
+        pilot.set_messages(await req.json())
+        return web.json_response({"ok": True})
+
     async def rediscover(_req: web.Request) -> web.Response:
         await pilot.discover()
         pilot.tick()
@@ -62,5 +66,6 @@ def make_app(pilot) -> web.Application:
     app.router.add_post("/api/feature", feature)
     app.router.add_post("/api/district", district)
     app.router.add_post("/api/ventilation", vent)
+    app.router.add_post("/api/messages", messages)
     app.router.add_get("/api/diagnostics", diagnostics)
     return app

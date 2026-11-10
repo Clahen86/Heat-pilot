@@ -89,10 +89,15 @@ def find(areas: list[dict[str, Any]], devices_list: list[dict[str, Any]], entiti
                         and e.get("device_id") not in climate_devs)
         co2 = pick(lambda e, a: e["entity_id"].startswith("sensor.") and a.get("device_class") == "carbon_dioxide")
         lights = pick(lambda e, a: e["entity_id"].startswith("light."))
+        # Batteries of the room's own devices (thermostats, sensors) - for the low-battery message.
+        own_devs = {e.get("device_id") for e in ents if e.get("device_id") and (e["entity_id"].startswith("climate.") or e["entity_id"] in temps[:1])}
+        batteries = sorted(e["entity_id"] for es in by_area.values() for e in es
+                           if e.get("device_id") in own_devs and e["entity_id"].startswith("sensor.")
+                           and (states[e["entity_id"]].get("attributes") or {}).get("device_class") == "battery")
         floor = all(t["floor"] for t in thermostats) or (room_kind(name) == "bathroom" and any(t["floor"] for t in thermostats))
         rooms.append({"area_id": area, "name": name, "kind": room_kind(name), "heating": "floor" if floor else "radiator",
                       "thermostats": thermostats, "temp_sensor": temps[0] if temps else None, "temp_options": temps,
-                      "windows": windows, "presence": presence, "humidity": humidity[:1], "co2": co2[:1], "lights": lights})
+                      "windows": windows, "presence": presence, "humidity": humidity[:1], "co2": co2[:1], "lights": lights, "batteries": batteries})
     return rooms
 
 

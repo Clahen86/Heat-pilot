@@ -31,6 +31,7 @@ async def main() -> None:
                         await pilot.seed_history()
                 pilot.tick()
                 await pilot.publish()
+                await pilot.send_alerts()
             except Exception:  # noqa: BLE001 - tries again next minute
                 logging.getLogger("heat_pilot").warning("Round failed", exc_info=True)
             rounds += 1

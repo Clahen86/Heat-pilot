@@ -109,6 +109,8 @@
   .toggle { width:46px; height:28px; border-radius:14px; background:var(--surface2); border:1px solid var(--line2); position:relative; cursor:pointer; flex:none; transition:background .2s; }
   .toggle::after { content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:var(--muted); transition:all .2s; }
   .toggle.on { background:var(--accent); border-color:var(--accent); } .toggle.on::after { left:21px; background:#fff; }
+  .chipb { border:1px solid var(--line2); background:var(--surface2); color:var(--muted); font:inherit; font-size:13px; font-weight:600; padding:7px 12px; border-radius:10px; cursor:pointer; }
+  .chipb.on { background:color-mix(in srgb, var(--accent) 18%, var(--surface2)); color:var(--text); border-color:var(--accent); }
   .empty { text-align:center; padding:40px 10px; color:var(--muted); }
   @media (max-width:520px) { .rooms { grid-template-columns:1fr 1fr; gap:10px; } .room { padding:13px; border-radius:18px; } .now { font-size:30px; } .want { font-size:16px; } .devs { display:none; } }
 </style>
@@ -160,6 +162,9 @@ Object.assign(T, L === "da" ? {
     district: ["Fjernvarme-afkøling", "Følger afkølingen fra din varmemåler. Er den dårlig, varmes rummene op i ro og mag – det giver lavere retur"],
     price: ["Elpris", "Rum med elvarme eller varmepumpe er lidt varmere i de billigste timer og lidt køligere i de dyreste"],
     ventilation: ["Ventilation", "Boost ved bad, mere luft ved høj CO₂ eller fugt, gratis køling med bypass – og varmen holder sig væk, når der køles"] },
+  aTitle: "Værd at vide", mTitle: "Beskeder", mH: "Advarslerne vises altid her. Vælg, om de også skal sendes som besked – og hvilke.",
+  mTo: "Send til", mNobody: "Ingen valgt – vises kun i appen", mNight: "Også om natten (22–7)",
+  kinds: { mold: "Skimmelrisiko", air: "Luft ud (CO₂)", window: "Vindue åbent længe", offline: "Termostat svarer ikke", battery: "Lavt batteri", not_warming: "Rum bliver ikke varmt", cooling: "Fjernvarme-afkøling" },
   vTitle: "Ventilation", vLevels: { low: "Lav", normal: "Normal", high: "Høj", boost: "Boost" }, vNow: "Står på", vWant: "Ville sætte",
   vWhy: { shower: "Bad – fjerner fugten", co2: "Høj CO₂", humidity: "Høj fugt", free_cooling: "Gratis køling udefra", away: "Alle er ude", normal: "Normal drift" },
   vEff: "Varmegenvinding", vBypass: "Bypass", vOpen: "åben", vClosed: "lukket", vOut: "Ude", vSup: "Ind", vExt: "Ud af rum", vExh: "Ud af hus",
@@ -191,6 +196,9 @@ Object.assign(T, L === "da" ? {
     district: ["District heating cooling", "Follows the cooling from your heat meter. When it's poor, rooms warm up gently – a lower return temperature"],
     price: ["Electricity price", "Rooms with electric heating or a heat pump are a little warmer in the cheapest hours and cooler in the dearest"],
     ventilation: ["Ventilation", "Boost after a shower, more air with high CO₂ or humidity, free cooling through the bypass – and no heating while it cools"] },
+  aTitle: "Worth knowing", mTitle: "Messages", mH: "Warnings are always shown here. Choose whether they are also sent as messages – and which.",
+  mTo: "Send to", mNobody: "None chosen – only shown in the app", mNight: "Also at night (22–7)",
+  kinds: { mold: "Mould risk", air: "Air it out (CO₂)", window: "Window open long", offline: "Thermostat not responding", battery: "Low battery", not_warming: "Room not getting warm", cooling: "District heating cooling" },
   vTitle: "Ventilation", vLevels: { low: "Low", normal: "Normal", high: "High", boost: "Boost" }, vNow: "Set now", vWant: "Would set",
   vWhy: { shower: "Shower – removing the humidity", co2: "High CO₂", humidity: "High humidity", free_cooling: "Free cooling from outside", away: "Everyone is out", normal: "Normal" },
   vEff: "Heat recovery", vBypass: "Bypass", vOpen: "open", vClosed: "closed", vOut: "Outdoor", vSup: "Supply", vExt: "Extract", vExh: "Exhaust",
@@ -284,6 +292,15 @@ function houseSvg(rooms) {
   const out = data.outdoor != null ? `<text x="${bx - 4}" y="64" font-size="13" font-weight="650" fill="var(--cool)">☁ ${num(data.outdoor)}°</text>` : "";
   return `<svg viewBox="0 0 ${W} ${H}">${roof}${out}${tiles}</svg>`;
 }
+function msgCard() {
+  const m = data.messages || {}, targets = m.targets || [], kinds = m.kinds || {};
+  const nice = (n) => n.replace(/^mobile_app_/, "").replace(/_/g, " ");
+  return `<div class="card"><p class="eyebrow">${T.mTitle}</p><p class="muted" style="margin:-4px 0 6px">${T.mH}</p>
+    <div class="row"><div class="t"><b>${T.mTo}</b><span>${targets.length ? targets.map(nice).map(esc).join(", ") : T.mNobody}</span></div></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;padding-bottom:8px">${(data.notify || []).map((n) => `<button class="chipb ${targets.includes(n) ? "on" : ""}" data-target="${esc(n)}">${esc(nice(n))}</button>`).join("")}</div>
+    <div class="row"><div class="t"><b>${T.mNight}</b></div><button class="toggle ${m.night ? "on" : ""}" data-mnight></button></div>
+    ${(data.alert_kinds || []).map((k) => `<div class="row"><div class="t"><b>${esc(T.kinds[k])}</b></div><button class="toggle ${kinds[k] === false ? "" : "on"}" data-mkind="${k}"></button></div>`).join("")}</div>`;
+}
 function ventCard() {
   const v = data.vent;
   if (!v) return "";
@@ -312,6 +329,7 @@ function nowTab(rooms) {
   const lg = data.learning || {}, heating = rooms.filter((r) => r.heating).length;
   const learnRows = rooms.map((r) => `<div class="lrow"><b>${esc(r.name)}</b><span>${r.hours_today == null ? T.learning : r.hours_today.length ? T.uses.replace("{h}", ranges(r.hours_today)) : T.notUsed} · ${r.rate_n ? T.rate.replace("{x}", num(r.rate, 0)) : T.rateDefault}</span></div>`).join("");
   return `<div class="card status"><div class="dotc">${FLAME}</div><div><h2>${esc(sentence(rooms))}</h2><p>${T.heroP}${data.agree != null ? " · " + T.agree.replace("{x}", data.agree) : ""}</p></div></div>
+    ${(data.alerts || []).length ? `<div class="card"><p class="eyebrow">${T.aTitle}</p>${data.alerts.map((a) => `<div class="lrow"><b style="color:var(--warn)">${esc(T.kinds[a.kind] || a.kind)}</b><span>${esc(a.text)}</span></div>`).join("")}</div>` : ""}
     <div class="card house">${houseSvg(rooms)}</div>
     <div class="metrics">
       <div class="metric"><div class="lbl">${T.mSaved}</div><div class="v">${num(lg.today_dh)}<small>${T.dh}</small></div><div class="s">${lg.week_pct != null ? T.mSavedS.replace("{x}", num(lg.week_pct, 0)) : ""}</div></div>
@@ -359,6 +377,7 @@ function render() {
     const f = data.features || {};
     body = `<div class="card"><p class="eyebrow">${T.feat.title}</p><p class="muted" style="margin:-4px 0 6px">${T.feat.hint}</p>
       ${Object.keys(f).map((k) => `<div class="row"><div class="t"><b>${esc(T.feat[k][0])}</b><span>${esc(T.feat[k][1])}</span></div><button class="toggle ${f[k].on ? "on" : ""}" data-feat="${k}"></button></div>`).join("")}</div>
+      ${msgCard()}
       ${f.ventilation && f.ventilation.on ? `<div class="card"><p class="eyebrow">${T.vTitle}</p>
         <div class="row"><div class="t"><b>${T.vCool}</b><span>${T.vCoolH}</span></div><select data-vcool><option value="">${T.vNone}</option>${(data.cooling_options || []).map((o) => `<option value="${esc(o.entity_id)}" ${data.ventilation.cooling_entity === o.entity_id ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select></div></div>` : ""}
       ${f.district && f.district.on ? `<div class="card"><p class="eyebrow">${T.dhTitle}</p>
@@ -370,6 +389,9 @@ function render() {
   app.innerHTML = tabs + body;
   document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; location.hash = tab; render(); });
   document.querySelectorAll("[data-room]").forEach((el) => el.onclick = () => openRoom(el.dataset.room));
+  document.querySelectorAll("[data-target]").forEach((b) => b.onclick = async () => { const t = new Set((data.messages || {}).targets || []); t.has(b.dataset.target) ? t.delete(b.dataset.target) : t.add(b.dataset.target); await api("/api/messages", { targets: [...t] }); load(); });
+  document.querySelectorAll("[data-mnight]").forEach((b) => b.onclick = async () => { await api("/api/messages", { night: !b.classList.contains("on") }); load(); });
+  document.querySelectorAll("[data-mkind]").forEach((b) => b.onclick = async () => { await api("/api/messages", { kind: b.dataset.mkind, on: !b.classList.contains("on") }); load(); });
   document.querySelectorAll("[data-vcool]").forEach((el) => el.onchange = async () => { await api("/api/ventilation", { cooling_entity: el.value || null }); load(); });
   document.querySelectorAll("[data-dh]").forEach((el) => el.onchange = async () => { await api("/api/district", { [el.dataset.dh]: el.value === "" ? null : Number(el.value.replace(",", ".")) }); load(); });
   document.querySelectorAll("[data-feat]").forEach((b) => b.onclick = async () => { await api("/api/feature", { key: b.dataset.feat, on: !b.classList.contains("on") }); load(); });

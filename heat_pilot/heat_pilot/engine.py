@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from . import brands, discover, features, people, plan, pricefeed, supply, ventilation
+from . import alerts, brands, discover, features, people, plan, pricefeed, supply, ventilation
 from .signals import Watch
 from .learning import Learning, seed
 
@@ -49,6 +49,8 @@ class Pilot:
         self.vent: dict[str, Any] | None = None
         self.vent_now: dict[str, Any] | None = None
         self.cooling_options: list[str] = []
+        self.alerts = alerts.Alerts(self.learning.s)
+        self.notify: list[str] = []
         self.cooling = supply.Cooling(self.learning.s)
         self.timelines: dict[str, list] = {}
 
@@ -66,6 +68,12 @@ class Pilot:
         self.doors = discover.exit_doors(entities, self.ha.states)
         self.meter = supply.find_heat_meter(entities, devices, self.ha.states)
         self.vent = ventilation.find(entities, devices, self.ha.states)
+        try:
+            svc = await self.ha.command({"type": "get_services"})
+            names = sorted((svc.get("notify") or {}).keys())
+            self.notify = [n for n in names if n.startswith("mobile_app_")] + [n for n in names if not n.startswith("mobile_app_") and n not in ("notify", "send_message", "persistent_notification")]
+        except Exception:  # noqa: BLE001
+            self.notify = []
         self.cooling_options = sorted(e for e, s in self.ha.states.items() if e.split(".")[0] in ("binary_sensor", "switch", "input_boolean", "sensor")
                                       and (any(k in (s.get("attributes") or {}) for k in ("precool", "cooling", "free_cooling"))
                                            or any(w in e for w in ("precool", "free_cooling", "frikoling", "natkoling", "kole_mode", "cooling_mode"))))[:30]
@@ -242,6 +250,7 @@ class Pilot:
                          "learned": self.learning.known(a_id), "hours_today": by_day[now.weekday()]}
         self.now = out
         self.away = away
+        self.alerts.check(rooms, out, st, now, outdoor_now, getattr(self, "cooling_info", None))
         if now.minute % 10 == 0:
             self.learning.save()
 
@@ -256,6 +265,28 @@ class Pilot:
                 continue
             latest = t if latest is None or t > latest else latest
         return latest
+
+    async def send_alerts(self) -> None:
+        """Messages for the warnings due now - only to the phones chosen."""
+        tz = ZoneInfo(self.ha.config.get("time_zone") or "UTC")
+        due = self.alerts.to_send(self.settings, datetime.now(tz))
+        lang = "da" if str(self.ha.config.get("language") or "").startswith("da") else "en"
+        for a in due:
+            for target in (self.settings.get("messages") or {}).get("targets") or []:
+                try:
+                    await self.ha.call_service("notify", target, {"title": alerts.TEXT[lang]["title"], "message": alerts.text(a, lang)})
+                except Exception:  # noqa: BLE001
+                    _LOGGER.warning("Could not send to notify.%s", target)
+
+    def set_messages(self, values: dict[str, Any]) -> None:
+        m = self.settings.setdefault("messages", {})
+        if "targets" in values:
+            m["targets"] = [str(t) for t in values["targets"] or [] if str(t) in self.notify]
+        if "night" in values:
+            m["night"] = bool(values["night"])
+        if "kind" in values:
+            m.setdefault("kinds", {})[str(values["kind"])] = bool(values.get("on"))
+        self.save()
 
     async def publish(self) -> None:
         """For Energy Pilot (and dashboards): the electric heating now and the hours it plans to heat - only when
@@ -331,6 +362,9 @@ class Pilot:
                 "cooling": getattr(self, "cooling_info", None), "cooling_now": getattr(self, "cooling_now", None),
                 "district": self.settings.get("district") or {}, "price_level": getattr(self, "price_level", None),
                 "electric": [r["area_id"] for r in rooms if supply.is_electric(r)],
+                "alerts": [{**a, "text": alerts.text(a, "da" if str(self.ha.config.get("language") or "").startswith("da") else "en")}
+                           for a in self.alerts.active],
+                "messages": self.settings.get("messages") or {}, "notify": self.notify, "alert_kinds": alerts.KINDS,
                 "vent": getattr(self, "vent_now", None), "ventilation": self.settings.get("ventilation") or {},
                 "cooling_options": [{"entity_id": e, "name": (self.ha.states.get(e) or {}).get("attributes", {}).get("friendly_name") or e} for e in self.cooling_options]}
 
