@@ -616,7 +616,7 @@ class Pilot:
         for r in self.rooms():
             n = self.now.get(r["area_id"]) or {}
             rooms.append({k: r[k] for k in ("area_id", "name", "kind", "heating", "temp_sensor", "temp_options", "windows",
-                                            "presence", "humidity", "excluded", "fixed_hours", "owner", "floor_id", "doors", "doors_extra", "comfort_learned") if k in r}
+                                            "presence", "humidity", "excluded", "fixed_hours", "owner", "floor_id", "doors", "doors_extra", "comfort_learned", "floor_kind") if k in r}
                          | {"heat_type": r["heating"], "cfg": r["cfg"],
                             "temp_names": {e: ((self.ha.states.get(e) or {}).get("attributes") or {}).get("friendly_name") or e for e in r.get("temp_options") or []}, "thermostats": [{k: t[k] for k in ("entity_id", "name", "brand", "platform", "model")}
                                                              for t in r["thermostats"]]} | n)
