@@ -72,3 +72,21 @@ def test_house_away_needs_an_hour_without_motion():
     s["binary_sensor.m"]["last_changed"] = (NOW - timedelta(minutes=20)).isoformat()
     assert not plan.house_away(rooms, s, NOW, None)
     assert not plan.house_away([{"presence": []}], {}, NOW, None)  # no sensors: never "away"
+
+
+def test_water_floor_heating_never_far_below_comfort():
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from heat_pilot import plan
+    now = datetime(2026, 11, 11, 14, 0, tzinfo=ZoneInfo("Europe/Copenhagen"))
+    room = {"area_id": "bad", "name": "Badeværelse", "kind": "bathroom", "heating": "floor", "floor_kind": "water", "windows": []}
+    w = plan.target(room, {"comfort": 22.0}, {}, now, False, None, hours=[7, 8])
+    assert w["temp"] == 20.0 and w["why"] == "floor_keep"
+    night = plan.target(room, {"comfort": 22.0}, {}, now.replace(hour=2), False, None, hours=[7, 8])
+    assert night["temp"] == 20.0
+    tl = plan.timeline(room, {"comfort": 22.0}, now, {now.weekday(): [7, 8]}, 21.0, 30)
+    assert min(q["temp"] for q in tl) == 20.0
+    electric = {**room, "floor_kind": "electric"}
+    assert plan.target(electric, {"comfort": 22.0}, {}, now, False, None, hours=[7, 8])["temp"] < 20.0
+    radiator = {**room, "heating": "radiator", "floor_kind": None}
+    assert plan.target(radiator, {"comfort": 22.0}, {}, now, False, None, hours=[7, 8])["temp"] < 20.0

@@ -25,6 +25,14 @@ NIGHT_TO = 6     # … to this one (both chosen in the settings)
 AWAY = 17.0
 HOLIDAY = 15.0
 PRICE_FLEX = 1.0  # degrees up in the cheapest hours / down in the dearest (electric heating)
+FLOOR_DROP = 2.0  # water floor heating is slow (a concrete floor takes hours): never more than this below comfort
+
+
+def floor_min(room: dict[str, Any], c: dict[str, Any]) -> float | None:
+    """The lowest a water floor heating goes - None for radiators and electric floor heating (fast: set back freely)."""
+    if room.get("heating") != "floor" or room.get("floor_kind") == "electric":
+        return None
+    return c["comfort"] - float(c.get("floor_drop", FLOOR_DROP))
 FROST = 7.0
 WINDOW_MIN = 5
 AWAY_MIN = 60
@@ -158,6 +166,9 @@ def target(room: dict[str, Any], cfg: dict[str, Any], states: dict[str, Any], no
         t, why, until = c["setback"], "owner_away", None
     if house_away and not coming and t > c["away"]:
         t, why, until = c["away"], "away", None
+    fm = floor_min(room, c)
+    if fm is not None and t < fm:
+        t, why = fm, "floor_keep"  # a warm floor: setting it back far saves little and takes hours to undo
     return {"temp": max(FROST, round(t, 1)), "why": why, "until": until.isoformat() if until else None}
 
 
@@ -170,6 +181,9 @@ def timeline(room: dict[str, Any], cfg: dict[str, Any], now: datetime, hours_by_
     for i in range(steps):
         t = t0 + timedelta(minutes=15 * i)
         v, why = base(c, hours_by_day.get(t.weekday()), t)
+        fm = floor_min(room, c)
+        if fm is not None and v < fm:
+            v, why = fm, "floor_keep"
         out.append({"t": t.isoformat(), "temp": v, "why": "comfort" if why == "evening" else why})
     lead_q = int(round(max(0.0, c["comfort"] - (temp if temp is not None else c["setback"])) * (rate or 12) / 15)) if rate else 0
     lead_q = max(lead_q, 1)

@@ -33,6 +33,7 @@ ROOM_KINDS = [
     ("office", r"kontor|office|büro|arbeits|bureau|werk"),
 ]
 FLOOR_WORDS = re.compile(r"floor|gulv|fußboden|golv|plancher|vloer|underfloor", re.I)
+ELECTRIC_WORDS = re.compile(r"electric|elektris|el-gulv|elgulv|elektrisch|électrique|elektrisk", re.I)
 
 
 def _area_of(e: dict[str, Any], devices: dict[str, dict[str, Any]]) -> str | None:
@@ -102,8 +103,13 @@ def find(areas: list[dict[str, Any]], devices_list: list[dict[str, Any]], entiti
                            if e.get("device_id") in own_devs and e["entity_id"].startswith("sensor.")
                            and (states[e["entity_id"]].get("attributes") or {}).get("device_class") == "battery")
         floor = all(t["floor"] for t in thermostats) or (room_kind(name) == "bathroom" and any(t["floor"] for t in thermostats))
+        # Electric floor heating (fast, thin layer) measures its own power; water floor heating doesn't. In doubt: water.
+        tdevs = {e.get("device_id") for e in climates if e.get("device_id")}
+        powered = any(e.get("device_id") in tdevs and (states.get(e["entity_id"], {}).get("attributes") or {}).get("device_class") in ("power", "energy")
+                      for e in entities if e["entity_id"] in states)
+        electric = powered or any(ELECTRIC_WORDS.search(f"{t['entity_id']} {t['name']} {t.get('model') or ''}") for t in thermostats)
         rooms.append({"area_id": area, "name": name, "kind": room_kind(name), "floor_id": area_floor.get(area), "heating": "floor" if floor else "radiator",
-                      "thermostats": thermostats, "temp_sensor": temps[0] if temps else None, "temp_options": temps,
+                      "floor_kind": ("electric" if electric else "water") if floor else None, "thermostats": thermostats, "temp_sensor": temps[0] if temps else None, "temp_options": temps,
                       "windows": windows, "doors": doors, "presence": presence, "humidity": humidity[:1], "co2": co2[:1], "lights": lights, "batteries": batteries})
     # Thermostats with no area (a single Nest or ecobee is often never put in a room): each is a room of its own,
     # named after it - with nothing but the thermostat's own temperature.
