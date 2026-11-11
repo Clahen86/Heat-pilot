@@ -592,6 +592,17 @@ class Pilot:
         except Exception:  # noqa: BLE001
             _LOGGER.debug("No Energy dashboard solar forecast", exc_info=True)
 
+    def sky(self) -> dict[str, Any]:
+        """What the front page draws above the house: the sun's place, the weather and how cloudy it is now."""
+        st = self.ha.states
+        sun = (st.get("sun.sun") or {}).get("attributes") or {}
+        w = next((v for e, v in sorted(st.items()) if e.startswith("weather.")), None) or {}
+        cloud = (w.get("attributes") or {}).get("cloud_coverage")
+        f = self.sun_hours.get(sunfeed.hour_key(datetime.now())) if self.sun_hours else None
+        if f is not None:
+            cloud = round((1 - f) * 100)
+        return {"elevation": sun.get("elevation"), "azimuth": sun.get("azimuth"), "condition": w.get("state"), "cloud": cloud}
+
     @staticmethod
     def _recent_on(s: dict[str, Any] | None, now: datetime) -> bool:
         from .learning import HOLD_MIN
@@ -617,7 +628,7 @@ class Pilot:
         out_t = self.outdoor()
         sun = (self.ha.states.get("sun.sun") or {}).get("state")
         return {"unit": "°F" if self.fahrenheit else "°C", "sent": self.sender.log[:20], "setup_done": bool(self.settings.get("setup_done")), "all_doors": [{"entity_id": e, "name": (self.ha.states.get(e) or {}).get("attributes", {}).get("friendly_name") or e} for e in self.all_doors],
-                "arm": getattr(self, "arm", None), "cold_snap": getattr(self, "cold_snap", False), "tune": features.tune_view(self.settings), "month": self.month_report(now), "floors": self.floors, "sun": sun, "sun_source": self.sunfeed.source, "rooms": rooms, "unplaced": self.unplaced, "away": getattr(self, "away", False), "now": now.isoformat(),
+                "arm": getattr(self, "arm", None), "cold_snap": getattr(self, "cold_snap", False), "tune": features.tune_view(self.settings), "month": self.month_report(now), "floors": self.floors, "sun": sun, "sun_source": self.sunfeed.source, "sky": self.sky(), "rooms": rooms, "unplaced": self.unplaced, "away": getattr(self, "away", False), "now": now.isoformat(),
                 "agree": round(100 * a["same"] / a["checks"]) if a["checks"] else None, "outdoor": out_t,
                 "learning": self.learning.summary(now, [r["area_id"] for r in rooms if not r.get("excluded")]),
                 "features": {k: {"found": bool(self.have.get(k)), "on": bool(getattr(self, "on", {}).get(k))}

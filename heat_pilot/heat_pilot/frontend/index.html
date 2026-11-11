@@ -89,8 +89,20 @@
   .wave { fill:none; stroke:var(--heat); stroke-width:1.6; stroke-linecap:round; opacity:0; animation:rise 2.6s ease-in infinite; }
   .wave.w2 { animation-delay:.9s; } .wave.w3 { animation-delay:1.7s; }
   @keyframes rise { 0% { opacity:0; transform:translateY(6px); } 30% { opacity:.9; } 100% { opacity:0; transform:translateY(-12px); } }
-  .smoke { fill:color-mix(in srgb, var(--muted) 70%, var(--text)); opacity:0; transform-box:fill-box; transform-origin:center; animation:smoke 4.8s ease-out infinite; }
-  .smoke.s2 { animation-delay:1.2s; } .smoke.s3 { animation-delay:2.4s; } .smoke.s4 { animation-delay:3.6s; }
+  .smoke { fill:color-mix(in srgb, var(--muted) 55%, var(--surface)); opacity:0; transform-box:fill-box; transform-origin:center; animation:smoke 4.8s ease-out infinite; }
+  .t-fl { font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; fill:var(--faint); }
+  .t-out { font-size:12.5px; font-weight:650; fill:var(--text); }
+  .cloud { animation:drift 60s linear infinite; } @keyframes drift { from { transform:translateX(-110%); } to { transform:translateX(110%); } }
+  .halo { transform-box:fill-box; transform-origin:center; animation:halo 4s ease-in-out infinite; } @keyframes halo { 50% { transform:scale(1.25); opacity:.08; } }
+  .star { fill:#fff; animation:twinkle 3s ease-in-out infinite; } @keyframes twinkle { 50% { opacity:.25; } }
+  .drop { stroke:#7cb7ff; stroke-width:1.4; stroke-linecap:round; opacity:.7; animation:fall .9s linear infinite; } @keyframes fall { from { transform:translateY(-10px); } to { transform:translateY(130px); opacity:0; } }
+  .flake { fill:#fff; opacity:.9; animation:snow 6s linear infinite; } @keyframes snow { from { transform:translate(0,-6px); } 50% { transform:translate(8px,60px); } to { transform:translate(-4px,130px); opacity:0; } }
+  .roofglow { opacity:0; animation:roofglow 4s ease-in-out infinite; } @keyframes roofglow { 50% { opacity:.16; } }
+  .lamp { animation:lamp 3.5s ease-in-out infinite; } @keyframes lamp { 50% { opacity:.75; } }
+  .alertsum { display:flex; align-items:center; gap:10px; cursor:pointer; list-style:none; font-weight:650; color:var(--text); margin:0; }
+  .alertsum::-webkit-details-marker { display:none; }
+  .alertsum .chev { margin-left:auto; color:var(--muted); transition:transform .2s; } details[open] .alertsum .chev { transform:rotate(90deg); }
+  @media (prefers-reduced-motion: reduce) { .cloud, .halo, .star, .drop, .flake, .roofglow, .lamp, .smoke, .wave, .glow { animation:none !important; } }
   @keyframes smoke { 0% { opacity:0; transform:translate(0, 4px) scale(.5); } 15% { opacity:.7; } 60% { opacity:.4; } 100% { opacity:0; transform:translate(16px, -34px) scale(2.1); } }
   .glow { opacity:.08; animation:glow 3s ease-in-out infinite; } @keyframes glow { 50% { opacity:.2; } }
   .tile { transition:transform .15s; transform-box:fill-box; transform-origin:center; } .tile:hover { transform:scale(1.02); }
@@ -372,52 +384,92 @@ function tileColor(r) {
 }
 function houseSvg(rooms) {
   const narrow = (window.innerWidth || 800) < 600;
-  const W = narrow ? 380 : 680, pad = narrow ? 6 : 26, tw0 = 150, th = narrow ? 92 : 96, gx = 10, gy = 10, labelW = 0;
+  const W = narrow ? 380 : 680, pad = narrow ? 8 : 26, tw0 = 150, th = narrow ? 92 : 96, gx = 10, gy = 10;
   const floors = (data.floors || []).filter((f) => rooms.some((r) => r.floor_id === f.floor_id));
   const bands = floors.map((f) => ({ ...f, rooms: rooms.filter((r) => r.floor_id === f.floor_id) }));
   const loose = rooms.filter((r) => !floors.some((f) => f.floor_id === r.floor_id));
   if (loose.length) bands.push({ floor_id: "", name: "", level: 0, rooms: loose });
   const cols = Math.min(narrow ? 2 : 4, Math.max(...bands.map((b) => b.rooms.length), 1));
-  const inner = narrow ? 24 : 40;
+  const inner = narrow ? 20 : 40;
   const tw = Math.min(narrow ? 999 : tw0, (W - 2 * pad - inner - (cols - 1) * gx) / cols);
-  const bw = cols * tw + (cols - 1) * gx + inner, bx = (W - bw) / 2, roofH = 90;
-  let y = roofH + 20, body = "", ground = null, tiles = "";
-  bands.forEach((b, bi) => {
+  const bw = cols * tw + (cols - 1) * gx + inner, bx = (W - bw) / 2;
+  const skyH = 112, roofTop = 34, roofH = 84, eave = narrow ? 8 : 24;
+  const ph = (dur) => `animation-delay:-${((Date.now() / 1000) % dur).toFixed(2)}s`;  // keep the phase across re-draws
+  let y = roofTop + roofH, body = "", ground = null, tiles = "";
+  const cap = (s) => s ? s.charAt(0).toLocaleUpperCase() + s.slice(1) : s;
+  const fit = (s, px, size) => { const n = Math.max(4, Math.floor(px / (size * 0.56))); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+  bands.forEach((b) => {
     const rows = Math.ceil(b.rooms.length / cols), h = rows * th + (rows - 1) * gy + 36;
-    if (b.level < 0 && ground == null) ground = y;
-    body += `<g><rect x="${bx}" y="${y}" width="${bw}" height="${h}" fill="${b.level < 0 ? "color-mix(in srgb, #8b6b4a 10%, var(--surface))" : "var(--surface)"}" stroke="var(--line2)" stroke-width="1.5"/>
-      ${b.name ? `<text x="${bx + 14}" y="${y + 20}" class="t-nm" style="text-transform:uppercase;letter-spacing:.1em;font-size:10px;fill:var(--faint)">${esc(b.name)}</text>` : ""}</g>`;
+    const below = b.level < 0;
+    if (below && ground == null) ground = y;
+    body += `<rect x="${bx}" y="${y}" width="${bw}" height="${h}" fill="${below ? "url(#cellar)" : "url(#wall)"}" stroke="var(--line2)" stroke-width="1.5"/>
+      ${b.name ? `<text x="${bx + 12}" y="${y + 19}" class="t-fl">${esc(b.name)}</text>` : ""}`;
     b.rooms.forEach((r, i) => {
       const c = i % cols, row = Math.floor(i / cols), x = bx + inner / 2 + c * (tw + gx), ty = y + 28 + row * (th + gy);
       const w = r.want || {}, why = w.why || "comfort", [col, mix] = tileColor(r);
       const win = (r.windows || []).length && why === "window";
-      const waves = r.heating ? [0, 1, 2].map((k) => `<path class="wave w${k + 1}" d="M${x + tw - 30 + k * 8} ${ty + 34} q4 -5 0 -10 q-4 -5 0 -10"/>`).join("") : "";
+      const waves = r.heating ? [0, 1, 2].map((k) => `<path class="wave w${k + 1}" d="M${x + tw - 34 + k * 9} ${ty + th - 22} q5 -6 0 -12 q-5 -6 0 -12"/>`).join("") : "";
       const prog = r.temp != null && w.temp != null ? Math.max(0, Math.min(1, 1 - (w.temp - r.temp) / 3)) : 0;
-      const short = r.name.length > 18 ? r.name.slice(0, 17) + "…" : r.name;
-      tiles += `<g class="tile" data-room="${esc(r.area_id)}">
+      const lamp = r.occupied ? `<g class="lamp"><circle cx="${x + tw - 16}" cy="${ty + 16}" r="9" fill="#ffd36b" opacity=".25"/><circle cx="${x + tw - 16}" cy="${ty + 16}" r="4" fill="#ffc847"/></g>` : "";
+      const label = w.temp == null ? (win ? "🪟 " : "") + T.off : "→ " + num(deg(w.temp)) + "° " + (T.why[why] || why);
+      tiles += `<g class="tile${r.heating ? " hot" : ""}" data-room="${esc(r.area_id)}">
         <rect class="bg" x="${x}" y="${ty}" width="${tw}" height="${th}" rx="14" fill="color-mix(in srgb, ${col} ${mix}%, var(--surface2))" stroke="color-mix(in srgb, ${col} 50%, transparent)"/>
-        ${r.heating ? `<rect x="${x}" y="${ty}" width="${tw}" height="${th}" rx="14" fill="${col}" class="glow"/>` : ""}
-        <text class="t-nm" x="${x + 12}" y="${ty + 20}">${esc(short)}${r.occupied ? " ●" : ""}</text>
+        ${r.heating ? `<rect x="${x}" y="${ty}" width="${tw}" height="${th}" rx="14" fill="${col}" class="glow" style="${ph(3)}"/>` : ""}
+        ${lamp}
+        <text class="t-nm" x="${x + 12}" y="${ty + 20}">${esc(fit(cap(r.name), tw - (r.occupied ? 44 : 24), 12))}</text>
         <text class="t-v" x="${x + 12}" y="${ty + 52}">${num(deg(r.temp))}°</text>
-        <text class="t-w" x="${x + 12}" y="${ty + 72}" fill="${col}">${w.temp == null ? (win ? "🪟 " : "") + T.off : "→ " + num(deg(w.temp)) + "° " + esc(T.why[why] || why)}</text>
+        <text class="t-w" x="${x + 12}" y="${ty + 72}" fill="${col}">${esc(fit(label, tw - 24, 11))}</text>
         <rect x="${x + 12}" y="${ty + th - 13}" width="${tw - 24}" height="3" rx="1.5" fill="var(--line2)"/>
         <rect x="${x + 12}" y="${ty + th - 13}" width="${(tw - 24) * prog}" height="3" rx="1.5" fill="${col}"/>${waves}</g>`;
     });
     y += h;
   });
-  const H = y + 16, anyHeat = rooms.some((r) => r.heating), day = data.sun !== "below_horizon";
-  const chx = bx + bw - 90;
-  const smoke = anyHeat ? [0, 1, 2, 3].map((k) => `<circle class="smoke s${k + 1}" cx="${chx + 11}" cy="30" r="7"/>`).join("") : "";
-  const sx = narrow ? 22 : bx - 4;
-  const sky = day ? `<circle cx="${sx}" cy="30" r="13" fill="#f5c451"/><circle cx="${sx}" cy="30" r="22" fill="#f5c451" opacity=".15"/>`
-    : `<path d="M${sx + 2} 18 a13 13 0 1 0 10 22 a10 10 0 1 1 -10 -22z" fill="#c9d3ff"/>`;
-  const out = data.outdoor != null ? `<text x="${sx + 22}" y="35" font-size="13" font-weight="650" fill="var(--muted)">${num(deg(data.outdoor))}° ${WD[0]}</text>` : "";
-  const roof = `<defs><linearGradient id="roofg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".35"/><stop offset="1" stop-color="var(--accent)" stop-opacity=".06"/></linearGradient></defs>
-    <path d="M${bx - (narrow ? 4 : 22)} ${roofH + 22} L${W / 2} 22 L${bx + bw + (narrow ? 4 : 22)} ${roofH + 22} Z" fill="url(#roofg)" stroke="var(--line2)" stroke-width="2" stroke-linejoin="round"/>
-    <rect x="${chx}" y="34" width="22" height="46" rx="3" fill="var(--surface2)" stroke="var(--line2)" stroke-width="1.5"/>
-    <rect x="${chx - 3}" y="31" width="28" height="6" rx="2" fill="var(--surface2)" stroke="var(--line2)" stroke-width="1.5"/>${smoke}`;
-  const gl = ground != null ? `<line x1="0" x2="${W}" y1="${ground}" y2="${ground}" stroke="#8b6b4a" stroke-width="3" stroke-linecap="round" opacity=".7"/>` : "";
-  return `<svg viewBox="0 0 ${W} ${H}">${sky}${out}${roof}${body}${gl}${tiles}</svg>`;
+  if (ground == null) ground = y;
+  const H = y + 22, heatN = rooms.filter((r) => r.heating).length;
+  // --- the sky: sun or moon on its arc, clouds after the forecast, rain or snow after the weather
+  const sky = data.sky || {}, el = Number(sky.elevation), az = Number(sky.azimuth);
+  const day = !isNaN(el) ? el > -3 : data.sun !== "below_horizon";
+  const cond = sky.condition || "", cloud = sky.cloud != null ? sky.cloud : ({ sunny: 5, "clear-night": 5, partlycloudy: 45, cloudy: 85 }[cond] ?? 60);
+  const sxp = !isNaN(az) ? Math.max(0.06, Math.min(0.94, (az - 90) / 180)) : 0.15;
+  const sx = day ? W * sxp : W * 0.18, sy = day && !isNaN(el) ? 92 - Math.max(0, Math.min(1, el / 55)) * 66 : 34;
+  let sk = `<rect x="0" y="0" width="${W}" height="${skyH + 30}" fill="url(#${day ? "skyd" : "skyn"})"/>`;
+  if (!day) sk += [[.08, 18], [.3, 40], [.46, 14], [.62, 30], [.8, 16], [.92, 46], [.38, 62], [.72, 58]].map(([fx, fy], k) =>
+    `<circle class="star" cx="${W * fx}" cy="${fy}" r="${k % 3 ? 1 : 1.5}" style="animation-delay:${(k * .7).toFixed(1)}s"/>`).join("");
+  sk += day ? `<g class="sun"><circle cx="${sx}" cy="${sy}" r="26" fill="#ffd35c" opacity=".18" class="halo"/><circle cx="${sx}" cy="${sy}" r="13" fill="#ffc93c"/></g>`
+    : `<path d="M${sx + 2} ${sy - 12} a13 13 0 1 0 10 22 a10 10 0 1 1 -10 -22z" fill="#d7defc"/>`;
+  const nCl = cloud < 15 ? 0 : cloud < 40 ? 1 : cloud < 70 ? 2 : 3;
+  const cl = (cx, cy, s, k) => `<g class="cloud" style="animation-duration:${60 + k * 17}s;${ph(60 + k * 17)}"><g transform="translate(${cx} ${cy}) scale(${s})" fill="${day ? "#fff" : "#9aa4c4"}" opacity="${day ? .92 : .35}">
+      <ellipse cx="0" cy="8" rx="26" ry="10"/><circle cx="-10" cy="2" r="11"/><circle cx="8" cy="-2" r="14"/><circle cx="22" cy="6" r="8"/></g></g>`;
+  sk += [[W * .25, 30, 1], [W * .68, 48, .8], [W * .45, 18, .65]].slice(0, nCl).map(([cx, cy, s], k) => cl(cx, cy, s, k)).join("");
+  if (/rain|pouring|lightning-rainy/.test(cond)) sk += Array.from({ length: 14 }, (_, k) => `<line class="drop" x1="${(k * 53) % W}" y1="0" x2="${(k * 53) % W - 3}" y2="9" style="animation-delay:-${(k * .17).toFixed(2)}s"/>`).join("");
+  if (/snow/.test(cond)) sk += Array.from({ length: 14 }, (_, k) => `<circle class="flake" cx="${(k * 59) % W}" cy="0" r="2" style="animation-delay:-${(k * .4).toFixed(1)}s"/>`).join("");
+  const out = data.outdoor != null ? `<g><rect x="${W - 92}" y="10" width="82" height="26" rx="13" fill="var(--surface)" opacity=".85"/><text x="${W - 51}" y="28" text-anchor="middle" class="t-out">${num(deg(data.outdoor))}° ${WD[0]}</text></g>` : "";
+  // --- roof with tiles, chimney on the slope, smoke by how many rooms heat
+  const rl = bx - eave, rr = bx + bw + eave, rb = roofTop + roofH + 2, peak = W / 2;
+  const slope = (x) => rb - (rb - roofTop) * (1 - Math.abs(x - peak) / (peak - rl));
+  const chx = bx + bw * 0.74, chTop = slope(chx + 22) - 30;
+  const tileLines = [1, 2, 3, 4].map((k) => { const yy = roofTop + roofH * k / 5, half = (peak - rl) * (yy - roofTop) / (rb - roofTop); return `<line x1="${peak - half + 4}" x2="${peak + half - 4}" y1="${yy}" y2="${yy}"/>`; }).join("");
+  const puffs = Math.min(4, heatN ? 1 + Math.ceil(heatN / 2) : 0);
+  const smoke = Array.from({ length: puffs }, (_, k) => `<circle class="smoke" cx="${chx + 11}" cy="${chTop - 4}" r="7" style="animation-delay:${(k * 4.8 / puffs).toFixed(2)}s"/>`).join("");
+  const roof = `<g>${smoke}<rect x="${chx}" y="${chTop}" width="22" height="${slope(chx) - chTop + 4}" fill="url(#brick)" stroke="var(--line2)" stroke-width="1.2"/>
+      <rect x="${chx - 3}" y="${chTop - 5}" width="28" height="7" rx="2" fill="#7c4a3a" stroke="var(--line2)" stroke-width="1"/></g>
+    <path d="M${rl} ${rb} L${peak} ${roofTop} L${rr} ${rb} Z" fill="url(#roofg)" stroke="#8a4a38" stroke-width="2" stroke-linejoin="round"/>
+    <g stroke="#000" stroke-opacity=".12" stroke-width="1">${tileLines}</g>
+    ${heatN ? `<path d="M${rl} ${rb} L${peak} ${roofTop} L${rr} ${rb} Z" fill="var(--heat)" class="roofglow" style="${ph(4)}"/>` : ""}
+    <circle cx="${peak}" cy="${roofTop + roofH * .55}" r="10" fill="var(--surface)" stroke="#8a4a38" stroke-width="2"/>
+    <path d="M${peak} ${roofTop + roofH * .55 - 10} v20 M${peak - 10} ${roofTop + roofH * .55} h20" stroke="#8a4a38" stroke-width="1.5"/>`;
+  const grass = `<rect x="0" y="${ground}" width="${W}" height="${Math.max(6, H - ground)}" fill="url(#earth)"/>
+    <path d="M0 ${ground} H${W}" stroke="#5aa35a" stroke-width="4" stroke-linecap="round"/>
+    ${[bx - 16, bx + bw + 14].map((gx0) => `<g fill="#5aa35a"><circle cx="${gx0}" cy="${ground - 8}" r="9"/><circle cx="${gx0 + 9}" cy="${ground - 5}" r="7"/><circle cx="${gx0 - 8}" cy="${ground - 4}" r="6"/></g>`).join("")}`;
+  const defs = `<defs>
+    <linearGradient id="skyd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc0ff" stop-opacity=".55"/><stop offset="1" stop-color="#7cc0ff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="skyn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b2550" stop-opacity=".9"/><stop offset="1" stop-color="#1b2550" stop-opacity="0"/></linearGradient>
+    <linearGradient id="roofg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9775a"/><stop offset="1" stop-color="#b85a40"/></linearGradient>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--surface)"/><stop offset="1" stop-color="var(--surface2)"/></linearGradient>
+    <linearGradient id="cellar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="color-mix(in srgb, #8b6b4a 14%, var(--surface))"/><stop offset="1" stop-color="color-mix(in srgb, #8b6b4a 22%, var(--surface))"/></linearGradient>
+    <linearGradient id="earth" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b6b4a" stop-opacity=".25"/><stop offset="1" stop-color="#8b6b4a" stop-opacity=".05"/></linearGradient>
+    <pattern id="brick" width="11" height="8" patternUnits="userSpaceOnUse"><rect width="11" height="8" fill="#a8563f"/><path d="M0 .5H11M0 4.5H11M5.5 0V4M0 4V8" stroke="#7c3f2e" stroke-width=".8"/></pattern></defs>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img">${defs}${sk}${out}${grass}${body}${roof}${tiles}</svg>`;
 }
 function tuneLabel(v, u, k) {
   if (u === "clock") return String(v % 24).padStart(2, "0") + ":00";
@@ -464,14 +516,23 @@ function dhCard() {
     <div class="muted" style="color:${good ? "var(--ok)" : "var(--warn)"};font-weight:600">${good ? T.dhGood : T.dhBad}</div>
     <div class="muted">${T.dhToday} ${num(ddeg(c.today))}° · ${T.dhYear} ${num(ddeg(c.year))}° · ${T.dhNeed} ${num(ddeg(need), 0)}°${c.per_mwh != null && ((data.district || {}).bonus || (data.district || {}).penalty) ? " · " + T.dhPer.replace("{x}", (c.per_mwh > 0 ? "+" : "") + num(c.per_mwh, 2)) : ""}</div></div>`;
 }
+let alertsOpen = false;
+function alertsCard() {
+  const al = data.alerts || [];
+  if (!al.length) return "";
+  const kinds = {}; al.forEach((a) => { kinds[a.kind] = (kinds[a.kind] || 0) + 1; });
+  const sum = Object.entries(kinds).map(([k, n]) => (n > 1 ? n + " × " : "") + (T.akinds[k] || k)).join(" · ");
+  return `<details class="card" id="alerts" ${alertsOpen ? "open" : ""}><summary class="alertsum"><span class="ai" style="width:26px;height:26px;flex:none;border-radius:9px;display:grid;place-items:center;font-weight:800;color:var(--warn);background:color-mix(in srgb, var(--warn) 16%, transparent)">!</span><span>${esc(sum)}</span><span class="chev">›</span></summary>
+    <div style="margin-top:12px">${al.map((a) => `<div class="alert"><span class="ai">!</span><div><b>${esc(T.akinds[a.kind] || a.kind)}</b><div class="muted">${esc(a.text)}</div></div></div>`).join("")}</div></details>`;
+}
 function nowTab(rooms) {
   const lg = data.learning || {}, heating = rooms.filter((r) => r.heating).length;
   const anyControl = rooms.some((r) => r.mode === "control");  // in shadow another system heats: not Heat Pilot's result
   const sunMax = (g) => g ? Math.max(...Object.values(g)) : 0;
   const learnRows = rooms.map((r) => `<div class="lrow"><b>${esc(r.name)}</b><span>${r.hours_today == null ? T.learning : r.hours_today.length ? T.uses.replace("{h}", ranges(r.hours_today)) : T.notUsed} · ${r.rate_n ? T.rate.replace("{x}", num(r.rate, 0)) : T.rateDefault}${r.loss ? " · " + T.lossTxt.replace("{x}", num(ddeg(r.loss * 20), 1)) : ""}${sunMax(r.sun_gain) > 0.2 ? " · " + T.sunTxt.replace("{x}", num(ddeg(sunMax(r.sun_gain)), 1)) : ""}${r.comfort_learned ? " · " + num(deg(r.cfg.comfort)) + "° " + T.learnedC : ""}</span></div>`).join("");
   return `<div class="card status"><div class="dotc">${FLAME}</div><div><h2>${esc(sentence(rooms))}</h2><p>${T.heroP}${data.agree != null ? " · " + T.agree.replace("{x}", data.agree) : ""}</p></div></div>
-    ${(data.alerts || []).length ? `<div class="card"><p class="eyebrow">${T.aTitle}</p>${data.alerts.map((a) => `<div class="alert"><span class="ai">!</span><div><b>${esc(T.akinds[a.kind] || a.kind)}</b><div class="muted">${esc(a.text)}</div></div></div>`).join("")}</div>` : ""}
-    <div class="card house">${houseSvg(rooms)}</div>
+    <div class="card house" style="padding:0;overflow:hidden">${houseSvg(rooms)}</div>
+    ${alertsCard()}
     <div class="metrics">
       <div class="metric"><div class="lbl">${T.mSaved2}</div><div class="v">≈ ${lg.today_pct ?? 0}<small>%</small></div><div class="s">${T.mSaved2S.replace("{x}", num(ddeg(lg.today_avg_down ?? 0), 1))}</div></div>
       <div class="metric"><div class="lbl">${T.mOnTime}</div><div class="v">${anyControl && lg.ontime != null ? lg.ontime + "<small>%</small>" : "–"}</div><div class="s">${anyControl ? (lg.ontime_n ? T.mOnTimeS.replace("{n}", lg.ontime_n) : T.learning) : T.onTimeShadow}</div></div>
@@ -669,6 +730,7 @@ function openRoom(id) {
 async function load() { try { data = await api("/api/status"); render(); if (openFirst) { const id = openFirst; openFirst = null; openRoom(id); } } catch (e) { /* tries again */ } }
 load();
 setInterval(() => { if (!document.getElementById("sheet").classList.contains("open")) load(); }, 30000);
+document.addEventListener("toggle", (e) => { const d = e.target; if (d.id === "alerts") alertsOpen = d.open; else if (d.classList && d.classList.contains("more")) moreOpen = d.open; }, true);
 </script>
 </body>
 </html>
