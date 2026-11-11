@@ -231,7 +231,9 @@ class Model:
             self.s.setdefault(key, {})
         self._hist: dict[str, list[tuple[datetime, float, bool]]] = {}
 
-    def see(self, room: str, now: datetime, temp: float | None, outdoor: float | None, heating: bool, sunny: bool, sun_up: bool) -> None:
+    def see(self, room: str, now: datetime, temp: float | None, outdoor: float | None, heating: bool, sunny: bool, sun_up: bool,
+            sun: float | None = None) -> None:
+        """sun: how sunny this hour is (0..1) when a forecast knows it - the gain is then learned as a clear day's."""
         if temp is None:
             return
         h = self._hist.setdefault(room, [])
@@ -250,10 +252,10 @@ class Model:
             if k < 0.2:
                 cur = self.s["k"].get(room)
                 self.s["k"][room] = round(_ema(cur, k, 0.1), 4)
-        elif sun_up and sunny and rate > 0:
+        elif sun_up and rate > 0 and (sunny if sun is None else sun >= 0.5):
             slot = str(now.hour)
             g = self.s["sun"].setdefault(room, {})
-            g[slot] = round(_ema(g.get(slot), min(rate, 3.0), 0.2), 3)
+            g[slot] = round(_ema(g.get(slot), min(rate / (sun or 1.0), 3.0), 0.2), 3)
         if len(h) > 5:
             del h[: len(h) - 5]  # next measurement over a fresh half hour
 
@@ -268,13 +270,16 @@ class Model:
         import math
         return (temp - outdoor) * (1 - math.exp(-k * hours))
 
-    def sun_gain(self, room: str, start: datetime, hours: float) -> float:
-        """The sun's free warming over the coming hours (sunny days)."""
+    def sun_gain(self, room: str, start: datetime, hours: float, sun: dict[int, float] | None = None) -> float:
+        """The sun's free warming over the coming hours. sun: how sunny each hour will be (sunfeed); without it a
+        sunny day is assumed (the caller checks the weather now). An hour the forecast doesn't know counts as grey."""
+        from .sunfeed import hour_key
         g = self.s["sun"].get(room) or {}
         total, t = 0.0, start
         while hours > 0:
             step = min(1.0, hours)
-            total += (g.get(str(t.hour)) or 0.0) * step
+            f = 1.0 if sun is None else sun.get(hour_key(t), 0.0)
+            total += (g.get(str(t.hour)) or 0.0) * f * step
             t += timedelta(hours=step)
             hours -= step
         return round(total, 2)

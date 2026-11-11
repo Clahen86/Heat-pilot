@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from . import alerts, brands, discover, features, people, plan, pricefeed, supply, ventilation
+from . import alerts, brands, discover, features, people, plan, pricefeed, sunfeed, supply, ventilation
 from .signals import Watch
 from .control import Sender, exercise_now
 from .learning import Learning, Model, seed
@@ -77,6 +77,10 @@ class Pilot:
         self.model = Model(self.learning.s)
         self.sender = Sender()
         self.forecast: list[tuple[datetime, float, str]] = []
+        self.clouds: dict[int, float] = {}       # cloud cover % per hour (weather forecast)
+        self.energy_pv: dict[int, float] = {}    # kWh per hour from the Energy dashboard's solar forecast
+        self.sunfeed = sunfeed.SunFeed(self.learning.s)
+        self.sun_hours: dict[int, float] = {}
         self.notify: list[str] = []
         self.cooling = supply.Cooling(self.learning.s)
         self.timelines: dict[str, list] = {}
@@ -295,6 +299,9 @@ class Pilot:
         except (TypeError, ValueError):
             sun_up = False
         sunny = any(v.get("state") in ("sunny", "partlycloudy") for e, v in st.items() if e.startswith("weather."))
+        conditions = {sunfeed.hour_key(w): c for w, _t, c in self.forecast}
+        self.sun_hours = self.sunfeed.factors(st, self.energy_pv, self.clouds, conditions, now)
+        sun_now = self.sun_hours.get(sunfeed.hour_key(now)) if self.sun_hours else None
         arm = self.model.arm_today(now) if on["strategy"] else "normal"
         self.arm = arm
         cold_snap = on["weather"] and outdoor_now is not None and any(
@@ -337,7 +344,7 @@ class Pilot:
                                         controlled and on["manual"])
             manual = self.watch.manual_for(a_id, now) if on["manual"] else None
             hours_today = by_day[now.weekday()]
-            self.model.see(a_id, now, temp, outdoor_now, heating_now, sunny, sun_up)
+            self.model.see(a_id, now, temp, outdoor_now, heating_now, sunny, sun_up, sun_now)
             nxt = plan.next_comfort({**plan.defaults(r), **r["cfg"]}, hours_today, now)
             gap_h = (nxt - now).total_seconds() / 3600 if nxt else None
             drop = self.model.drop(a_id, temp, outdoor_now, gap_h) if (temp is not None and gap_h is not None and gap_h <= 3) else None
@@ -346,7 +353,8 @@ class Pilot:
             extra = {
                 "door": on["doors"] and any((st.get(d) or {}).get("state") == "on" and not self._recent_on_since(st.get(d), now, 10) for d in r.get("doors") or []),
                 "noshow": bool(r["presence"]) and now.hour >= 12 and not seen_today,
-                "sun_ahead": self.model.sun_gain(a_id, now, gap_h) if (on["sun"] and sunny and gap_h) else 0.0,
+                "sun_ahead": (self.model.sun_gain(a_id, now, gap_h, self.sun_hours) if self.sun_hours
+                              else self.model.sun_gain(a_id, now, gap_h) if sunny else 0.0) if (on["sun"] and gap_h) else 0.0,
                 "arm": arm, "cold_snap": cold_snap,
                 "floor_active": on["floor"] and r.get("floor_id") in occupied_floors,
                 "buffer": on["floor"] and on["district"] and radiators_heating and supply.poor_cooling(getattr(self, "cooling_info", None), float((self.settings.get("district") or {}).get("need", 25.0))),
@@ -562,8 +570,27 @@ class Pilot:
             fc = ((res or {}).get("response") or {}).get(w, {}).get("forecast") or []
             self.forecast = [(datetime.fromisoformat(f["datetime"]), float(f["temperature"]), f.get("condition") or "")
                              for f in fc if f.get("temperature") is not None]
+            clouds = {}
+            for f in fc:
+                try:
+                    clouds[sunfeed.hour_key(datetime.fromisoformat(f["datetime"]))] = float(f["cloud_coverage"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+            self.clouds = clouds
         except Exception:  # noqa: BLE001
             _LOGGER.debug("No forecast", exc_info=True)
+        await self.refresh_energy_pv()
+
+    async def refresh_energy_pv(self) -> None:
+        """The solar forecast set up in Home Assistant's Energy dashboard (Forecast.Solar and others), hour by hour."""
+        try:
+            prefs = await self.ha.command({"type": "energy/get_prefs"})
+            ids = [i for src in (prefs or {}).get("energy_sources") or [] if src.get("type") == "solar"
+                   for i in src.get("config_entry_solar_forecast") or []]
+            fc = await self.ha.command({"type": "energy/solar_forecast"}) if ids else None
+            self.energy_pv = sunfeed.pv_from_energy(fc, ids)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("No Energy dashboard solar forecast", exc_info=True)
 
     @staticmethod
     def _recent_on(s: dict[str, Any] | None, now: datetime) -> bool:
@@ -590,7 +617,7 @@ class Pilot:
         out_t = self.outdoor()
         sun = (self.ha.states.get("sun.sun") or {}).get("state")
         return {"unit": "°F" if self.fahrenheit else "°C", "sent": self.sender.log[:20], "setup_done": bool(self.settings.get("setup_done")), "all_doors": [{"entity_id": e, "name": (self.ha.states.get(e) or {}).get("attributes", {}).get("friendly_name") or e} for e in self.all_doors],
-                "arm": getattr(self, "arm", None), "cold_snap": getattr(self, "cold_snap", False), "tune": features.tune_view(self.settings), "month": self.month_report(now), "floors": self.floors, "sun": sun, "rooms": rooms, "unplaced": self.unplaced, "away": getattr(self, "away", False), "now": now.isoformat(),
+                "arm": getattr(self, "arm", None), "cold_snap": getattr(self, "cold_snap", False), "tune": features.tune_view(self.settings), "month": self.month_report(now), "floors": self.floors, "sun": sun, "sun_source": self.sunfeed.source, "rooms": rooms, "unplaced": self.unplaced, "away": getattr(self, "away", False), "now": now.isoformat(),
                 "agree": round(100 * a["same"] / a["checks"]) if a["checks"] else None, "outdoor": out_t,
                 "learning": self.learning.summary(now, [r["area_id"] for r in rooms if not r.get("excluded")]),
                 "features": {k: {"found": bool(self.have.get(k)), "on": bool(getattr(self, "on", {}).get(k))}
