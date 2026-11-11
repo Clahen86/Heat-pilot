@@ -106,7 +106,7 @@
   @keyframes smoke { 0% { opacity:0; transform:translate(0, 4px) scale(.5); } 15% { opacity:.7; } 60% { opacity:.4; } 100% { opacity:0; transform:translate(16px, -34px) scale(2.1); } }
   .glow { opacity:.08; animation:glow 3s ease-in-out infinite; } @keyframes glow { 50% { opacity:.2; } }
   .tile { transition:transform .15s; transform-box:fill-box; transform-origin:center; } .tile:hover { transform:scale(1.02); }
-  #app > * { animation:fadein .35s ease both; } @keyframes fadein { from { opacity:0; transform:translateY(6px); } }
+  #app.fresh > * { animation:fadein .35s ease both; } @keyframes fadein { from { opacity:0; transform:translateY(6px); } }
   .metrics { display:grid; grid-template-columns:repeat(4, 1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:22px; overflow:hidden; margin-top:12px; }
   .metric { background:var(--surface); padding:15px; }
   .metric .lbl { font-size:10.5px; font-weight:650; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); }
@@ -587,9 +587,12 @@ function guide() {
     await api("/api/setup", { done: true }); data.setup_done = true; g.classList.remove("open");
   };
 }
+let shownTab = null;  // fade in only when a page is opened - not when the numbers refresh every 30 s
 function render() {
   const app = document.getElementById("app");
   if (!data) return;
+  app.classList.toggle("fresh", tab !== shownTab);
+  shownTab = tab;
   guide();
   const rooms = data.rooms.filter((r) => !r.excluded);
   if (!data.rooms.length) {
