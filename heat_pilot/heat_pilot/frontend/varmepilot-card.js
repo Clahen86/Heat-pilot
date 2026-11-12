@@ -328,7 +328,7 @@ const VV_FAN = '<path d="M12 12c0-3 1.5-6 4-6 2 0 2.5 2.5.5 3.5L12 12Zm0 0c3 0 6
 class VarmepilotVentCard extends HTMLElement {
   setConfig(config) { this.config = config || {}; this._open = false; }
   getCardSize() { return 2; }
-  getGridOptions() { return { columns: 12, rows: 2, min_rows: 2 }; }
+  getGridOptions() { return { columns: 12, rows: "auto", min_rows: 1 }; }
   static getStubConfig() { return {}; }
   set hass(hass) {
     this._hass = hass;
