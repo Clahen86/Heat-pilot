@@ -13,6 +13,8 @@ warning is sent at most once every 12 hours, and not at night unless allowed.
   doesn't close (stuck, or its battery), or something else heats it
 - not_warming: a room that has been heating for 3 hours and is still more than a degree below its target -
   air in the radiator, a valve stuck, or a radiator too small
+- not_obeying: two rooms or more on the same radio (Zigbee2MQTT, ZHA, Matter) whose thermostats haven't done what they
+  were told for 20 minutes - the radio drops commands (see watchdog.py); "not_obeying_restart" when it is restarted
 - cooling: district heating cooling well below what is required today
 """
 
@@ -21,7 +23,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
-KINDS = ["mold", "air", "window", "offline", "battery", "not_warming", "too_warm", "cooling", "monthly"]
+KINDS = ["mold", "air", "window", "offline", "battery", "not_warming", "too_warm", "not_obeying", "cooling", "monthly"]
 REPEAT_H = 12
 TOO_WARM = 2.0  # degrees over the target ...
 TOO_WARM_H = 6  # ... for this long (the sun alone doesn't keep a room 2 degrees too warm for 6 hours)
@@ -125,7 +127,7 @@ class Alerts:
         off = set(k for k, v in (cfg.get("kinds") or {}).items() if v is False)
         due = []
         for a in self.active:
-            if a["kind"] in off:
+            if a["kind"].replace("_restart", "") in off:
                 continue
             last = self.s["sent"].get(a["key"])
             if last and now - datetime.fromisoformat(last) < timedelta(hours=REPEAT_H):
@@ -145,6 +147,8 @@ TEXT = {
            "battery": "{device} har {level} % tilbage – skift batteriet.",
            "not_warming": "{room} bliver ikke varmt ({temp}° af {want}°). Måske luft i radiatoren eller en ventil, der sidder fast.",
            "too_warm": "{room} er for varmt ({temp}° mod {want}°) i flere timer. Måske sidder ventilen fast åben, eller noget andet varmer rummet.",
+           "not_obeying": "Radiatorerne i {rooms} gør ikke, hvad Varmepilot beder om ({radio}). Tjek {radio}.",
+           "not_obeying_restart": "Radiatorerne i {rooms} gør ikke, hvad Varmepilot beder om. {radio} genstartes.",
            "cooling": "Fjernvarmen: afkøling {today}° i dag – kravet er {need}°. Tjek om nogle radiatorer står helt åbne.",
            "monthly": "Varmepilot i {month}: ca. {pct} % mindre varme end uden. Rummene var varme til tiden {ontime} % af gangene.",
            "title": "Varmepilot"},
@@ -155,6 +159,8 @@ TEXT = {
            "battery": "{device} has {level} % left – change the battery.",
            "not_warming": "{room} isn't getting warm ({temp}° of {want}°). Maybe air in the radiator or a stuck valve.",
            "too_warm": "{room} has been too warm for hours ({temp}° vs {want}°). Maybe the valve is stuck open, or something else heats the room.",
+           "not_obeying": "The radiators in {rooms} don't do what Heat Pilot asks ({radio}). Check {radio}.",
+           "not_obeying_restart": "The radiators in {rooms} don't do what Heat Pilot asks. Restarting {radio}.",
            "cooling": "District heating: cooling {today}° today – required is {need}°. Check for radiators fully open.",
            "monthly": "Heat Pilot in {month}: about {pct} % less heat than without. Rooms were warm on time {ontime} % of the time.",
            "title": "Heat Pilot"},
@@ -167,6 +173,8 @@ TEXT["de"] = {"mold": "Schimmelgefahr in {room}: {hum} % Feuchte. Lüften und de
               "battery": "{device} hat noch {level} % – Batterie wechseln.",
               "not_warming": "{room} wird nicht warm ({temp}° von {want}°). Vielleicht Luft im Heizkörper oder ein klemmendes Ventil.",
               "too_warm": "{room} ist seit Stunden zu warm ({temp}° statt {want}°). Vielleicht klemmt das Ventil offen, oder etwas anderes heizt den Raum.",
+              "not_obeying": "Die Heizkörper in {rooms} tun nicht, was Heat Pilot verlangt ({radio}). {radio} prüfen.",
+              "not_obeying_restart": "Die Heizkörper in {rooms} tun nicht, was Heat Pilot verlangt. {radio} wird neu gestartet.",
               "cooling": "Fernwärme: Auskühlung heute {today}° – gefordert sind {need}°. Prüfen, ob Heizkörper voll offen stehen.",
               "monthly": "Heat Pilot im {month}: etwa {pct} % weniger Wärme als ohne. Rechtzeitig warm in {ontime} % der Fälle.",
               "title": "Heat Pilot"}
@@ -177,6 +185,8 @@ TEXT["fr"] = {"mold": "Risque de moisissure dans {room} : {hum} % d'humidité. A
               "battery": "{device} n'a plus que {level} % – changez la pile.",
               "not_warming": "{room} ne chauffe pas ({temp}° sur {want}°). Peut-être de l'air dans le radiateur ou une vanne bloquée.",
               "too_warm": "{room} est trop chaud depuis des heures ({temp}° au lieu de {want}°). La vanne est peut-être bloquée ouverte, ou autre chose chauffe la pièce.",
+              "not_obeying": "Les radiateurs de {rooms} n'obéissent pas à Heat Pilot ({radio}). Vérifiez {radio}.",
+              "not_obeying_restart": "Les radiateurs de {rooms} n'obéissent pas à Heat Pilot. Redémarrage de {radio}.",
               "cooling": "Chauffage urbain : refroidissement {today}° aujourd'hui – exigé {need}°. Vérifiez les radiateurs ouverts à fond.",
               "monthly": "Heat Pilot en {month} : environ {pct} % de chaleur en moins. Chaud à temps dans {ontime} % des cas.",
               "title": "Heat Pilot"}
@@ -187,6 +197,8 @@ TEXT["nl"] = {"mold": "Schimmelrisico in {room}: {hum} % vocht. Lucht en houd de
               "battery": "{device} heeft nog {level} % – vervang de batterij.",
               "not_warming": "{room} wordt niet warm ({temp}° van {want}°). Misschien lucht in de radiator of een vastzittende klep.",
               "too_warm": "{room} is al uren te warm ({temp}° i.p.v. {want}°). Misschien zit de klep open vast, of iets anders verwarmt de kamer.",
+              "not_obeying": "De radiatoren in {rooms} doen niet wat Heat Pilot vraagt ({radio}). Controleer {radio}.",
+              "not_obeying_restart": "De radiatoren in {rooms} doen niet wat Heat Pilot vraagt. {radio} wordt herstart.",
               "cooling": "Stadsverwarming: afkoeling vandaag {today}° – vereist is {need}°. Controleer of radiatoren volledig open staan.",
               "monthly": "Heat Pilot in {month}: ongeveer {pct} % minder warmte. Op tijd warm in {ontime} % van de keren.",
               "title": "Heat Pilot"}
@@ -197,6 +209,8 @@ TEXT["sv"] = {"mold": "Mögelrisk i {room}: {hum} % fukt. Vädra och håll rumme
               "battery": "{device} har {level} % kvar – byt batteri.",
               "not_warming": "{room} blir inte varmt ({temp}° av {want}°). Kanske luft i elementet eller en ventil som fastnat.",
               "too_warm": "{room} har varit för varmt i flera timmar ({temp}° mot {want}°). Kanske har ventilen fastnat öppen, eller något annat värmer rummet.",
+              "not_obeying": "Elementen i {rooms} gör inte som Heat Pilot ber ({radio}). Kontrollera {radio}.",
+              "not_obeying_restart": "Elementen i {rooms} gör inte som Heat Pilot ber. {radio} startas om.",
               "cooling": "Fjärrvärme: avkylning {today}° i dag – kravet är {need}°. Kontrollera om element står helt öppna.",
               "monthly": "Heat Pilot i {month}: ungefär {pct} % mindre värme. Varmt i tid {ontime} % av gångerna.",
               "title": "Heat Pilot"}
@@ -207,6 +221,8 @@ TEXT["nb"] = {"mold": "Muggfare i {room}: {hum} % fukt. Luft ut og hold rommet v
               "battery": "{device} har {level} % igjen – bytt batteri.",
               "not_warming": "{room} blir ikke varmt ({temp}° av {want}°). Kanskje luft i radiatoren eller en ventil som har satt seg fast.",
               "too_warm": "{room} har vært for varmt i flere timer ({temp}° mot {want}°). Kanskje ventilen står fast åpen, eller noe annet varmer rommet.",
+              "not_obeying": "Radiatorene i {rooms} gjør ikke som Heat Pilot ber om ({radio}). Sjekk {radio}.",
+              "not_obeying_restart": "Radiatorene i {rooms} gjør ikke som Heat Pilot ber om. {radio} startes på nytt.",
               "cooling": "Fjernvarme: avkjøling {today}° i dag – kravet er {need}°. Sjekk om radiatorer står helt åpne.",
               "monthly": "Heat Pilot i {month}: omtrent {pct} % mindre varme. Varmt i tide {ontime} % av gangene.",
               "title": "Heat Pilot"}

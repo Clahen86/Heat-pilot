@@ -99,6 +99,9 @@ class Pilot:
         self.vent_now: dict[str, Any] | None = None
         self.cooling_options: list[str] = []
         self.alerts = alerts.Alerts(self.learning.s)
+        from . import watchdog
+
+        self.watchdog = watchdog.Watchdog(self.learning.s)
         self.model = Model(self.learning.s)
         self.sender = Sender()
         self.forecast: list[tuple[datetime, float, str]] = []
@@ -298,6 +301,12 @@ class Pilot:
             todo += self.sender.due(calls, self.ha.states, gaps, now, steps)
         if todo:
             await self.sender.send(self.ha, todo, now, lambda e, v, t: self.watch.wrote(e, self.c(v) or v, t))
+        if self.settings.get("watchdog_restart"):  # the radio drops commands: restart it (at most every 2 hours)
+            for plat in list(self.watchdog.lost):
+                if self.watchdog.due(plat, now):
+                    done = await self.watchdog.restart(self.ha, plat, now)
+                    _LOGGER.warning("Thermostats in %s don't obey - %s", ", ".join(self.watchdog.lost[plat]),
+                                    f"restarted {done}" if done else "nothing to restart here")
         for r in rooms.values():  # the room temperature to the valves - often, so kept out of the log of changes
             if self.mode(r["area_id"]) != "control":
                 continue
@@ -508,6 +517,13 @@ class Pilot:
         self.now = out
         self.away = away
         self.alerts.check(rooms, out, st, now, outdoor_now, getattr(self, "cooling_info", None))
+        from . import watchdog
+
+        bad = watchdog.disobeying(rooms, out, st, self.watch.ours, self.c, lambda a: self.mode(a) == "control")
+        for plat, names in self.watchdog.see(bad, now).items():
+            restart = bool(self.settings.get("watchdog_restart")) and plat in watchdog.RADIOS
+            self.alerts.active.append({"kind": "not_obeying_restart" if restart else "not_obeying", "room": ", ".join(names),
+                                       "key": f"obey:{plat}", "rooms": ", ".join(names), "radio": watchdog.RADIOS.get(plat, plat)})
         if on["strategy"]:
             self.model.see_day(heat_n, cold_n)
         if now.minute % 10 == 0:
@@ -610,6 +626,8 @@ class Pilot:
             m["night"] = bool(values["night"])
         if "kind" in values:
             m.setdefault("kinds", {})[str(values["kind"])] = bool(values.get("on"))
+        if "restart" in values:  # the watchdog may restart Zigbee2MQTT / ZHA / Matter when they drop commands
+            self.settings["watchdog_restart"] = bool(values["restart"])
         self.save()
 
     async def publish(self) -> None:
@@ -749,6 +767,7 @@ class Pilot:
                 "alerts": [{**a, "text": alerts.text(a, self.lang())}
                            for a in self.alerts.active],
                 "messages": self.settings.get("messages") or {}, "notify": self.notify, "alert_kinds": alerts.KINDS,
+                "watchdog_restart": bool(self.settings.get("watchdog_restart")),
                 "vent": getattr(self, "vent_now", None), "ventilation": self.settings.get("ventilation") or {},
                 "cooling_options": [{"entity_id": e, "name": (self.ha.states.get(e) or {}).get("attributes", {}).get("friendly_name") or e} for e in self.cooling_options]}
 
