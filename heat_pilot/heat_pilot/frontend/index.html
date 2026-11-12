@@ -186,10 +186,10 @@
   .vl-in { animation:vlin 4s ease-in infinite; } @keyframes vlin { 0% { transform:translate(-14px,-12px); opacity:0; } 30% { opacity:.9; } 100% { opacity:0; } }
   .vl-out { animation:vlout 4s ease-out infinite; } @keyframes vlout { 0% { opacity:0; } 25% { opacity:.85; } 100% { transform:translate(12px,-18px) scale(1.2); opacity:0; } }
   .vl-steam { animation:vlst 2.6s ease-out infinite; } @keyframes vlst { 0% { transform:translateY(4px); opacity:0; } 35% { opacity:.9; } 100% { transform:translateY(-14px); opacity:0; } }
-  .vl-pulse, .vl-led { animation:vlg 2.4s ease-in-out infinite; } @keyframes vlg { 50% { opacity:.4; } }
-  .vl-whoosh { stroke-dasharray:14 220; animation:vlwh 1.8s cubic-bezier(.5,0,.3,1) infinite; } @keyframes vlwh { from { stroke-dashoffset:234; } to { stroke-dashoffset:0; } }
+  .vl-pulse { animation:vlg 7s ease-in-out infinite; } @keyframes vlg { 50% { opacity:.25; } }
+  .vl-whoosh { stroke-dasharray:14 220; animation:vlwh 3.5s cubic-bezier(.5,0,.3,1) infinite; } @keyframes vlwh { from { stroke-dashoffset:234; } to { stroke-dashoffset:0; } }
   .vl-fog { animation:vlfog 6s ease-in-out infinite; } @keyframes vlfog { 50% { opacity:.35; transform:translateY(6px); } }
-  @media (prefers-reduced-motion: reduce) { .vl-spin, .vl-rip, .vl-in, .vl-out, .vl-steam, .vl-pulse, .vl-led, .vl-whoosh, .vl-fog { animation:none; } }
+  @media (prefers-reduced-motion: reduce) { .vl-spin, .vl-rip, .vl-in, .vl-out, .vl-steam, .vl-pulse, .vl-whoosh, .vl-fog { animation:none; } }
 </style>
 </head>
 <body>
@@ -458,7 +458,7 @@ function ventLayer(o) {
   const bw = narrow ? 50 : 62, bh = narrow ? 22 : 27, bx = peak - bw / 2, by = rb - bh - 5;
   let a = `<path d="M${rl + 20} ${rb} L${peak} ${top + 10} L${o.rr - 20} ${rb} Z" fill="url(#vl-attic)"/>`;
   // ripples spreading through the attic: quicker the more air it moves
-  a += [0, 1, 2].map((k) => `<ellipse class="vl-rip" cx="${peak}" cy="${by + bh / 2}" rx="${bw * .6}" ry="${bh * .55}" fill="none" stroke="${C}" stroke-width="1.2" style="animation-duration:${spin * 2}s;animation-delay:${k * spin * .66}s"/>`).join("");
+  a += [0, 1, 2].map((k) => `<ellipse class="vl-rip" cx="${peak}" cy="${by + bh / 2}" rx="${bw * .6}" ry="${bh * .55}" fill="none" stroke="${C}" stroke-width="1.2" style="animation-duration:${spin * 2}s;animation-delay:-${((Date.now() / 1000 + k * spin * .66) % (spin * 2)).toFixed(2)}s"/>`).join("");
   // two ducts up through the roof: fresh air in, used air out (frosted in winter)
   const capAt = (dx) => [peak + dx, top + (rb - top) * Math.abs(dx) / (peak - rl)];
   [[-1, "in"], [1, "out"]].forEach(([sgn, k]) => {
@@ -467,7 +467,7 @@ function ventLayer(o) {
       <rect x="${cx - 7}" y="${cy - 9}" width="14" height="9" rx="2" fill="#3a4252" stroke="#596377" stroke-width=".8"/><path d="M${cx - 10} ${cy - 9} h20 l-4 -4 h-12 z" fill="#4a5468"/>`;
     if (o.winter) a += `<path d="M${cx - 10} ${cy - 13} h20" stroke="#eef6ff" stroke-width="2.2" stroke-linecap="round"/>` + [-6, 0, 6].map((ix, q) => `<path d="M${cx + ix} ${cy - 1} v${3 + (q % 2) * 3}" stroke="#dff0ff" stroke-width="1.2" stroke-linecap="round"/>`).join("");
     const p = k === "in" ? `M${cx - 18} ${cy - 30} q6 2 8 8 t6 4` : `M${cx + 2} ${cy - 14} q6 -4 4 -10 t6 -8`;
-    a += [0, 1].map((q) => `<path class="${k === "in" ? "vl-in" : "vl-out"}" d="${p}" transform="translate(${k === "in" ? -q * 4 : q * 3} ${-q * 3})" fill="none" stroke="${k === "in" ? C : "#c9b8a6"}" stroke-width="2.2" stroke-linecap="round" style="animation-duration:${spin * 2.2}s;animation-delay:${q * spin}s"/>`).join("");
+    a += [0, 1].map((q) => `<path class="${k === "in" ? "vl-in" : "vl-out"}" d="${p}" transform="translate(${k === "in" ? -q * 4 : q * 3} ${-q * 3})" fill="none" stroke="${k === "in" ? C : "#c9b8a6"}" stroke-width="2.2" stroke-linecap="round" style="animation-duration:${spin * 2.2}s;animation-delay:-${((Date.now() / 1000 + q * spin) % (spin * 2.2)).toFixed(2)}s"/>`).join("");
   });
   // the unit: a white box, a turning fan, the heat exchanger glowing cold to warm, and a status light
   const fc = bh / 2, fr = bh * .36;
@@ -475,8 +475,8 @@ function ventLayer(o) {
     <rect x="${bw * .48}" y="5" width="${bw * .4}" height="${bh - 10}" rx="3" fill="url(#vl-hx)" opacity=".9"/><rect x="${bw * .48}" y="5" width="${bw * .4}" height="${bh - 10}" rx="3" fill="url(#vl-hx)" filter="url(#vl-b2)" opacity=".6"/>
     ${[0, 1, 2, 3].map((k) => `<rect x="${bw * .48 + 3 + k * bw * .09}" y="5" width="1.2" height="${bh - 10}" fill="#fff" opacity=".55"/>`).join("")}
     <circle cx="${fc}" cy="${bh / 2}" r="${fr + 2}" fill="#dfe4ec" stroke="#b5bdca"/>
-    <g class="vl-spin" style="animation-duration:${spin}s">${[0, 120, 240].map((d) => `<path d="M${fc} ${bh / 2} q-2 -${fr * .8} 3 -${fr * .9} q2 ${fr * .45} -3 ${fr * .9}z" fill="${strong ? "#2f8ef0" : "#7c8aa0"}" transform="rotate(${d} ${fc} ${bh / 2})"/>`).join("")}</g>
-    <circle cx="${fc}" cy="${bh / 2}" r="1.8" fill="#5d6b80"/><circle class="vl-led" cx="${bw - 6}" cy="6" r="2.2" fill="${C}"/></g>`;
+    <g class="vl-spin" style="animation-duration:${spin}s;animation-delay:-${((Date.now() / 1000) % spin).toFixed(2)}s">${[0, 120, 240].map((d) => `<path d="M${fc} ${bh / 2} q-2 -${fr * .8} 3 -${fr * .9} q2 ${fr * .45} -3 ${fr * .9}z" fill="${strong ? "#2f8ef0" : "#7c8aa0"}" transform="rotate(${d} ${fc} ${bh / 2})"/>`).join("")}</g>
+    <circle cx="${fc}" cy="${bh / 2}" r="1.8" fill="#5d6b80"/><circle cx="${bw - 6}" cy="6" r="2.2" fill="${C}"/></g>`;
   out.attic = a;
   // each room's air colour, and a dot in the corner
   let ov = "";
@@ -484,26 +484,26 @@ function ventLayer(o) {
     const pos = o.tilePos[r.area_id], ar = (r.air || {}).air;
     if (!pos || !ar) continue;
     const [x, y] = pos, col = { good: "#3ddc97", warn: "#f5b544", bad: "#ff6a4a" }[ar];
-    ov += `<rect x="${x}" y="${y}" width="${o.tw}" height="${o.th}" rx="16" fill="url(#vl-air-${ar})" pointer-events="none" ${ar !== "good" ? 'class="vl-pulse"' : ""}/>
+    ov += `<rect x="${x}" y="${y}" width="${o.tw}" height="${o.th}" rx="16" fill="url(#vl-air-${ar})" pointer-events="none"/>
       <circle cx="${x + o.tw - 12}" cy="${y + o.th - 21}" r="3" fill="${col}"/>`;
   }
   // the room that decides: a soft glow, steam or a chip with the value, and the air drawn up to the attic
   const lead = v.lead && o.tilePos[v.lead.area_id];
   if (lead && strong) {
     const [x, y] = lead, w = o.tw, h = o.th;
-    ov = `<rect class="vl-pulse" x="${x - 4}" y="${y - 4}" width="${w + 8}" height="${h + 8}" rx="20" fill="#5ab8ff" opacity=".5" filter="url(#vl-b6)"/>` + ov
+    ov = `<rect class="vl-pulse" style="${o.ph(7)}" x="${x - 4}" y="${y - 4}" width="${w + 8}" height="${h + 8}" rx="20" fill="#5ab8ff" opacity=".5" filter="url(#vl-b6)"/>` + ov
       + `<rect x="${x + .5}" y="${y + .5}" width="${w - 1}" height="${h - 1}" rx="15.5" fill="none" stroke="#8fd0ff" stroke-opacity=".75"/>`;
-    if (v.why === "shower" || v.why === "damp") ov += [0, 1, 2].map((k) => `<path class="vl-steam" d="M${x + w - 34 + k * 6} ${y + 52} q-3 -5 0 -9 q3 -4 0 -9" fill="none" stroke="#d8ecff" stroke-width="1.6" stroke-linecap="round" style="animation-delay:${k * .5}s"/>`).join("");
+    if (v.why === "shower" || v.why === "damp") ov += [0, 1, 2].map((k) => `<path class="vl-steam" d="M${x + w - 34 + k * 6} ${y + 52} q-3 -5 0 -9 q3 -4 0 -9" fill="none" stroke="#d8ecff" stroke-width="1.6" stroke-linecap="round" style="animation-delay:-${((Date.now() / 1000 + k * .5) % 2.6).toFixed(2)}s"/>`).join("");
     if (v.lead.value != null) {
       const txt = `${v.lead.value}${v.lead.unit === "%" ? " %" : " " + v.lead.unit}`, cw = txt.length * 6.2 + 16;
       ov += `<g transform="translate(${x + 10} ${y + h - 9})"><rect width="${cw}" height="18" rx="9" fill="#1e6fd9"/><text x="${cw / 2}" y="12.5" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${txt}</text></g>`;
     }
     const path = `M${x + w - 22} ${y + 18} C ${x + w + 10} ${y - 40}, ${peak - 10} ${by + bh + 40}, ${peak - 6} ${by + bh}`;
-    ov += `<path class="vl-whoosh" d="${path}" fill="none" stroke="#8fd0ff" stroke-width="6" stroke-linecap="round" filter="url(#vl-b2)" opacity=".6"/>
-      <path class="vl-whoosh" d="${path}" fill="none" stroke="#e6f5ff" stroke-width="1.8" stroke-linecap="round"/>`;
+    ov += `<path class="vl-whoosh" style="${o.ph(3.5)}" d="${path}" fill="none" stroke="#8fd0ff" stroke-width="6" stroke-linecap="round" filter="url(#vl-b2)" opacity=".6"/>
+      <path class="vl-whoosh" style="${o.ph(3.5)}" d="${path}" fill="none" stroke="#e6f5ff" stroke-width="1.8" stroke-linecap="round"/>`;
   }
   // summer: cool air pouring in through the bypass
-  if (cool) ov += `<rect class="vl-fog" x="${o.bx + o.wallT}" y="${rb}" width="${o.bw - 2 * o.wallT}" height="200" fill="url(#vl-attic)" opacity=".7"/>`;
+  if (cool) ov += `<rect class="vl-fog" style="${o.ph(6)}" x="${o.bx + o.wallT}" y="${rb}" width="${o.bw - 2 * o.wallT}" height="200" fill="url(#vl-attic)" opacity=".7"/>`;
   // what it does, as a small caption under the roof
   const roomName = v.lead ? v.lead.name : "";
   const why = (t[v.why] || (v.why === "normal" ? (v.efficiency != null ? t.rec.replace("{x}", v.efficiency) : t.ok) : v.why || "")).replace("{r}", roomName);
