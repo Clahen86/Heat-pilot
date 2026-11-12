@@ -90,6 +90,7 @@ class Pilot:
         self.agree = {"same": 0, "checks": 0}
         self.learning = Learning(data_dir)
         self.watch = Watch()
+        self.floor_pull: dict[str, bool] = {}
         self.airwatch = air.AirWatch()
         self.air_rooms: list[dict[str, Any]] = []
         self.doors: list[str] = []
@@ -502,13 +503,23 @@ class Pilot:
             self.learning.see_heating(a_id, now, heating_now, temp, want["temp"], r["heating"], outdoor)
             self.learning.see_result(a_id, now, temp, want["temp"], r["cfg"]["comfort"], want["why"])
             self.timelines[a_id] = plan.timeline(r, r["cfg"], now, by_day, temp, rate)
+            # Floor heating with a slow valve (a W600 keeps ~18 % open while the room is already over): when the room is
+            # more than half a degree over, ask 2° less so the valve closes - and back once the room is down at its target.
+            send = want["temp"]
+            pulled = self.floor_pull.get(a_id, False)
+            if r.get("heating") == "floor" and send is not None and temp is not None:
+                pulled = temp > send + 0.5 or (pulled and temp > send + 0.1)
+                self.floor_pull[a_id] = pulled
+                if pulled:
+                    send = max(send - 2.0, 5.0)
+                    want = {**want, "pull": True}
             devs, calls, same = [], [], True
             for th in r["thermostats"]:
                 s = st.get(th["entity_id"]) or {}
                 a = dict(s.get("attributes") or {})
                 a["_state"] = s.get("state")
                 prof = th["profile"]
-                c = brands.off_calls(th["entity_id"], a, prof) if want["temp"] is None else brands.heat_calls(th["entity_id"], a, prof, self.out_unit(want["temp"]))
+                c = brands.off_calls(th["entity_id"], a, prof) if want["temp"] is None else brands.heat_calls(th["entity_id"], a, prof, self.out_unit(send))
                 calls += c
                 cur_off = s.get("state") == "off"
                 cur = self.c(a.get("temperature"))
@@ -517,7 +528,7 @@ class Pilot:
                 else:
                     # Another system that turns the valve off once the room is warm enough heats to the same.
                     warm = (room_t := self.room_temp(r)) is not None and room_t >= want["temp"] - 0.3
-                    same = same and cur is not None and abs(cur - want["temp"]) <= 0.5 and (not cur_off or warm)
+                    same = same and cur is not None and abs(cur - send) <= 0.5 and (not cur_off or warm)
                 devs.append({"entity_id": th["entity_id"], "name": th["name"], "brand": th["brand"], "state": s.get("state"),
                              "setpoint": cur, "temp": self.c(a.get("current_temperature")), "action": a.get("hvac_action")})
             self.agree["checks"] += 1
