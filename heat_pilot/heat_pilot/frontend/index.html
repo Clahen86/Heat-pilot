@@ -103,7 +103,16 @@
   .alertsum { display:flex; align-items:center; gap:10px; cursor:pointer; list-style:none; font-weight:650; color:var(--text); margin:0; }
   .alertsum::-webkit-details-marker { display:none; }
   .alertsum .chev { margin-left:auto; color:var(--muted); transition:transform .2s; } details[open] .alertsum .chev { transform:rotate(90deg); }
-  @media (prefers-reduced-motion: reduce) { .cloud, .halo, .star, .drop, .flake, .roofglow, .lamp, .smoke, .wave, .glow { animation:none !important; } }
+  .sway { transform-box:fill-box; transform-origin:50% 100%; animation:sway 5s ease-in-out infinite alternate; } .sway.windy { animation-duration:1.6s; }
+  @keyframes sway { from { transform:rotate(-1deg); } to { transform:rotate(1.5deg); } }
+  .sway.windy { animation-name:swayw; } @keyframes swayw { from { transform:rotate(-3deg); } to { transform:rotate(4deg); } }
+  .flash { opacity:0; animation:flash 9s linear infinite; } @keyframes flash { 0%,93%,100% { opacity:0; } 94% { opacity:.55; } 95% { opacity:.1; } 96% { opacity:.45; } }
+  .bolt { opacity:0; animation:flash 9s linear infinite; }
+  .fog { animation:fogd 40s ease-in-out infinite alternate; } @keyframes fogd { from { transform:translateX(-30px); } to { transform:translateX(30px); } }
+  .leaf { animation:leaf 7s linear infinite; } @keyframes leaf { from { transform:translate(0,0) rotate(0); opacity:1; } to { transform:translate(60px,150px) rotate(320deg); opacity:0; } }
+  .fire { transform-box:fill-box; transform-origin:50% 100%; animation:fire .35s ease-in-out infinite alternate; } @keyframes fire { to { transform:scale(1.08,.92); opacity:.85; } }
+  .fw { animation:burst 2.6s ease-out infinite; transform:scale(0); opacity:0; } @keyframes burst { 0% { transform:scale(.1); opacity:0; } 10% { opacity:1; } 70% { transform:scale(1); opacity:.8; } 100% { transform:scale(1.1); opacity:0; } }
+  @media (prefers-reduced-motion: reduce) { .cloud, .halo, .star, .drop, .flake, .roofglow, .lamp, .smoke, .wave, .glow, .sway, .flash, .bolt, .fog, .leaf, .fire, .fw { animation:none !important; } }
   @keyframes smoke { 0% { opacity:0; transform:translate(0, 4px) scale(.5); } 15% { opacity:.7; } 60% { opacity:.4; } 100% { opacity:0; transform:translate(16px, -34px) scale(2.1); } }
   .glow { opacity:.08; animation:glow 3s ease-in-out infinite; } @keyframes glow { 50% { opacity:.2; } }
   .tile { transition:transform .15s; transform-box:fill-box; transform-origin:center; } .tile:hover { transform:scale(1.02); }
@@ -385,95 +394,233 @@ function tileColor(r) {
   if (r.temp != null && r.temp < w.temp - 0.5) return ["var(--cool)", 18];
   return [COL[why] || "var(--heat)", 10];
 }
+// ---- the house picture: painted, with the real weather, the time of day, the season and the holidays ----
+function easterDay(y) {  // Gauss/Meeus
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(y, month - 1, day);
+}
+function holidayOf(now) {
+  const y = now.getFullYear(), day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()), t = day(now);
+  const add = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const xmas = new Date(y, 11, 25), advent1 = add(xmas, -((xmas.getDay() || 7) + 21));  // the 4th Sunday before Christmas
+  const easter = easterDay(y), fast = add(easter, -49);
+  const between = (a, b) => t >= day(a) && t <= day(b);
+  if (between(advent1, new Date(y, 11, 26))) return "jul";
+  if (between(new Date(y, 11, 31), new Date(y, 11, 31)) || between(new Date(y, 0, 1), new Date(y, 0, 1))) return "nytaar";
+  if (between(add(fast, -2), fast)) return "fastelavn";
+  if (between(add(easter, -7), add(easter, 1))) return "paaske";
+  if (between(new Date(y, 5, 23), new Date(y, 5, 23))) return "sankthans";
+  if (between(new Date(y, 9, 24), new Date(y, 9, 31))) return "halloween";
+  return "";
+}
+function seasonOf(now) {
+  // the tree follows the year softly: blossom in early spring, full green in summer, turning in autumn, bare in winter
+  const m = now.getMonth(), d = now.getDate(), f = (m + d / 31);
+  if (f >= 2 && f < 4.3) return ["spring", f < 3.5 ? "blossom" : "fresh"];
+  if (f >= 4.3 && f < 8.4) return ["summer", "green"];
+  if (f >= 8.4 && f < 11) return ["autumn", f < 9.2 ? "turning" : f < 10.3 ? "orange" : "sparse"];
+  return ["winter", "bare"];
+}
 function houseSvg(rooms) {
   const narrow = (window.innerWidth || 800) < 600;
-  const W = narrow ? 380 : 680, pad = narrow ? 8 : 26, tw0 = 150, th = narrow ? 92 : 96, gx = 10, gy = 10;
-  const floors = (data.floors || []).filter((f) => rooms.some((r) => r.floor_id === f.floor_id));
+  const W = narrow ? 390 : 760, cols = narrow ? 2 : 4, pad = narrow ? 30 : 92, gx = 10, gy = 10, th = narrow ? 90 : 94, wallT = narrow ? 9 : 14, inner = narrow ? 10 : 18;
+  const bw = W - 2 * pad, tw = (bw - 2 * wallT - 2 * inner - (cols - 1) * gx) / cols, bx = pad;
+  // ?when=2026-12-24&wx=snowy&t=night previews another day, weather or time of day
+  const q = new URLSearchParams(location.search);
+  const now = q.get("when") ? new Date(q.get("when") + "T12:00") : new Date(), [season, leafStage] = seasonOf(now), holiday = holidayOf(now);
+  const sky = { ...(data.sky || {}), ...(q.get("wx") ? { condition: q.get("wx"), cloud: null, snow_lying: /snow/.test(q.get("wx")) } : {}) };
+  const el = Number(sky.elevation), cond = sky.condition || "";
+  const time = q.get("t") || (!isNaN(el) ? (el > 6 ? "day" : el > -6 ? "dusk" : "night") : (data.sun === "below_horizon" ? "night" : "day"));
+  const night = time === "night", dusk = time === "dusk", D = night || dusk;
+  const cloud = sky.cloud != null ? sky.cloud : ({ sunny: 5, "clear-night": 5, partlycloudy: 45, cloudy: 90, fog: 80, rainy: 90, pouring: 95, snowy: 90, "lightning-rainy": 95 }[cond] ?? 50);
+  const rain = /rain|pouring/.test(cond), snowing = /snow/.test(cond), storm = /lightning/.test(cond), fog = cond === "fog", hail = cond === "hail";
+  const windy = /windy/.test(cond) || (sky.wind != null && sky.wind >= 8);
+  const snowLies = !!sky.snow_lying || snowing;
+  const grey = Math.min(1, Math.max(0, (cloud - 40) / 60)) * (rain || storm ? 1 : .8);
+  const ph = (dur) => `animation-delay:-${((Date.now() / 1000) % dur).toFixed(2)}s`;
+  const rnd = (k) => { const h = Math.sin(k * 127.1 + 311.7) * 43758.5453; return h - Math.floor(h); };
+  const mix = (a, b, t) => { const p = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)); const x = p(a), y = p(b); return "#" + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, "0")).join(""); };
+  const cap = (s) => s ? s.charAt(0).toLocaleUpperCase() + s.slice(1) : s;
+  const fit = (s, px, size) => { const n = Math.max(4, Math.floor(px / (size * 0.56))); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+  const roofTop = narrow ? 34 : 40, roofH = narrow ? 70 : 112;
+  // ---- the rooms, floor by floor (cellar below the ground)
+  const floors = (data.floors || []).filter((f) => rooms.some((r) => r.floor_id === f.floor_id)).sort((a, b) => b.level - a.level);
   const bands = floors.map((f) => ({ ...f, rooms: rooms.filter((r) => r.floor_id === f.floor_id) }));
   const loose = rooms.filter((r) => !floors.some((f) => f.floor_id === r.floor_id));
   if (loose.length) bands.push({ floor_id: "", name: "", level: 0, rooms: loose });
-  const cols = Math.min(narrow ? 2 : 4, Math.max(...bands.map((b) => b.rooms.length), 1));
-  const inner = narrow ? 20 : 40;
-  const tw = Math.min(narrow ? 999 : tw0, (W - 2 * pad - inner - (cols - 1) * gx) / cols);
-  const bw = cols * tw + (cols - 1) * gx + inner, bx = (W - bw) / 2;
-  const skyH = 112, roofTop = 34, roofH = 84, eave = narrow ? 8 : 24;
-  const ph = (dur) => `animation-delay:-${((Date.now() / 1000) % dur).toFixed(2)}s`;  // keep the phase across re-draws
-  let y = roofTop + roofH, body = "", ground = null, tiles = "";
-  const cap = (s) => s ? s.charAt(0).toLocaleUpperCase() + s.slice(1) : s;
-  const fit = (s, px, size) => { const n = Math.max(4, Math.floor(px / (size * 0.56))); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
-  bands.forEach((b) => {
-    const rows = Math.ceil(b.rooms.length / cols), h = rows * th + (rows - 1) * gy + 36;
-    const below = b.level < 0;
+  let y = roofTop + roofH + 6, inside = "", tiles = "", ground = null, slabs = "";
+  const ink = D ? "#f1f3f8" : "#141824", sub = D ? "#c3c9d6" : "#4a505e";
+  bands.forEach((b, bi) => {
+    const rows = Math.ceil(b.rooms.length / cols), h = rows * th + (rows - 1) * gy + 42, below = b.level < 0;
     if (below && ground == null) ground = y;
-    body += `<rect x="${bx}" y="${y}" width="${bw}" height="${h}" fill="${below ? "url(#cellar)" : "url(#wall)"}" stroke="var(--line2)" stroke-width="1.5"/>
-      ${b.name ? `<text x="${bx + 12}" y="${y + 19}" class="t-fl">${esc(b.name)}</text>` : ""}`;
+    inside += `<rect x="${bx + wallT}" y="${y}" width="${bw - 2 * wallT}" height="${h}" fill="url(#hp-${below ? "cellar" : "room"})"/>
+      <rect x="${bx + wallT}" y="${y}" width="${bw - 2 * wallT}" height="${h}" fill="url(#hp-ao)"/><rect x="${bx + wallT}" y="${y}" width="${bw - 2 * wallT}" height="${h}" fill="url(#hp-aoS)"/>
+      <rect x="${bx + wallT}" y="${y + h - 6}" width="${bw - 2 * wallT}" height="6" fill="url(#hp-wood)"/>
+      ${b.name ? `<text x="${bx + wallT + 12}" y="${y + 20}" class="t-fl" style="fill:${D ? "#e8d9c4" : "#7a5b3e"};opacity:.8">${esc(b.name)}</text>` : ""}`;
     b.rooms.forEach((r, i) => {
-      const c = i % cols, row = Math.floor(i / cols), x = bx + inner / 2 + c * (tw + gx), ty = y + 28 + row * (th + gy);
-      const w = r.want || {}, why = w.why || "comfort", [col, mix] = tileColor(r);
+      const c = i % cols, row = Math.floor(i / cols), x = bx + wallT + inner + c * (tw + gx), ty = y + 30 + row * (th + gy);
+      const w = r.want || {}, why = w.why || "comfort", [col] = tileColor(r), hot = r.heating;
+      const cold = w.temp != null && (["setback", "night", "away", "holiday", "owner_away"].includes(why) || (r.temp != null && r.temp < w.temp - .5 && !hot));
       const win = (r.windows || []).length && why === "window";
-      const waves = r.heating ? [0, 1, 2].map((k) => `<path class="wave w${k + 1}" d="M${x + tw - 34 + k * 9} ${ty + th - 22} q5 -6 0 -12 q-5 -6 0 -12"/>`).join("") : "";
       const prog = r.temp != null && w.temp != null ? Math.max(0, Math.min(1, 1 - (w.temp - r.temp) / 3)) : 0;
-      const lamp = r.occupied ? `<g class="lamp"><circle cx="${x + tw - 16}" cy="${ty + 16}" r="9" fill="#ffd36b" opacity=".25"/><circle cx="${x + tw - 16}" cy="${ty + 16}" r="4" fill="#ffc847"/></g>` : "";
       const label = w.temp == null ? (win ? "🪟 " : "") + T.off : "→ " + num(deg(w.temp)) + "° " + (T.why[why] || why);
-      tiles += `<g class="tile${r.heating ? " hot" : ""}" data-room="${esc(r.area_id)}">
-        <rect class="bg" x="${x}" y="${ty}" width="${tw}" height="${th}" rx="14" fill="color-mix(in srgb, ${col} ${mix}%, var(--surface2))" stroke="color-mix(in srgb, ${col} 50%, transparent)"/>
-        ${r.heating ? `<rect x="${x}" y="${ty}" width="${tw}" height="${th}" rx="14" fill="${col}" class="glow" style="${ph(3)}"/>` : ""}
-        ${lamp}
-        <text class="t-nm" x="${x + 12}" y="${ty + 20}">${esc(fit(cap(r.name), tw - (r.occupied ? 44 : 24), 12))}</text>
-        <text class="t-v" x="${x + 12}" y="${ty + 52}">${num(deg(r.temp))}°</text>
-        <text class="t-w" x="${x + 12}" y="${ty + 72}" fill="${col}">${esc(fit(label, tw - 24, 11))}</text>
-        <rect x="${x + 12}" y="${ty + th - 13}" width="${tw - 24}" height="3" rx="1.5" fill="var(--line2)"/>
-        <rect x="${x + 12}" y="${ty + th - 13}" width="${(tw - 24) * prog}" height="3" rx="1.5" fill="${col}"/>${waves}</g>`;
+      const icon = hot || r.occupied;
+      tiles += `<g class="tile${hot ? " hot" : ""}" data-room="${esc(r.area_id)}">
+        ${hot && D ? `<rect x="${x - 6}" y="${ty - 6}" width="${tw + 12}" height="${th + 12}" rx="22" fill="#ff9a4a" opacity=".32" filter="url(#hp-b10)"/>` : ""}
+        <rect class="bg" x="${x}" y="${ty}" width="${tw}" height="${th}" rx="16" fill="${D ? "rgba(28,32,44,.88)" : "rgba(255,255,255,.9)"}" filter="url(#hp-card)"/>
+        <rect x="${x}" y="${ty}" width="${tw}" height="${th}" rx="16" fill="url(#hp-${hot ? "tHot" : cold ? "tCold" : "tCalm"})" stroke="${col}" stroke-opacity="${hot ? .55 : .22}"/>
+        ${hot ? `<rect x="${x}" y="${ty}" width="${tw}" height="${th}" rx="16" fill="${col}" class="glow" style="${ph(3)}"/>` : ""}
+        <text class="t-nm" x="${x + 13}" y="${ty + 21}" style="fill:${sub}">${esc(fit(cap(r.name), tw - (icon ? 46 : 24), 12.5))}</text>
+        <text class="t-v" x="${x + 12}" y="${ty + 52}" style="fill:${ink};font-weight:300;font-size:${narrow ? 25 : 28}px">${num(deg(r.temp))}°</text>
+        <text class="t-w" x="${x + 13}" y="${ty + 71}" fill="${col}">${esc(fit(label, tw - 24, 11))}</text>
+        <rect x="${x + 13}" y="${ty + th - 12}" width="${tw - 26}" height="3" rx="1.5" fill="${D ? "#2e3545" : "#ebedf2"}"/>
+        <rect x="${x + 13}" y="${ty + th - 12}" width="${(tw - 26) * prog}" height="3" rx="1.5" fill="${col}"/>
+        ${hot ? `<g transform="translate(${x + tw - 33} ${ty + 10})"><rect y="10" width="19" height="12" rx="3" fill="none" stroke="${col}" stroke-width="1.7"/><path d="M5 10v12M9.5 10v12M14 10v12" stroke="${col}" stroke-width="1.3"/>
+          ${[0, 1, 2].map((k) => `<path class="wave w${k + 1}" style="stroke:${col}" d="M${4 + k * 5.5} 7 q3 -3 0 -6"/>`).join("")}</g>` : ""}
+        ${r.occupied && !hot ? `<g class="lamp"><circle cx="${x + tw - 20}" cy="${ty + 18}" r="10" fill="#ffd36b" opacity=".28"/><circle cx="${x + tw - 20}" cy="${ty + 18}" r="4" fill="#ffc847"/></g>` : ""}
+      </g>`;
     });
+    if (bi > 0) slabs += `<rect x="${bx}" y="${y - 5}" width="${bw}" height="10" fill="url(#hp-slab)"/>`;
     y += h;
   });
   if (ground == null) ground = y;
-  const H = y + 22, heatN = rooms.filter((r) => r.heating).length;
-  // --- the sky: sun or moon on its arc, clouds after the forecast, rain or snow after the weather
-  const sky = data.sky || {}, el = Number(sky.elevation), az = Number(sky.azimuth);
-  const day = !isNaN(el) ? el > -3 : data.sun !== "below_horizon";
-  const cond = sky.condition || "", cloud = sky.cloud != null ? sky.cloud : ({ sunny: 5, "clear-night": 5, partlycloudy: 45, cloudy: 85 }[cond] ?? 60);
-  const sxp = !isNaN(az) ? Math.max(0.06, Math.min(0.94, (az - 90) / 180)) : 0.15;
-  const sx = day ? W * sxp : W * 0.18, sy = day && !isNaN(el) ? 92 - Math.max(0, Math.min(1, el / 55)) * 66 : 34;
-  let sk = `<rect x="0" y="0" width="${W}" height="${skyH + 30}" fill="url(#${day ? "skyd" : "skyn"})"/>`;
-  if (!day) sk += [[.08, 18], [.3, 40], [.46, 14], [.62, 30], [.8, 16], [.92, 46], [.38, 62], [.72, 58]].map(([fx, fy], k) =>
-    `<circle class="star" cx="${W * fx}" cy="${fy}" r="${k % 3 ? 1 : 1.5}" style="animation-delay:${(k * .7).toFixed(1)}s"/>`).join("");
-  sk += day ? `<g class="sun"><circle cx="${sx}" cy="${sy}" r="26" fill="#ffd35c" opacity=".18" class="halo"/><circle cx="${sx}" cy="${sy}" r="13" fill="#ffc93c"/></g>`
-    : `<path d="M${sx + 2} ${sy - 12} a13 13 0 1 0 10 22 a10 10 0 1 1 -10 -22z" fill="#d7defc"/>`;
-  const nCl = cloud < 15 ? 0 : cloud < 40 ? 1 : cloud < 70 ? 2 : 3;
-  const cl = (cx, cy, s, k) => `<g class="cloud" style="animation-duration:${60 + k * 17}s;${ph(60 + k * 17)}"><g transform="translate(${cx} ${cy}) scale(${s})" fill="${day ? "#fff" : "#9aa4c4"}" opacity="${day ? .92 : .35}">
-      <ellipse cx="0" cy="8" rx="26" ry="10"/><circle cx="-10" cy="2" r="11"/><circle cx="8" cy="-2" r="14"/><circle cx="22" cy="6" r="8"/></g></g>`;
-  sk += [[W * .25, 30, 1], [W * .68, 48, .8], [W * .45, 18, .65]].slice(0, nCl).map(([cx, cy, s], k) => cl(cx, cy, s, k)).join("");
-  if (/rain|pouring|lightning-rainy/.test(cond)) sk += Array.from({ length: 14 }, (_, k) => `<line class="drop" x1="${(k * 53) % W}" y1="0" x2="${(k * 53) % W - 3}" y2="9" style="animation-delay:-${(k * .17).toFixed(2)}s"/>`).join("");
-  if (/snow/.test(cond)) sk += Array.from({ length: 14 }, (_, k) => `<circle class="flake" cx="${(k * 59) % W}" cy="0" r="2" style="animation-delay:-${(k * .4).toFixed(1)}s"/>`).join("");
-  const out = data.outdoor != null ? `<g><rect x="${W - 92}" y="10" width="82" height="26" rx="13" fill="var(--surface)" opacity=".85"/><text x="${W - 51}" y="28" text-anchor="middle" class="t-out">${num(deg(data.outdoor))}° ${WD[0]}</text></g>` : "";
-  // --- roof with tiles, chimney on the slope, smoke by how many rooms heat
-  const rl = bx - eave, rr = bx + bw + eave, rb = roofTop + roofH + 2, peak = W / 2;
-  const slope = (x) => rb - (rb - roofTop) * (1 - Math.abs(x - peak) / (peak - rl));
-  const chx = bx + bw * 0.74, chTop = slope(chx + 22) - 30;
-  const tileLines = [1, 2, 3, 4].map((k) => { const yy = roofTop + roofH * k / 5, half = (peak - rl) * (yy - roofTop) / (rb - roofTop); return `<line x1="${peak - half + 4}" x2="${peak + half - 4}" y1="${yy}" y2="${yy}"/>`; }).join("");
-  const puffs = Math.min(4, heatN ? 1 + Math.ceil(heatN / 2) : 0);
-  const smoke = Array.from({ length: puffs }, (_, k) => `<circle class="smoke" cx="${chx + 11}" cy="${chTop - 4}" r="7" style="animation-delay:${(k * 4.8 / puffs).toFixed(2)}s"/>`).join("");
-  const roof = `<g>${smoke}<rect x="${chx}" y="${chTop}" width="22" height="${slope(chx) - chTop + 4}" fill="url(#brick)" stroke="var(--line2)" stroke-width="1.2"/>
-      <rect x="${chx - 3}" y="${chTop - 5}" width="28" height="7" rx="2" fill="#7c4a3a" stroke="var(--line2)" stroke-width="1"/></g>
-    <path d="M${rl} ${rb} L${peak} ${roofTop} L${rr} ${rb} Z" fill="url(#roofg)" stroke="#8a4a38" stroke-width="2" stroke-linejoin="round"/>
-    <g stroke="#000" stroke-opacity=".12" stroke-width="1">${tileLines}</g>
-    ${heatN ? `<path d="M${rl} ${rb} L${peak} ${roofTop} L${rr} ${rb} Z" fill="var(--heat)" class="roofglow" style="${ph(4)}"/>` : ""}
-    <circle cx="${peak}" cy="${roofTop + roofH * .55}" r="10" fill="var(--surface)" stroke="#8a4a38" stroke-width="2"/>
-    <path d="M${peak} ${roofTop + roofH * .55 - 10} v20 M${peak - 10} ${roofTop + roofH * .55} h20" stroke="#8a4a38" stroke-width="1.5"/>`;
-  const grass = `<rect x="0" y="${ground}" width="${W}" height="${Math.max(6, H - ground)}" fill="url(#earth)"/>
-    <path d="M0 ${ground} H${W}" stroke="#5aa35a" stroke-width="4" stroke-linecap="round"/>
-    ${[bx - 16, bx + bw + 14].map((gx0) => `<g fill="#5aa35a"><circle cx="${gx0}" cy="${ground - 8}" r="9"/><circle cx="${gx0 + 9}" cy="${ground - 5}" r="7"/><circle cx="${gx0 - 8}" cy="${ground - 4}" r="6"/></g>`).join("")}`;
+  const H = y + 26, peak = W / 2, ov = narrow ? 18 : 30, rl = bx - ov, rr = bx + bw + ov, rb = roofTop + roofH + 4;
+  const heatN = rooms.filter((r) => r.heating).length;
+  // ---- sky: painted colours that flow together; grey with clouds, rain or snow
+  let skyC = night ? ["#0a1029", "#18245a", "#2f3f7a"] : dusk ? (holiday === "halloween" ? ["#2a1a3d", "#7a3b4f", "#e2804a"] : ["#2b3566", "#b0627a", "#f2a66a"])
+    : season === "winter" ? ["#8fb0d8", "#cfdcec", "#eef3f9"] : season === "autumn" ? ["#6f9fd6", "#bcd2e8", "#f1dcc4"] : ["#4e9eec", "#94caf4", "#e3f2fd"];
+  const greyC = D ? ["#14161c", "#22252d", "#34373f"] : ["#7d8590", "#a7adb5", "#cfd3d8"];
+  skyC = skyC.map((c, i) => mix(c, greyC[i], grey));
+  let sk = `<rect width="${W}" height="${ground + 4}" fill="url(#hp-sky)"/>
+    <ellipse cx="${W * .18}" cy="${ground * .32}" rx="${W * .36}" ry="120" fill="${skyC[2]}" opacity=".32" filter="url(#hp-b30)"/>
+    <ellipse cx="${W * .86}" cy="${ground * .48}" rx="${W * .32}" ry="140" fill="${skyC[1]}" opacity=".38" filter="url(#hp-b30)"/>`;
+  const az = Number(sky.azimuth), sxp = !isNaN(az) ? Math.max(0.08, Math.min(0.92, (az - 90) / 180)) : 0.15;
+  const sx = W * sxp, sy = !isNaN(el) ? 92 - Math.max(0, Math.min(1, el / 55)) * 60 : 60;
+  if (night) {
+    if (grey < .7) sk += Array.from({ length: narrow ? 16 : 28 }, (_, k) => `<circle class="star" cx="${rnd(k) * W}" cy="${rnd(k + 50) * Math.min(150, ground - 40) + 6}" r="${rnd(k + 9) > .8 ? 1.5 : .9}" style="animation-delay:${(k * .37).toFixed(2)}s;opacity:${(1 - grey) * (.5 + rnd(k + 3) * .5)}"/>`).join("");
+    const mx = W * .16, my = 58;
+    sk += holiday === "halloween" ? `<circle cx="${W * .8}" cy="66" r="66" fill="#ffb067" opacity=".22" filter="url(#hp-b14)"/><circle cx="${W * .8}" cy="66" r="30" fill="#ffd9a0" opacity="${1 - grey * .7}"/>`
+      : `<circle cx="${mx}" cy="${my}" r="42" fill="#d5ddff" opacity="${.18 * (1 - grey)}" filter="url(#hp-b14)"/><path d="M${mx + 5} ${my - 20} a21 21 0 1 0 15 36 a17 17 0 1 1 -15 -36z" fill="#eef1ff" opacity="${1 - grey * .8}"/>`;
+  } else if (!dusk) {
+    sk += `<g class="halo"><circle cx="${sx}" cy="${sy}" r="58" fill="#fff6cf" opacity="${.55 * (1 - grey)}" filter="url(#hp-b14)"/></g><circle cx="${sx}" cy="${sy}" r="19" fill="#ffe27a" opacity="${1 - grey * .9}"/>`;
+  } else sk += `<circle cx="${sx}" cy="${ground - 30}" r="80" fill="#ffc06a" opacity="${.45 * (1 - grey)}" filter="url(#hp-b14)"/>`;
+  const nCl = cloud < 15 ? 0 : cloud < 40 ? 1 : cloud < 70 ? 2 : 4;
+  const clC = D ? (grey > .5 ? "#3a3e48" : "#8a90a8") : (grey > .5 ? "#c9ced5" : "#ffffff");
+  const clDur = windy ? 22 : 70;
+  [[W * .62, 48, 1], [W * .28, 30, .75], [W * .9, 70, .6], [W * .45, 86, .9]].slice(0, nCl).forEach(([cx, cy, s], k) => {
+    sk += `<g class="cloud" style="animation-duration:${clDur + k * 11}s;${ph(clDur + k * 11)}"><g transform="translate(${cx} ${cy}) scale(${s * (narrow ? .7 : 1)})" fill="${clC}" opacity="${D ? .55 : .92}" filter="url(#hp-b2)">
+      <ellipse cx="0" cy="10" rx="58" ry="15"/><circle cx="-22" cy="2" r="20"/><circle cx="6" cy="-6" r="26"/><circle cx="32" cy="4" r="16"/></g></g>`;
+  });
+  if (storm) sk += `<rect width="${W}" height="${ground}" fill="#fff" class="flash"/><path class="bolt" d="M${W * .7} 20 l-14 40 h12 l-16 42 l34 -52 h-13 l12 -30 z" fill="#fff6c0"/>`;
+  if (fog) sk += [0, 1, 2].map((k) => `<ellipse class="fog" cx="${W * (.2 + k * .35)}" cy="${ground - 30 - k * 26}" rx="${W * .45}" ry="26" fill="#fff" opacity="${D ? .12 : .35}" filter="url(#hp-b14)" style="${ph(40 + k * 9)}"/>`).join("");
+  // ---- the garden: lawn (or snow), soil around the cellar, a tree that carries the season
+  const lawn = snowLies ? "#eef3f8" : season === "winter" ? (D ? "#3a4632" : "#8a9a6a") : season === "autumn" ? (D ? "#36452a" : "#8aa04e") : (D ? "#2a4426" : "#64a646");
+  let gd = `<rect x="0" y="${ground}" width="${W}" height="${H - ground}" fill="url(#hp-soil)"/>
+    <path d="M0 ${ground - 11} Q ${W * .25} ${ground - 19} ${W * .5} ${ground - 11} T ${W} ${ground - 11} V ${ground + 6} H 0 Z" fill="${lawn}" filter="url(#hp-paper)"/>
+    <path d="M0 ${ground - 3} H ${W}" stroke="#000" stroke-opacity=".12" stroke-width="6" filter="url(#hp-b2)"/>
+    ${rain ? `<path d="M0 ${ground - 6} H ${W}" stroke="#bfe0ff" stroke-opacity=".35" stroke-width="2"/>` : ""}`;
+  const tx = narrow ? 14 : 44, tg = ground - 10, ts = narrow ? .55 : 1, bark = D ? "#2a1e16" : "#5a4030";
+  const leaves = { blossom: ["#f6b6c8", "#f9d3dd", "#e98fae"], fresh: ["#9fd36a", "#7fc155", "#b7e08a"], green: ["#4f8f3a", "#6aa84b", "#3a7a2c"],
+    turning: ["#8fa83a", "#e0a640", "#6a9a3a"], orange: ["#e07a2c", "#f0a640", "#c4542a"], sparse: ["#c4542a", "#a8452a", "#d08a3a"], bare: null }[leafStage];
+  let tree = `<path d="M0 0 C -2 -60, 6 -110, 2 -150" stroke="${bark}" stroke-width="9" fill="none" stroke-linecap="round"/>
+    <path d="M2 -110 q 18 -16 30 -40 M1 -90 q -18 -12 -26 -32" stroke="${bark}" stroke-width="5" fill="none" stroke-linecap="round"/>`;
+  const nLeaves = leafStage === "sparse" ? 6 : 14;
+  if (leaves) tree += Array.from({ length: nLeaves }, (_, k) => `<circle cx="${4 + (rnd(k) - .5) * 58}" cy="${-150 + (rnd(k + 20) - .5) * 70}" r="${13 + rnd(k + 7) * 12}" fill="${leaves[k % 3]}" opacity="${D ? .6 : .88}"/>`).join("");
+  if (snowLies && !leaves) tree += `<path d="M-24 -166 q 26 -10 52 0 M8 -132 q 14 -6 26 -2" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none"/>`;
+  gd += `<g transform="translate(${tx} ${tg}) scale(${ts})"><g class="${windy ? "sway windy" : "sway"}" filter="url(#hp-paper)">${tree}</g></g>`;
+  if (season === "autumn" && leafStage !== "turning") gd += Array.from({ length: windy ? 9 : 5 }, (_, k) => `<ellipse class="leaf" cx="${tx + rnd(k + 30) * 60}" cy="${tg - 150 * ts}" rx="3.5" ry="2" fill="${["#e07a2c", "#c4542a", "#f0a640"][k % 3]}" style="animation-delay:-${(k * 1.3).toFixed(1)}s;animation-duration:${windy ? 4 : 7}s"/>`).join("");
+  // ---- the house: brick, cellar in concrete, soft shadows; a dark roof with a light wooden fascia
+  let house = `<ellipse cx="${peak}" cy="${ground - 2}" rx="${bw * .62}" ry="14" fill="#000" opacity=".25" filter="url(#hp-b10)"/>
+    <rect x="${bx}" y="${rb - 2}" width="${bw}" height="${ground - rb + 2}" fill="url(#hp-brick)" filter="url(#hp-paper)"/>
+    <rect x="${bx}" y="${ground}" width="${bw}" height="${y - ground}" fill="url(#hp-concrete)"/>
+    <rect x="${bx}" y="${rb - 2}" width="${bw}" height="${y - rb}" fill="url(#hp-light)"/>`;
+  let roof = `<path d="M${rl} ${rb} L${peak} ${roofTop} L${rr} ${rb} Z" fill="url(#hp-slate)" filter="url(#hp-paper)"/>
+    <path d="M${peak} ${roofTop} L${rr} ${rb} L${peak} ${rb} Z" fill="#000" opacity=".18"/>
+    ${rain ? `<path d="M${rl} ${rb} L${peak} ${roofTop} L${rr} ${rb} Z" fill="#bfe0ff" opacity=".08"/>` : ""}
+    <path d="M${rl} ${rb} L${peak} ${roofTop} L${rr} ${rb}" fill="none" stroke="${D ? "#8a7a62" : "#d2bd98"}" stroke-width="${narrow ? 5 : 8}" stroke-linejoin="round" stroke-linecap="round" filter="url(#hp-paper)"/>
+    <rect x="${bx}" y="${rb + 2}" width="${bw}" height="22" fill="url(#hp-eave)"/>
+    ${heatN && D ? `<path d="M${rl} ${rb} L${peak} ${roofTop} L${rr} ${rb} Z" fill="#ff9a4a" class="roofglow" style="${ph(4)}"/>` : ""}`;
+  if (snowLies) roof += `<path d="M${rl + 4} ${rb - 3} L${peak} ${roofTop + 2} L${rr - 4} ${rb - 3} L${rr - 30} ${rb - 9} Q ${peak + 80} ${roofTop + 50} ${peak} ${roofTop + 14} Q ${peak - 80} ${roofTop + 50} ${rl + 30} ${rb - 9} Z" fill="#f4f8fc" filter="url(#hp-paper)"/>`;
+  // ---- holidays
+  let deco = "";
+  const sideL = bx / 2, sideR = W - bx / 2;
+  if (holiday === "jul") {
+    deco += `<path d="M${rl} ${rb + 4} L${peak} ${roofTop + 4} L${rr} ${rb + 4}" stroke="#1d1f22" stroke-width="1" fill="none"/>` + Array.from({ length: narrow ? 15 : 23 }, (_, k, a) => {
+      const t = k / ((narrow ? 15 : 23) - 1), x = t < .5 ? rl + (peak - rl) * t * 2 : peak + (rr - peak) * (t - .5) * 2, yy = t < .5 ? rb - (rb - roofTop) * t * 2 : roofTop + (rb - roofTop) * (t - .5) * 2;
+      const c = ["#ff4d4d", "#ffd84d", "#4dff88", "#4dc3ff"][k % 4];
+      return `<circle cx="${x}" cy="${yy + 6}" r="3" fill="${c}"/><circle class="lamp" cx="${x}" cy="${yy + 6}" r="8" fill="${c}" opacity="${D ? .5 : .25}" filter="url(#hp-b4)" style="animation-delay:${(k * .3).toFixed(1)}s"/>`;
+    }).join("");
+    const cx = sideR, cy = ground - 10, s = narrow ? .55 : 1;
+    deco += `<g transform="translate(${cx} ${cy}) scale(${s})" filter="url(#hp-paper)"><path d="M0 -120 L34 -10 L-34 -10 Z" fill="#1f5a34"/><path d="M0 -120 L26 -50 L-26 -50 Z" fill="#2a7244"/><rect x="-5" y="-10" width="10" height="12" fill="#5a3a22"/>
+      <path d="M0 -134 l4 9 10 1 -8 6 3 10 -9 -6 -9 6 3 -10 -8 -6 10 -1z" fill="#ffd84d"/>${Array.from({ length: 9 }, (_, k) => `<circle class="lamp" cx="${(rnd(k + 60) - .5) * 40 * (rnd(k + 70) * .6 + .3)}" cy="${-100 + rnd(k + 70) * 80}" r="2.6" fill="${["#ff4d4d", "#ffd84d", "#4dc3ff"][k % 3]}" style="animation-delay:${k * .4}s"/>`).join("")}</g>`;
+  }
+  if (holiday === "halloween") {
+    [[sideR, ground - 12, .95], [sideR - 26, ground - 8, .6], [sideL, ground - 8, .7]].forEach(([cx, cy, s]) => {
+      deco += `<g transform="translate(${cx} ${cy}) scale(${s * (narrow ? .6 : 1)})"><ellipse cx="0" cy="-14" rx="30" ry="22" fill="#e8742a" filter="url(#hp-paper)"/><ellipse cx="-12" cy="-14" rx="10" ry="21" fill="#d2621f" opacity=".6"/><ellipse cx="12" cy="-14" rx="10" ry="21" fill="#d2621f" opacity=".6"/><rect x="-3" y="-42" width="6" height="9" rx="2" fill="#4a6a2a"/>
+        <path d="M-14 -20 l6 -7 6 7z M2 -20 l6 -7 6 7z M-14 -6 q14 10 28 0 l-5 -2 -4 4 -5 -4 -5 4 -4 -4z" fill="#ffd36b"/>${D ? `<ellipse class="lamp" cx="0" cy="-14" rx="40" ry="30" fill="#ff9a3c" opacity=".35" filter="url(#hp-b10)"/>` : ""}</g>`;
+    });
+    if (D) deco += [[W * .6, 70], [W * .68, 100], [W * .52, 54]].map(([x, yy], k) => `<path class="cloud" style="animation-duration:${30 + k * 8}s" transform="translate(${x} ${yy}) scale(${.8 + k * .2})" d="M0 0 q-6 -8 -16 -4 q4 2 4 6 q-6 -2 -10 2 q8 2 10 6 q4 -6 12 -6 q8 0 12 6 q2 -4 10 -6 q-4 -4 -10 -2 q0 -4 4 -6 q-10 -4 -16 4z" fill="#1a1022"/>`).join("");
+  }
+  if (holiday === "paaske") {
+    [[sideL - 8, "#f7c6d9"], [sideL + 10, "#bfe3ff"], [sideR - 14, "#fff0a6"], [sideR + 6, "#c9f2c4"]].forEach(([cx, c]) => {
+      deco += `<ellipse cx="${cx}" cy="${ground - 17}" rx="${narrow ? 5 : 8}" ry="${narrow ? 7 : 11}" fill="${c}" filter="url(#hp-paper)"/>`;
+    });
+    [[sideR + 18], [sideL + 22], [sideR - 30]].forEach(([cx]) => {
+      deco += `<path d="M${cx} ${ground - 8} v-24" stroke="#4f8f3a" stroke-width="2.5"/>${[0, 72, 144, 216, 288].map((a) => `<ellipse cx="${cx}" cy="${ground - 36}" rx="4.5" ry="8" fill="#ffe14d" transform="rotate(${a} ${cx} ${ground - 34})"/>`).join("")}<circle cx="${cx}" cy="${ground - 34}" r="3.5" fill="#ff9f1c"/>`;
+    });
+  }
+  if (holiday === "fastelavn") {
+    const cx = sideR, cy = ground - 60;
+    deco += `<path d="M${cx - 26} ${cy - 30} H${cx + 26}" stroke="${bark}" stroke-width="3"/><path d="M${cx} ${cy - 30} v8" stroke="#555" stroke-width="1.5"/>
+      <rect x="${cx - 16}" y="${cy - 22}" width="32" height="40" rx="10" fill="#b8814c" filter="url(#hp-paper)"/><path d="M${cx - 16} ${cy - 10} h32 M${cx - 16} ${cy + 6} h32" stroke="#6a4424" stroke-width="2.5"/><path d="M${cx - 8} ${cy - 4} q8 -8 16 0" stroke="#000" fill="none" stroke-width="1.5"/>`;
+  }
+  if (holiday === "sankthans" && D) {
+    const cx = sideL, cy = ground - 10;
+    deco += `<ellipse cx="${cx}" cy="${cy - 20}" rx="60" ry="46" fill="#ff8a2a" opacity=".35" filter="url(#hp-b14)"/>
+      <path d="M${cx - 18} ${cy} l36 0 -8 -8 -20 0z" fill="#3a2414"/>
+      <path class="fire" d="M${cx} ${cy - 46} q14 18 10 34 q-4 12 -10 12 q-8 0 -12 -12 q-2 -18 12 -34z" fill="#ffb02e"/><path class="fire" style="animation-delay:.15s" d="M${cx} ${cy - 30} q8 10 6 20 q-2 6 -6 6 q-5 0 -7 -6 q-1 -10 7 -20z" fill="#fff0a0"/>`;
+  }
+  if (holiday === "nytaar" && D) {
+    [[W * .22, 50, "#ff5d8f"], [W * .5, 34, "#ffd84d"], [W * .8, 56, "#5dd6ff"]].forEach(([cx, cy, c], k) => {
+      deco += `<g class="fw" style="animation-delay:${k * .8}s;transform-origin:${cx}px ${cy}px">${Array.from({ length: 12 }, (_, i) => { const a = i / 12 * Math.PI * 2; return `<line x1="${cx}" y1="${cy}" x2="${cx + Math.cos(a) * 26}" y2="${cy + Math.sin(a) * 26}" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/>`; }).join("")}<circle cx="${cx}" cy="${cy}" r="30" fill="${c}" opacity=".25" filter="url(#hp-b10)"/></g>`;
+    });
+  }
+  // ---- weather in front of it all
+  let wx = "";
+  if (rain || storm) wx += Array.from({ length: narrow ? 18 : 34 }, (_, k) => `<line class="drop" x1="${(k * 53) % W}" y1="0" x2="${(k * 53) % W - (windy ? 7 : 3)}" y2="12" style="animation-delay:-${(k * .13).toFixed(2)}s;animation-duration:${(cond === "pouring" ? .55 : .85).toFixed(2)}s"/>`).join("");
+  if (snowing || hail || (holiday === "jul" && D && !rain)) wx += Array.from({ length: narrow ? 18 : 34 }, (_, k) => `<circle class="flake" cx="${(k * 59) % W}" cy="0" r="${hail ? 1.6 : 1.4 + rnd(k) * 1.6}" style="animation-delay:-${(k * .4).toFixed(1)}s;animation-duration:${windy ? 4 : 7 + rnd(k) * 3}s"/>`).join("");
+  if (snowLies) wx += `<path d="M0 ${ground - 11} Q ${W * .25} ${ground - 21} ${W * .5} ${ground - 12} T ${W} ${ground - 11} V ${ground - 2} H 0 Z" fill="#fbfdff" opacity=".95" filter="url(#hp-paper)"/>`;
+  const veil = night ? `<rect width="${W}" height="${H}" fill="#0a1238" opacity=".16"/>` : dusk ? `<rect width="${W}" height="${H}" fill="#ff8a50" opacity=".05"/>` : "";
+  const out = data.outdoor != null ? `<g><rect x="${W - 96}" y="12" width="84" height="27" rx="13.5" fill="${D ? "rgba(20,24,34,.7)" : "rgba(255,255,255,.85)"}"/><text x="${W - 54}" y="30" text-anchor="middle" class="t-out" style="fill:${D ? "#eef1f7" : "#141824"}">${num(deg(data.outdoor))}° ${WD[0]}</text></g>` : "";
   const defs = `<defs>
-    <linearGradient id="skyd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc0ff" stop-opacity=".55"/><stop offset="1" stop-color="#7cc0ff" stop-opacity="0"/></linearGradient>
-    <linearGradient id="skyn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b2550" stop-opacity=".9"/><stop offset="1" stop-color="#1b2550" stop-opacity="0"/></linearGradient>
-    <linearGradient id="roofg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9775a"/><stop offset="1" stop-color="#b85a40"/></linearGradient>
-    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--surface)"/><stop offset="1" stop-color="var(--surface2)"/></linearGradient>
-    <linearGradient id="cellar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="color-mix(in srgb, #8b6b4a 14%, var(--surface))"/><stop offset="1" stop-color="color-mix(in srgb, #8b6b4a 22%, var(--surface))"/></linearGradient>
-    <linearGradient id="earth" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8b6b4a" stop-opacity=".25"/><stop offset="1" stop-color="#8b6b4a" stop-opacity=".05"/></linearGradient>
-    <pattern id="brick" width="11" height="8" patternUnits="userSpaceOnUse"><rect width="11" height="8" fill="#a8563f"/><path d="M0 .5H11M0 4.5H11M5.5 0V4M0 4V8" stroke="#7c3f2e" stroke-width=".8"/></pattern></defs>`;
-  return `<svg viewBox="0 0 ${W} ${H}" role="img">${defs}${sk}${out}${grass}${body}${roof}${tiles}</svg>`;
+    <linearGradient id="hp-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${skyC[0]}"/><stop offset=".6" stop-color="${skyC[1]}"/><stop offset="1" stop-color="${skyC[2]}"/></linearGradient>
+    <linearGradient id="hp-slate" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${D ? "#2c303a" : "#565d69"}"/><stop offset=".6" stop-color="${D ? "#1b1e25" : "#363b44"}"/><stop offset="1" stop-color="${D ? "#121419" : "#262a31"}"/></linearGradient>
+    <pattern id="hp-brick" width="24" height="10" patternUnits="userSpaceOnUse"><rect width="24" height="10" fill="${D ? "#5a2a1f" : "#b65e40"}"/><rect x="1" y="1" width="10" height="3.6" fill="${D ? "#63302a" : "#c56a4a"}"/><rect x="13" y="1" width="10" height="3.6" fill="${D ? "#53271c" : "#a95438"}"/><rect x="-5" y="6" width="10" height="3.6" fill="${D ? "#5e2d21" : "#bb6043"}"/><rect x="7" y="6" width="10" height="3.6" fill="${D ? "#68342a" : "#c96e4d"}"/><rect x="19" y="6" width="10" height="3.6" fill="${D ? "#5e2d21" : "#bb6043"}"/></pattern>
+    <linearGradient id="hp-light" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="${D ? 0 : .12}"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".18"/></linearGradient>
+    <linearGradient id="hp-concrete" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${D ? "#3b3c40" : "#a39e95"}"/><stop offset="1" stop-color="${D ? "#2b2c2f" : "#8a857c"}"/></linearGradient>
+    <linearGradient id="hp-room" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${D ? "#3a2c22" : "#fdf3e4"}"/><stop offset="1" stop-color="${D ? "#2a2019" : "#f2e3cc"}"/></linearGradient>
+    <linearGradient id="hp-cellar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${D ? "#302722" : "#f0e8dc"}"/><stop offset="1" stop-color="${D ? "#241d19" : "#e2d7c6"}"/></linearGradient>
+    <linearGradient id="hp-ao" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity=".22"/><stop offset=".14" stop-color="#000" stop-opacity="0"/><stop offset=".9" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".12"/></linearGradient>
+    <linearGradient id="hp-aoS" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".14"/><stop offset=".05" stop-color="#000" stop-opacity="0"/><stop offset=".95" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".14"/></linearGradient>
+    <linearGradient id="hp-eave" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity=".45"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
+    <linearGradient id="hp-wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${D ? "#6a4a2e" : "#cfa274"}"/><stop offset="1" stop-color="${D ? "#4a3220" : "#a97d50"}"/></linearGradient>
+    <linearGradient id="hp-slab" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#77736c"/><stop offset="1" stop-color="#4e4b46"/></linearGradient>
+    <linearGradient id="hp-soil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${D ? "#2e2219" : "#94704d"}"/><stop offset="1" stop-color="${D ? "#1d1611" : "#6c5036"}"/></linearGradient>
+    <linearGradient id="hp-tHot" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff8a3d" stop-opacity=".22"/><stop offset="1" stop-color="#ffb347" stop-opacity=".05"/></linearGradient>
+    <linearGradient id="hp-tCalm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffb347" stop-opacity=".08"/><stop offset="1" stop-color="#ffb347" stop-opacity="0"/></linearGradient>
+    <linearGradient id="hp-tCold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4aa8ff" stop-opacity=".2"/><stop offset="1" stop-color="#4aa8ff" stop-opacity=".04"/></linearGradient>
+    <filter id="hp-paper" x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="3" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3.5"/></filter>
+    <filter id="hp-grainf"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="7"/><feColorMatrix values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .5 0"/></filter>
+    <filter id="hp-card" x="-15%" y="-15%" width="130%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000" flood-opacity="${D ? .5 : .14}"/></filter>
+    <filter id="hp-b2"><feGaussianBlur stdDeviation="2"/></filter><filter id="hp-b4" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter>
+    <filter id="hp-b10" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="10"/></filter><filter id="hp-b14" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter>
+    <filter id="hp-b30" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="30"/></filter></defs>`;
+  const grain = `<rect width="${W}" height="${H}" filter="url(#hp-grainf)" opacity="${D ? .22 : .14}" style="mix-blend-mode:overlay;pointer-events:none"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img">${defs}${sk}${gd}${house}${inside}${slabs}${roof}${deco}${tiles}${wx}${veil}${out}${grain}</svg>`;
 }
+
 function tuneLabel(v, u, k) {
   if (u === "clock") return String(v % 24).padStart(2, "0") + ":00";
   if (u === "°") { const x = k === "price_flex" ? ddeg(v) : deg(v); return `±`.slice(k === "price_flex" ? 0 : 1) + num(x, F() || x % 1 ? (F() ? 0 : 1) : 0) + "°"; }

@@ -725,7 +725,22 @@ class Pilot:
         f = self.sun_hours.get(sunfeed.hour_key(datetime.now())) if self.sun_hours else None
         if f is not None:
             cloud = round((1 - f) * 100)
-        return {"elevation": sun.get("elevation"), "azimuth": sun.get("azimuth"), "condition": w.get("state"), "cloud": cloud}
+        a = w.get("attributes") or {}
+        wind = a.get("wind_speed")
+        try:  # m/s whatever the weather entity uses
+            unit = str(a.get("wind_speed_unit") or "km/h").lower()
+            wind = round(float(wind) / {"km/h": 3.6, "mph": 2.237, "kn": 1.944, "ft/s": 3.281}.get(unit, 1.0), 1)
+        except (TypeError, ValueError):
+            wind = None
+        # snow stays on the ground (and the roof) while it is cold - for up to three days after it fell
+        now = datetime.now()
+        if w.get("state") in ("snowy", "snowy-rainy"):
+            self._snow_at = now
+        outdoor = self.c(a.get("temperature"))
+        snow_at = getattr(self, "_snow_at", None)
+        lying = bool(snow_at and (now - snow_at).total_seconds() < 72 * 3600 and (outdoor is None or outdoor <= 1.5))
+        return {"elevation": sun.get("elevation"), "azimuth": sun.get("azimuth"), "condition": w.get("state"), "cloud": cloud,
+                "wind": wind, "snow_lying": lying}
 
     @staticmethod
     def _recent_on(s: dict[str, Any] | None, now: datetime) -> bool:
