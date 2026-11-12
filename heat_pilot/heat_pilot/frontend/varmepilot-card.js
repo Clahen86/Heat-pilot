@@ -120,9 +120,14 @@ class VarmepilotRoomCard extends HTMLElement {
   }
   static getConfigElement() { return document.createElement("varmepilot-room-card-editor"); }
   get _lang() { return ((this._hass?.language || "en").slice(0, 2)).replace(/^(no|nn)$/, "nb"); }
-  get _room() { return (this._hass?.states["sensor.varmepilot"]?.attributes?.rooms || []).find((r) => r.area_id === this.config.area); }
+  get _room() {
+    const rooms = this._hass?.states["sensor.varmepilot"]?.attributes?.rooms || [];
+    const area = this.config?.area;
+    return rooms.find((r) => r.area_id === area || r.name === area) || (area ? undefined : rooms[0]);  // no room chosen yet: the first
+  }
   set hass(hass) {
     this._hass = hass;
+    if (!this.config) this.config = {};
     const r = this._room;
     const live = r ? hass.states[r.sensor] : null;
     const extra = r ? [r.humidity, ...(r.windows || [])].map((e) => hass.states[e]?.state) : [];
@@ -150,12 +155,14 @@ class VarmepilotRoomCard extends HTMLElement {
   async _call(service, data) {
     this._pending = service + JSON.stringify(data);
     this.render();
-    try { await this._hass.callService("heat_pilot", service, { area_id: this.config.area, ...data }); }
+    try { await this._hass.callService("heat_pilot", service, { area_id: this._room?.area_id, ...data }); }
     catch (e) { this._error = e.message || String(e); setTimeout(() => { this._error = null; this._key = null; this.render(); }, 5000); }
     this._pending = null; this._key = null; this.render();
   }
   render() {
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
+    if (!this._hass) return;
+    this.config = this.config || {};
     const hass = this._hass, T = VPR_T[this._lang] || VPR_T.en, r = this._room;
     if (!r) { this.shadowRoot.innerHTML = `<ha-card><div style="padding:16px">${hass?.states["sensor.varmepilot"] ? T.pick : "sensor.varmepilot …"}</div></ha-card>`; return; }
     const why = VP_T[this._lang]?.why || VP_T.en.why;
@@ -286,10 +293,15 @@ class VarmepilotRoomCardEditor extends HTMLElement {
   set hass(hass) { const first = !this._hass; this._hass = hass; if (first) this.render(); }
   render() {
     if (!this._hass) return;
+    this._config = this._config || {};
     const lang = ((this._hass.language || "en").slice(0, 2)).replace(/^(no|nn)$/, "nb"), T = VPR_T[lang] || VPR_T.en;
     const rooms = this._hass.states["sensor.varmepilot"]?.attributes?.rooms || [];
     this.innerHTML = `<div style="padding:8px 0"><label style="display:block;font-size:12px;color:var(--secondary-text-color);margin-bottom:4px">${T.room}</label>
       <select style="width:100%;padding:10px;border-radius:8px;font:inherit">${rooms.map((r) => `<option value="${r.area_id}" ${r.area_id === this._config.area ? "selected" : ""}>${r.name}</option>`).join("")}</select></div>`;
+    if (!this._config.area && rooms[0]) {  // nothing chosen yet: the first room, so the card shows at once
+      this._config = { ...this._config, area: rooms[0].area_id };
+      this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
+    }
     this.querySelector("select").onchange = (e) => {
       this._config = { ...this._config, area: e.target.value };
       this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
