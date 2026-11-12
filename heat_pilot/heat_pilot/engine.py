@@ -442,7 +442,8 @@ class Pilot:
             if cur is not None:
                 va["checks"] = va["checks"] * 0.9995 + 1
                 va["same"] = va["same"] * 0.9995 + (cur == want_v["level"])
-            self.vent_now = {**want_v, "current": cur, "same": cur == want_v["level"],
+            step, steps = ventilation.current_step(self.vent, st)
+            self.vent_now = {**want_v, "current": cur, "same": cur == want_v["level"], "step": step, "steps": steps,
                              "agree": round(100 * va["same"] / va["checks"]) if va["checks"] >= 30 else None, "efficiency": ventilation.efficiency(self.vent, st),
                              "bypass": ventilation.bypass_open(self.vent, st), "calls": ventilation.calls(self.vent, st, want_v["level"]),
                              "temps": {k: self.sensor_c(self.vent.get(k)) for k in ("outdoor", "supply", "extract", "exhaust")},

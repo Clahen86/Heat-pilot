@@ -72,7 +72,20 @@ class Publisher:
         attrs = {"friendly_name": "Varmepilot", "icon": "mdi:radiator", "rooms": rooms, "sentence": pilot.sentence(),
                  "mode": "shadow" if all(r.get("mode", "shadow") == "shadow" for r in st["rooms"]) else "control",
                  "heating": sum(1 for r in rooms if r["heating"]), "alerts": len(st.get("alerts") or [])}
-        key = json.dumps([{k: v for k, v in r.items() if k not in ("temp", "plan")} for r in rooms]
+        v = st.get("vent")
+        if v:
+            # the ventilation card: the step, the level and why, the room that decides, and the heat recovery (whole
+            # degrees, so the sensor isn't written for every tenth)
+            t = v.get("temps") or {}
+            r0 = lambda x: None if x is None else round(conv(x))
+            warn = [{"name": a["name"], "air": a["air"], "co2": a.get("co2"), "hum": a.get("hum")}
+                    for a in [{"name": r["name"], **(r.get("air") or {})} for r in st["rooms"]] + (st.get("air_rooms") or [])
+                    if a.get("air") in ("warn", "bad")]
+            attrs["vent"] = {"level": v.get("level"), "why": v.get("why"), "current": v.get("current"), "step": v.get("step"),
+                             "steps": v.get("steps"), "lead": v.get("lead"), "efficiency": v.get("efficiency"), "cooling": v.get("cooling"),
+                             "outdoor": r0(t.get("outdoor")), "supply": r0(t.get("supply")), "name": v.get("name"),
+                             "agree": v.get("agree"), "mode": "shadow", "warn": warn[:3]}
+        key = json.dumps([{k: v for k, v in r.items() if k not in ("temp", "plan")} for r in rooms] + [attrs.get("vent")]
                          + [[(r["plan"] or [[None]])[0][0] for r in rooms], attrs["sentence"], attrs["alerts"]], sort_keys=True, default=str)
         if key == self._last and SENSOR in ha.states:
             return

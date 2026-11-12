@@ -115,6 +115,21 @@ def current_level(unit: dict[str, Any], states: dict[str, Any]) -> str | None:
     return None
 
 
+def current_step(unit: dict[str, Any], states: dict[str, Any]) -> tuple[int | None, int | None]:
+    """The step the unit runs on now, as the unit counts it (1-4 on a Dantherm), and how many steps it has."""
+    if unit.get("level_select"):
+        s = states.get(unit["level_select"]) or {}
+        nums = sorted(x for x in set(_numeric_options(s)) if x > 0)
+        m = re.search(r"\d+", str(s.get("state")))
+        if m and nums:
+            return int(m.group()), max(nums)
+    if unit.get("fan"):
+        p = ((states.get(unit["fan"]) or {}).get("attributes") or {}).get("percentage")
+        if isinstance(p, (int, float)):
+            return max(1, min(4, round(p / 25))), 4
+    return None, None
+
+
 def _to_level(n: int, nums: list[int]) -> str:
     usable = [x for x in nums if x > 0] or nums  # 0 is off on most units - never chosen
     i = usable.index(n) if n in usable else 0

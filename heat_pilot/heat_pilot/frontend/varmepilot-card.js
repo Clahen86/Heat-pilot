@@ -309,6 +309,99 @@ class VarmepilotRoomCardEditor extends HTMLElement {
   }
 }
 customElements.define("varmepilot-room-card-editor", VarmepilotRoomCardEditor);
+
+/* ---------- The ventilation: one slim line - the step the unit runs on, why, and what matters now.
+   "custom:varmepilot-vent-card". Turquoise when calm, yellow when a room's air is getting poor, blue in boost. ---------- */
+const VV_T = {
+  da: { title: "Ventilation", lv: { low: "Lav", normal: "Normal", high: "Høj", boost: "Boost" }, step: "TRIN", shadow: "skygge", rec: "{x} % genvundet",
+        why: { shower: "Bad i gang", damp: "Fugt fra madlavning", dust: "Støv i luften", co2: "CO₂ i {r}", humidity: "Fugt i {r}", free_cooling: "Køler huset",
+               away: "Ingen hjemme", night: "Stille om natten", save_heat: "Sparer på varmen", normal: "God luft" }, min: "{x} min",
+        boostT: "Boost kommer, når Varmepilot styrer ventilationen", agree: "{x} % enig med det, der styrer i dag", ok: "Luften er god i alle rum" },
+  en: { title: "Ventilation", lv: { low: "Low", normal: "Normal", high: "High", boost: "Boost" }, step: "STEP", shadow: "shadow", rec: "{x} % recovered",
+        why: { shower: "Shower running", damp: "Damp from cooking", dust: "Dust in the air", co2: "CO₂ in {r}", humidity: "Damp in {r}", free_cooling: "Cooling the house",
+               away: "Nobody home", night: "Quiet at night", save_heat: "Saving heat", normal: "Good air" }, min: "{x} min",
+        boostT: "Boost comes when Heat Pilot runs the ventilation", agree: "{x} % agree with what runs it today", ok: "The air is good in every room" },
+};
+const VV_FAN = '<path d="M12 12c0-3 1.5-6 4-6 2 0 2.5 2.5.5 3.5L12 12Zm0 0c3 0 6 1.5 6 4 0 2-2.5 2.5-3.5.5L12 12Zm0 0c0 3-1.5 6-4 6-2 0-2.5-2.5-.5-3.5L12 12Zm0 0c-3 0-6-1.5-6-4 0-2 2.5-2.5 3.5-.5L12 12Z"/>';
+class VarmepilotVentCard extends HTMLElement {
+  setConfig(config) { this.config = config || {}; this._open = false; }
+  getCardSize() { return 1; }
+  getGridOptions() { return { columns: 12, rows: 1, min_rows: 1 }; }
+  static getStubConfig() { return {}; }
+  set hass(hass) {
+    this._hass = hass;
+    const v = hass.states["sensor.varmepilot"]?.attributes?.vent;
+    const key = JSON.stringify([v, hass.themes?.darkMode, this._open]);
+    if (key === this._key) return;
+    this._key = key;
+    this._render(v);
+  }
+  _render(v) {
+    if (!this.shadowRoot) this.attachShadow({ mode: "open" });
+    const L = (this._hass.locale?.language || this._hass.language || "en").slice(0, 2), T = VV_T[L] || VV_T.en;
+    if (!v) { this.shadowRoot.innerHTML = `<ha-card><div style="padding:12px 16px;color:var(--secondary-text-color)">${T.title} …</div></ha-card>`; return; }
+    const strong = v.level === "boost" || v.level === "high", warn = (v.warn || []).length > 0;
+    const a = strong ? "#6ea8fe" : warn ? "#f5b544" : "#47c7d8";
+    const n = Math.max(1, Math.min(4, v.step || { low: 1, normal: 2, high: 3, boost: 4 }[v.current || v.level] || 1));
+    const spin = n >= 4 ? .5 : n === 3 ? .9 : n === 2 ? 2 : 4;
+    const lead = v.lead || {}, room = lead.name || "";
+    let why = (T.why[v.why] || v.why || "").replace("{r}", room.toLowerCase());
+    if (lead.minutes != null && (v.why === "shower" || v.why === "damp")) why += " · " + T.min.replace("{x}", lead.minutes);
+    const R = 15, c = 16, seg = (i) => { const p = (x) => [c + R * Math.cos(x), c + R * Math.sin(x)], a0 = Math.PI * .75 + Math.PI * 1.5 * i / 4 + .1, a1 = Math.PI * .75 + Math.PI * 1.5 * (i + 1) / 4 - .1;
+      const [x0, y0] = p(a0), [x1, y1] = p(a1); return `M${x0.toFixed(1)} ${y0.toFixed(1)} A${R} ${R} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`; };
+    const ring = `<svg class="ring" viewBox="0 0 32 32">${[0, 1, 2, 3].map((i) => `<path d="${seg(i)}" fill="none" stroke="${i < n ? "var(--a)" : "var(--sbg)"}" stroke-width="2.6" stroke-linecap="round"/>`).join("")}</svg>`;
+    const bars = [1, 2, 3, 4].map((k) => `<u class="${k <= n ? "l" : ""}" style="height:${4 + k * 2.5}px;animation-delay:${k * .12}s"></u>`).join("");
+    const chip = (t, k) => `<span class="chip" style="--k:${k}"><i></i>${t}</span>`;
+    const val = lead.value != null ? `${lead.value}${lead.unit === "%" ? " %" : " " + (lead.unit || "")}` : null;
+    const w0 = (v.warn || [])[0] || {};
+    const right = strong && val ? chip(val, v.why === "co2" ? "#f5b544" : "#ff6a4a")
+      : warn ? chip(w0.co2 != null && w0.co2 >= 1000 ? `${w0.co2} ppm` : `${w0.hum} %`, w0.air === "bad" ? "#ff6a4a" : "#f5b544")
+      : v.outdoor != null && v.supply != null ? `<span class="mini">${v.outdoor}° <s></s> ${v.supply}°${v.efficiency != null ? ` · ${v.efficiency} %` : ""}</span>` : "";
+    const air = strong ? `<svg class="air" viewBox="0 0 400 60" preserveAspectRatio="none">${[0, 1, 2].map((k) => `<path d="M-30 ${14 + k * 16} C 100 ${4 + k * 16}, 220 ${26 + k * 14}, 430 ${10 + k * 16}" style="animation-delay:${-k * .8}s"/>`).join("")}</svg>` : "";
+    const shadow = v.mode !== "control";
+    const open = this._open ? `<div class="more">${v.efficiency != null ? `<span>${v.outdoor}° → ${v.supply}° · ${T.rec.replace("{x}", v.efficiency)}</span>` : ""}
+      ${warn ? (v.warn || []).map((w) => chip(`${w.name} ${w.co2 != null && w.co2 >= 1000 ? w.co2 + " ppm" : w.hum + " %"}`, w.air === "bad" ? "#ff6a4a" : "#f5b544")).join("") : `<span>${T.ok}</span>`}
+      ${shadow && v.agree != null ? `<span>${T.agree.replace("{x}", v.agree)}</span>` : ""}</div>` : "";
+    this.shadowRoot.innerHTML = `<style>
+      :host { --a:${a}; --sbg:color-mix(in srgb, var(--primary-text-color) 9%, transparent); }
+      ha-card { position:relative; overflow:hidden; cursor:pointer; ${strong ? `background:radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--a) 28%, transparent), transparent 55%), radial-gradient(80% 140% at 100% 100%, color-mix(in srgb, var(--a) 12%, transparent), transparent 60%), var(--ha-card-background, var(--card-background-color));` : ""} }
+      .air { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+      .air path { fill:none; stroke:var(--a); stroke-width:2; stroke-linecap:round; opacity:.22; stroke-dasharray:70 330; animation:flow 2.4s linear infinite; }
+      @keyframes flow { from { stroke-dashoffset:400; } to { stroke-dashoffset:0; } }
+      .row { position:relative; display:flex; align-items:center; gap:10px; padding:7px 10px 7px 12px; min-height:46px; box-sizing:border-box; }
+      .fan { position:relative; width:32px; height:32px; flex:none; }
+      .ring { position:absolute; inset:0; }
+      .b { position:absolute; inset:8px; width:16px; height:16px; color:var(--a); animation:sp ${spin}s linear infinite; filter:drop-shadow(0 0 5px color-mix(in srgb, var(--a) 70%, transparent)); }
+      @keyframes sp { to { transform:rotate(360deg); } }
+      .txt { min-width:0; flex:1; }
+      .lv { font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+      .bars { display:inline-flex; align-items:flex-end; gap:2px; height:14px; }
+      .bars u { width:4px; border-radius:2px; background:var(--sbg); text-decoration:none; }
+      .bars u.l { background:var(--a); box-shadow:0 0 6px color-mix(in srgb, var(--a) 70%, transparent); animation:eq ${Math.max(.4, spin / 3)}s ease-in-out infinite alternate; }
+      @keyframes eq { to { opacity:.55; } }
+      .trin { font-size:10.5px; font-weight:750; color:var(--a); letter-spacing:.02em; }
+      .tag { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--a); background:color-mix(in srgb, var(--a) 15%, transparent); padding:2px 6px; border-radius:6px; }
+      .why { font-size:11.5px; color:var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .mini { font-size:11px; color:var(--secondary-text-color); white-space:nowrap; display:flex; align-items:center; gap:4px; }
+      .mini s { text-decoration:none; display:inline-block; width:14px; height:3px; border-radius:2px; background:linear-gradient(90deg,#6ea8fe,#f5b544); }
+      .chip { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:650; padding:3px 8px; border-radius:9px; white-space:nowrap; background:color-mix(in srgb, var(--k) 15%, transparent); }
+      .chip i { width:7px; height:7px; border-radius:50%; background:var(--k); box-shadow:0 0 6px var(--k); }
+      .bt { width:30px; height:30px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; background:var(--sbg); color:var(--secondary-text-color); border:0; padding:0; }
+      .bt.on { background:linear-gradient(135deg, var(--a), color-mix(in srgb, var(--a) 55%, #7b6dff)); color:#fff; box-shadow:0 3px 10px color-mix(in srgb, var(--a) 45%, transparent); }
+      .bt:disabled { opacity:.45; } .bt svg { width:15px; height:15px; fill:currentColor; }
+      .more { position:relative; display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; padding:0 12px 10px 54px; font-size:11.5px; color:var(--secondary-text-color); }
+      @media (prefers-reduced-motion: reduce) { .b, .bars u.l, .air path { animation:none; } }
+    </style><ha-card>${air}<div class="row">
+      <div class="fan">${ring}<svg class="b" viewBox="0 0 24 24" fill="currentColor">${VV_FAN}</svg></div>
+      <div class="txt"><div class="lv">${T.lv[v.current || v.level] || v.level}<span class="bars">${bars}</span><span class="trin">${T.step} ${n}</span>${shadow ? `<span class="tag">${T.shadow}</span>` : ""}</div><div class="why">${why}</div></div>
+      ${right}
+      <button class="bt ${strong ? "on" : ""}" ${shadow ? "disabled" : ""} title="${shadow ? T.boostT : ""}"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></button>
+    </div>${open}</ha-card>`;
+    this.shadowRoot.querySelector("ha-card").onclick = (e) => { if (e.target.closest(".bt")) return; this._open = !this._open; this._key = ""; this.hass = this._hass; };
+  }
+}
+customElements.define("varmepilot-vent-card", VarmepilotVentCard);
 window.customCards = window.customCards || [];
 window.customCards.push({ type: "varmepilot-card", name: "Varmepilot", description: "All rooms at a glance" },
-                        { type: "varmepilot-room-card", name: "Varmepilot – room", description: "One room: temperature, boost and + / −", preview: true });
+                        { type: "varmepilot-room-card", name: "Varmepilot – room", description: "One room: temperature, boost and + / −", preview: true },
+                        { type: "varmepilot-vent-card", name: "Varmepilot – ventilation", description: "The ventilation in one line: the step, why and what matters now", preview: true });
