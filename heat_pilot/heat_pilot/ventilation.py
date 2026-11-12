@@ -70,10 +70,29 @@ def find(entities: list[dict[str, Any]], devices: list[dict[str, Any]], states: 
         out = {"device": dev, "name": d.get("name_by_user") or d.get("name") or "Ventilation", "model": d.get("model"),
                "manufacturer": d.get("manufacturer"), "platform": plat, **found,
                "level_select": levels[0] if levels else None, "fan": fans[0] if fans else None,
-               "bypass": next((x for x in ids if BYPASS.search(x) and x.split(".")[0] in ("cover", "binary_sensor", "sensor")), None)}
+               "bypass": next((x for x in ids if BYPASS.search(x) and x.split(".")[0] in ("cover", "binary_sensor", "sensor")), None),
+               "mode_select": next((x for x in ids if x.startswith("select.") and _is_mode(states[x])), None)}
         if best is None or plat in VENT_PLATFORMS:
             best = out
     return best
+
+
+def _is_mode(s: dict[str, Any]) -> bool:
+    """The unit's own operating mode: a list with manual and automatic in it (Dantherm, Nilan, Komfovent …)."""
+    opts = [str(o).lower() for o in (s.get("attributes") or {}).get("options") or []]
+    return "manual" in opts and any(o in opts for o in ("automatic", "auto"))
+
+
+PAUSE_MODES = ("fireplace", "standby", "away", "summer", "week_program")  # chosen on the unit: left alone
+
+
+def mode_now(unit: dict[str, Any], states: dict[str, Any]) -> str | None:
+    return (states.get(unit.get("mode_select") or "") or {}).get("state")
+
+
+def auto_option(unit: dict[str, Any], states: dict[str, Any]) -> str | None:
+    opts = [str(o) for o in ((states.get(unit.get("mode_select") or "") or {}).get("attributes") or {}).get("options") or []]
+    return next((o for o in opts if o.lower() in ("automatic", "auto")), None)
 
 
 def _numeric_options(s: dict[str, Any]) -> list[int]:
@@ -150,6 +169,31 @@ def level_value(unit: dict[str, Any], states: dict[str, Any], level: str) -> Any
 
 
 def calls(unit: dict[str, Any], states: dict[str, Any], level: str) -> list[dict[str, Any]]:
+    """What to send for this level - only what isn't so already. A unit with its own mode is put in manual first."""
+    v = level_value(unit, states, level)
+    out = []
+    ms = unit.get("mode_select")
+    if ms and str((states.get(ms) or {}).get("state")).lower() != "manual":
+        out.append({"domain": "select", "service": "select_option", "data": {"entity_id": ms, "option": "manual"}})
+    if unit.get("level_select"):
+        if str((states.get(unit["level_select"]) or {}).get("state")) != str(v):
+            out.append({"domain": "select", "service": "select_option", "data": {"entity_id": unit["level_select"], "option": v}})
+        return out
+    p = ((states.get(unit.get("fan") or "") or {}).get("attributes") or {}).get("percentage")
+    if p is None or abs(float(p) - float(v)) > 3:
+        out.append({"domain": "fan", "service": "set_percentage", "data": {"entity_id": unit["fan"], "percentage": v}})
+    return out
+
+
+def handback_calls(unit: dict[str, Any], states: dict[str, Any]) -> list[dict[str, Any]]:
+    """Heat Pilot lets go: the unit back to its own automatic mode (when it has one)."""
+    opt = auto_option(unit, states)
+    if unit.get("mode_select") and opt:
+        return [{"domain": "select", "service": "select_option", "data": {"entity_id": unit["mode_select"], "option": opt}}]
+    return []
+
+
+def _old_calls(unit: dict[str, Any], states: dict[str, Any], level: str) -> list[dict[str, Any]]:
     v = level_value(unit, states, level)
     if unit.get("level_select"):
         return [{"domain": "select", "service": "select_option", "data": {"entity_id": unit["level_select"], "option": v}}]

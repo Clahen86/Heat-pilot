@@ -315,11 +315,13 @@ customElements.define("varmepilot-room-card-editor", VarmepilotRoomCardEditor);
 const VV_T = {
   da: { title: "Ventilation", lv: { low: "Lav", normal: "Normal", high: "Høj", boost: "Boost" }, step: "TRIN", shadow: "skygge", rec: "{x} % genvundet",
         why: { shower: "Bad i gang", damp: "Fugt fra madlavning", dust: "Støv i luften", co2: "CO₂ i {r}", humidity: "Fugt i {r}", free_cooling: "Køler huset",
-               away: "Ingen hjemme", night: "Stille om natten", save_heat: "Sparer på varmen", normal: "God luft" }, min: "{x} min",
+               away: "Ingen hjemme", night: "Stille om natten", save_heat: "Sparer på varmen", normal: "God luft", precool: "Forkøler før en varm dag",
+               card_boost: "Boost fra kortet", card_away: "Ude", manual: "Skruet på anlægget", unit_mode: "Anlæggets egen tilstand" }, min: "{x} min", away: "Ude", auto: "Auto",
         boostT: "Boost kommer, når Varmepilot styrer ventilationen", would: "Varmepilot ville: {x}", agree: "{x} % enig med det, der styrer i dag", ok: "Luften er god i alle rum" },
   en: { title: "Ventilation", lv: { low: "Low", normal: "Normal", high: "High", boost: "Boost" }, step: "STEP", shadow: "shadow", rec: "{x} % recovered",
         why: { shower: "Shower running", damp: "Damp from cooking", dust: "Dust in the air", co2: "CO₂ in {r}", humidity: "Damp in {r}", free_cooling: "Cooling the house",
-               away: "Nobody home", night: "Quiet at night", save_heat: "Saving heat", normal: "Good air" }, min: "{x} min",
+               away: "Nobody home", night: "Quiet at night", save_heat: "Saving heat", normal: "Good air", precool: "Pre-cooling before a warm day",
+               card_boost: "Boost from the card", card_away: "Away", manual: "Turned on the unit", unit_mode: "The unit's own mode" }, min: "{x} min", away: "Away", auto: "Auto",
         boostT: "Boost comes when Heat Pilot runs the ventilation", would: "Heat Pilot would: {x}", agree: "{x} % agree with what runs it today", ok: "The air is good in every room" },
 };
 const VV_FAN = '<path d="M12 12c0-3 1.5-6 4-6 2 0 2.5 2.5.5 3.5L12 12Zm0 0c3 0 6 1.5 6 4 0 2-2.5 2.5-3.5.5L12 12Zm0 0c0 3-1.5 6-4 6-2 0-2.5-2.5-.5-3.5L12 12Zm0 0c-3 0-6-1.5-6-4 0-2 2.5-2.5 3.5-.5L12 12Z"/>';
@@ -361,7 +363,8 @@ class VarmepilotVentCard extends HTMLElement {
       : v.outdoor != null && v.supply != null ? `<span class="mini">${v.outdoor}° <s></s> ${v.supply}°${v.efficiency != null ? ` · ${v.efficiency} %` : ""}</span>` : "";
     const air = strong ? `<svg class="air" viewBox="0 0 400 60" preserveAspectRatio="none">${[0, 1, 2].map((k) => `<path d="M-30 ${14 + k * 16} C 100 ${4 + k * 16}, 220 ${26 + k * 14}, 430 ${10 + k * 16}" style="animation-delay:${-k * .8}s"/>`).join("")}</svg>` : "";
     const shadow = v.mode !== "control";
-    const open = this._open ? `<div class="more">${v.efficiency != null ? `<span>${v.outdoor}° → ${v.supply}° · ${T.rec.replace("{x}", v.efficiency)}</span>` : ""}
+    const btns = !shadow ? `<span class="seg"><b data-v="away" class="${v.hold === "card_away" ? "on" : ""}">${T.away}</b><b data-v="auto" class="${!v.hold ? "on" : ""}">${T.auto}</b></span>` : "";
+    const open = this._open ? `<div class="more">${btns}${v.efficiency != null ? `<span>${v.outdoor}° → ${v.supply}° · ${T.rec.replace("{x}", v.efficiency)}</span>` : ""}
       ${warn ? (v.warn || []).map((w) => chip(`${w.name} ${w.co2 != null && w.co2 >= 1000 ? w.co2 + " ppm" : w.hum + " %"}`, w.air === "bad" ? "#ff6a4a" : "#f5b544")).join("") : `<span>${T.ok}</span>`}
       ${shadow && v.agree != null ? `<span>${T.agree.replace("{x}", v.agree)}</span>` : ""}</div>` : "";
     this.shadowRoot.innerHTML = `<style>
@@ -391,6 +394,8 @@ class VarmepilotVentCard extends HTMLElement {
       .bt { width:30px; height:30px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; background:var(--sbg); color:var(--secondary-text-color); border:0; padding:0; }
       .bt.on { background:linear-gradient(135deg, var(--a), color-mix(in srgb, var(--a) 55%, #7b6dff)); color:#fff; box-shadow:0 3px 10px color-mix(in srgb, var(--a) 45%, transparent); }
       .bt:disabled { opacity:.45; } .bt svg { width:15px; height:15px; fill:currentColor; }
+      .seg { display:inline-flex; gap:2px; background:var(--sbg); border-radius:9px; padding:2px; } .seg b { padding:4px 10px; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; }
+      .seg b.on { background:var(--a); color:#fff; }
       .more { position:relative; display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; padding:0 12px 10px 54px; font-size:11.5px; color:var(--secondary-text-color); }
       @media (prefers-reduced-motion: reduce) { .b, .bars u.l, .air path { animation:none; } }
     </style><ha-card>${air}<div class="row">
@@ -399,7 +404,11 @@ class VarmepilotVentCard extends HTMLElement {
       ${right}
       <button class="bt ${strong ? "on" : ""}" ${shadow ? "disabled" : ""} title="${shadow ? T.boostT : ""}"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></button>
     </div>${open}</ha-card>`;
-    this.shadowRoot.querySelector("ha-card").onclick = (e) => { if (e.target.closest(".bt")) return; this._open = !this._open; this._key = ""; this.hass = this._hass; };
+    const send = (action) => this._hass.callService("heat_pilot", "ventilation", { action });
+    const bt = this.shadowRoot.querySelector(".bt");
+    if (bt && !shadow) bt.onclick = (e) => { e.stopPropagation(); send(v.hold === "card_boost" ? "auto" : "boost"); };
+    this.shadowRoot.querySelectorAll("[data-v]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); send(b.dataset.v); });
+    this.shadowRoot.querySelector("ha-card").onclick = (e) => { if (e.target.closest(".bt") || e.target.closest("[data-v]")) return; this._open = !this._open; this._key = ""; this.hass = this._hass; };
   }
 }
 customElements.define("varmepilot-vent-card", VarmepilotVentCard);

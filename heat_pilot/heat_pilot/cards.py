@@ -84,7 +84,8 @@ class Publisher:
             attrs["vent"] = {"level": v.get("level"), "why": v.get("why"), "current": v.get("current"), "step": v.get("step"),
                              "steps": v.get("steps"), "lead": v.get("lead"), "efficiency": v.get("efficiency"), "cooling": v.get("cooling"),
                              "outdoor": r0(t.get("outdoor")), "supply": r0(t.get("supply")), "name": v.get("name"),
-                             "agree": v.get("agree"), "mode": "shadow", "warn": warn[:3]}
+                             "agree": v.get("agree"), "mode": v.get("mode") or "shadow", "warn": warn[:3],
+                             "hold": v.get("why") if str(v.get("why") or "").startswith("card_") else None}
         key = json.dumps([{k: v for k, v in r.items() if k not in ("temp", "plan")} for r in rooms] + [attrs.get("vent")]
                          + [[(r["plan"] or [[None]])[0][0] for r in rooms], attrs["sentence"], attrs["alerts"]], sort_keys=True, default=str)
         if key == self._last and SENSOR in ha.states:

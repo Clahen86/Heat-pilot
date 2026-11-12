@@ -30,3 +30,13 @@ resume:
       required: true
       selector:
         area:
+ventilation:
+  fields:
+    action:
+      required: true
+      selector:
+        select:
+          options: ["boost", "away", "auto"]
+    minutes:
+      selector:
+        number: { min: 5, max: 1440, unit_of_measurement: min }

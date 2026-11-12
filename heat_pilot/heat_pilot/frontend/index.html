@@ -433,12 +433,18 @@ function seasonOf(now) {
   return ["winter", "bare"];
 }
 
+const VC_T = {
+  da: { t: "Styr ventilationen", shadow: "Skygge", control: "Styrer", off: "Skygge: viser, hvad den ville gøre – anlægget styres af noget andet", on: "Varmepilot styrer anlægget – slår du skygge til igen, får anlægget sin egen automatik tilbage",
+        q: "Lad Varmepilot styre ventilationen? Sæt din egen styring (fx AppDaemon) på pause først, så kun én styrer." },
+  en: { t: "Run the ventilation", shadow: "Shadow", control: "Control", off: "Shadow: shows what it would do – something else runs the unit", on: "Heat Pilot runs the unit – back to shadow gives the unit its own automatic mode back",
+        q: "Let Heat Pilot run the ventilation? Pause your own control (e.g. AppDaemon) first, so only one runs it." },
+};
 /* ---------- the ventilation in the house: the unit in the attic, the air's colour in each room, and why ---------- */
 const VT = {
   da: { low: "Lav", normal: "Normal", high: "Høj", boost: "Boost", shower: "bad i gang", damp: "fugt fra madlavning", dust: "støv i luften", co2: "CO₂ i {r}",
-        humidity: "fugt i {r}", free_cooling: "køler huset", away: "ingen hjemme", night: "stille om natten", save_heat: "sparer på varmen", ok: "luften er god", rec: "{x} % varme genvundet", shadow: "skygge", agree: "{x} % enig" },
+        humidity: "fugt i {r}", free_cooling: "køler huset", away: "ingen hjemme", night: "stille om natten", save_heat: "sparer på varmen", precool: "forkøler før en varm dag", card_boost: "boost fra kortet", card_away: "ude", manual: "skruet på anlægget", unit_mode: "anlæggets egen tilstand", ok: "luften er god", rec: "{x} % varme genvundet", shadow: "skygge", agree: "{x} % enig" },
   en: { low: "Low", normal: "Normal", high: "High", boost: "Boost", shower: "shower running", damp: "damp from cooking", dust: "dust in the air", co2: "CO₂ in {r}",
-        humidity: "damp in {r}", free_cooling: "cooling the house", away: "nobody home", night: "quiet at night", save_heat: "saving heat", ok: "the air is good", rec: "{x} % heat recovered", shadow: "shadow", agree: "{x} % agree" },
+        humidity: "damp in {r}", free_cooling: "cooling the house", away: "nobody home", night: "quiet at night", save_heat: "saving heat", precool: "pre-cooling before a warm day", card_boost: "boost from the card", card_away: "away", manual: "turned on the unit", unit_mode: "the unit's own mode", ok: "the air is good", rec: "{x} % heat recovered", shadow: "shadow", agree: "{x} % agree" },
 };
 function ventLayer(o) {
   const v = data.vent, out = { defs: "", attic: "", over: "" };
@@ -866,7 +872,9 @@ function render() {
       ${nCtl ? `<p class="muted" style="margin:-4px 0 4px">${T.controlling.replace("{n}", nCtl)}</p><button class="btn ghost" id="allshadow">${T.allShadow}</button>`
         : `<p class="muted" style="margin:-4px 0 4px">${T.heroP}</p><button class="btn" id="allcontrol">${T.ctlHouse}</button><p class="muted" style="margin-top:8px">${T.ctlHouseH}</p>`}
       ${nCtl && (data.sent || []).length ? `<details class="adj" style="margin-top:12px"><summary>${T.sentT}</summary><div class="calls">${data.sent.map((x) => `${hhmm(x.t)} ${x.ok ? "✓" : "✗"} ${esc(x.call)} ${esc(x.data.entity_id || "")} ${x.data.temperature ?? x.data.hvac_mode ?? x.data.preset_mode ?? ""}`).join("\n")}</div></details>` : ""}</div>`;
-    const vent = f.ventilation && f.ventilation.on ? `<div class="row"><div class="t"><b>${T.vCool}</b><span>${T.vCoolH}</span></div><select data-vcool><option value="">${T.vNone}</option>${(data.cooling_options || []).map((o) => `<option value="${esc(o.entity_id)}" ${data.ventilation.cooling_entity === o.entity_id ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select></div>` : "";
+    const VC = VC_T[L] || VC_T.en, vmode = (data.ventilation || {}).mode || "shadow";
+    const vctl = data.vent ? `<div class="row"><div class="t"><b>${VC.t}</b><span>${vmode === "control" ? VC.on : VC.off}</span></div><div class="seg">${["shadow", "control"].map((m) => `<button class="${vmode === m ? "on" : ""}" data-vmode="${m}">${VC[m]}</button>`).join("")}</div></div>` : "";
+    const vent = vctl + (f.ventilation && f.ventilation.on ? `<div class="row"><div class="t"><b>${T.vCool}</b><span>${T.vCoolH}</span></div><select data-vcool><option value="">${T.vNone}</option>${(data.cooling_options || []).map((o) => `<option value="${esc(o.entity_id)}" ${data.ventilation.cooling_entity === o.entity_id ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select></div>` : "");
     const dh = f.district && f.district.on ? `<details class="adj"><summary>${T.dhTitle} – ${T.adjust.toLowerCase()}</summary>
         <div class="row"><div class="t"><b>${T.dhSet}</b><span>${T.dhSetH}</span></div><input class="num" type="number" step="1" data-dh="need" value="${data.district.need ?? 25}"></div>
         <div class="row"><div class="t"><b>${T.dhPen}</b><span>${T.dhUnit}</span></div><input class="num" type="number" step="0.01" data-dh="penalty" value="${data.district.penalty ?? ""}"></div>
@@ -896,6 +904,9 @@ function render() {
   document.querySelectorAll("[data-mnight]").forEach((b) => b.onclick = async () => { await api("/api/messages", { night: !b.classList.contains("on") }); load(); });
   document.querySelectorAll("[data-mrestart]").forEach((b) => b.onclick = async () => { await api("/api/messages", { restart: !b.classList.contains("on") }); load(); });
   document.querySelectorAll("[data-mkind]").forEach((b) => b.onclick = async () => { await api("/api/messages", { kind: b.dataset.mkind, on: !b.classList.contains("on") }); load(); });
+  document.querySelectorAll("[data-vmode]").forEach((b) => b.onclick = async () => {
+    if (b.dataset.vmode === "control" && !confirm((VC_T[L] || VC_T.en).q)) return;
+    await api("/api/ventilation", { mode: b.dataset.vmode }); load(); });
   document.querySelectorAll("[data-vcool]").forEach((el) => el.onchange = async () => { await api("/api/ventilation", { cooling_entity: el.value || null }); load(); });
   document.querySelectorAll("[data-dh]").forEach((el) => el.onchange = async () => { await api("/api/district", { [el.dataset.dh]: el.value === "" ? null : Number(el.value.replace(",", ".")) }); load(); });
   document.querySelectorAll("[data-feat]").forEach((b) => b.onclick = async () => { await api("/api/feature", { key: b.dataset.feat, on: !b.classList.contains("on") }); load(); });

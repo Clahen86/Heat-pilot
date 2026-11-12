@@ -3,6 +3,7 @@
 heat_pilot.boost        - a room warmer for a while (60 min)
 heat_pilot.set_temperature - a temperature, or a step up/down from now, for a while
 heat_pilot.resume       - back to the plan now
+heat_pilot.ventilation  - the ventilation: boost for a while, low while away, or back to auto
 Kept apart from turning a thermostat by hand, so Heat Pilot never learns from them.
 """
 
@@ -29,6 +30,8 @@ SCHEMAS = {
                                    vol.Exclusive("step", "how"): vol.Coerce(float),
                                    vol.Optional("minutes", default=60): vol.All(vol.Coerce(float), vol.Range(min=5, max=720))}),
     "resume": vol.Schema({AREA: cv.string}),
+    "ventilation": vol.Schema({vol.Required("action"): vol.In(["boost", "away", "auto"]),
+                               vol.Optional("minutes"): vol.All(vol.Coerce(float), vol.Range(min=5, max=1440))}),
 }
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -39,6 +42,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def call(service: ServiceCall) -> None:
         body = dict(service.data)
+        if service.service == "ventilation":
+            try:
+                async with session.post(f"{url}/api/ventilation", json={"hold": body["action"], "minutes": body.get("minutes")},
+                                        timeout=aiohttp.ClientTimeout(total=20)) as r:
+                    r.raise_for_status()
+            except (aiohttp.ClientError, TimeoutError) as err:
+                raise HomeAssistantError(f"Varmepilot isn't answering: {err}") from err
+            return
         if service.service == "boost":
             body["boost"] = True
         elif service.service == "resume":

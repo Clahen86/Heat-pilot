@@ -124,7 +124,8 @@ class AirWatch:
 
 def decide(rooms: list[dict[str, Any]], states: dict[str, Any], watch: AirWatch, now: datetime, *, away: bool,
            house_temp: float | None, comfort: float, outdoor: float | None, outdoor_dp: float | None,
-           own: dict[str, dict[str, Any]] | None = None, params: dict[str, Any] | None = None) -> dict[str, Any]:
+           own: dict[str, dict[str, Any]] | None = None, params: dict[str, Any] | None = None,
+           tomorrow_max: float | None = None) -> dict[str, Any]:
     """{"level", "why", "lead": {area_id, name, value, unit, minutes} | None, "cooling"}."""
     own = own or {}
     pr = params or {}
@@ -185,6 +186,11 @@ def decide(rooms: list[dict[str, Any]], states: dict[str, Any], watch: AirWatch,
     # 5. Free cooling: the house is warm and the evening outside is cool.
     if house_temp is not None and outdoor is not None and house_temp >= comfort + 2 and 10 <= outdoor <= house_temp - 3:
         return pick("high", "free_cooling", cooling=True)
+    # 6. A warm day tomorrow: cool the house down through the night while the air outside is cool.
+    warm_day = float(pr.get("warm_day") or 24.0)
+    if tomorrow_max is not None and tomorrow_max >= warm_day and (now.hour >= 22 or now.hour < 7) and house_temp is not None \
+            and house_temp >= comfort - 0.5 and outdoor is not None and outdoor <= house_temp - 3:
+        return pick("high", "precool", cooling=True)
     if away:
         return pick("low", "away")
     if now.hour >= 23 or now.hour < 6:
@@ -198,7 +204,7 @@ def params_from_appdaemon(states: dict[str, Any]) -> dict[str, Any]:
     """An AppDaemon indoor-climate app already learned this house's limits: start from them."""
     a = (states.get("sensor.indeklima_learning") or {}).get("attributes") or {}
     out = {}
-    for mine, theirs in (("co2_boost", "co2_boost"), ("humidity_rise", "humidity_rise_pct"), ("pm25_boost", "pm25_boost")):
+    for mine, theirs in (("co2_boost", "co2_boost"), ("humidity_rise", "humidity_rise_pct"), ("pm25_boost", "pm25_boost"), ("warm_day", "warm_day_temp")):
         try:
             if a.get(theirs) is not None:
                 out[mine] = float(a[theirs])

@@ -303,6 +303,19 @@ class Pilot:
             steps = {th["entity_id"]: float(((self.ha.states.get(th["entity_id"]) or {}).get("attributes") or {}).get("target_temp_step") or 0.5)
                      for th in r["thermostats"]}
             todo += self.sender.due(calls, self.ha.states, gaps, now, steps)
+        vn, vs = getattr(self, "vent_now", None), self.settings.get("ventilation") or {}
+        if self.vent and vn and vs.get("mode") == "control" and not vn.get("paused"):
+            vcalls = vn.get("calls") or []
+            last = getattr(self, "vent_last_call", None)
+            if vcalls and not (last and (now - last).total_seconds() < 120):  # a unit isn't written more than every two minutes
+                todo += vcalls
+                self.vent_last_call = now
+                lv = next((c["data"].get("option") for c in vcalls if c["data"].get("entity_id") == self.vent.get("level_select")), None)
+                if lv is not None:
+                    self.vent_sent = (str(lv), now)
+        if self.vent and getattr(self, "vent_handback", False):
+            todo += ventilation.handback_calls(self.vent, self.ha.states)
+            self.vent_handback = False
         if todo:
             await self.sender.send(self.ha, todo, now, lambda e, v, t: self.watch.wrote(e, self.c(v) or v, t))
         if self.settings.get("watchdog_restart"):  # the radio drops commands: restart it (at most every 2 hours)
@@ -435,7 +448,24 @@ class Pilot:
                                 house_temp=sum(temps) / len(temps) if temps else None,
                                 comfort=sum(comforts) / len(comforts) if comforts else 21.0, outdoor=outdoor_now,
                                 outdoor_dp=air.outdoor_dewpoint(st), own=own_rooms,
-                                params={**air.params_from_appdaemon(st), **((self.settings.get("ventilation") or {}).get("params") or {})})
+                                params={**air.params_from_appdaemon(st), **((self.settings.get("ventilation") or {}).get("params") or {})},
+                                tomorrow_max=max((t for w, t, _c in self.forecast if now + timedelta(hours=6) <= w <= now + timedelta(hours=24)), default=None))
+            vs = self.settings.get("ventilation") or {}
+            hold = vs.get("hold")
+            if hold and datetime.fromisoformat(hold["until"]) > now:
+                want_v = {**want_v, "level": hold["level"], "why": hold["why"], "until": hold["until"]}
+            elif hold:
+                vs["hold"] = None
+            # someone turned the unit by hand (not what Heat Pilot sent): leave it for two hours
+            lvl_now = (st.get(self.vent.get("level_select") or "") or {}).get("state")
+            sent = getattr(self, "vent_sent", None)
+            if vs.get("mode") == "control" and sent and lvl_now not in (None, sent[0]) and (now - sent[1]).total_seconds() > 180:
+                self.vent_manual_until = now + timedelta(hours=2)
+                self.vent_sent = (lvl_now, now)
+            if getattr(self, "vent_manual_until", None) and now < self.vent_manual_until:
+                want_v = {**want_v, "why": "manual", "paused": True}
+            if str(ventilation.mode_now(self.vent, st) or "").lower() in ventilation.PAUSE_MODES:
+                want_v = {**want_v, "why": "unit_mode", "paused": True}  # fireplace, away … chosen on the unit
             cur = ventilation.current_level(self.vent, st)
             # how often it agrees with what runs the unit today (shadow): a slowly fading count, so last week weighs most
             va = self.settings.setdefault("vent_agree", {"same": 0.0, "checks": 0.0})
@@ -444,6 +474,7 @@ class Pilot:
                 va["same"] = va["same"] * 0.9995 + (cur == want_v["level"])
             step, steps = ventilation.current_step(self.vent, st)
             self.vent_now = {**want_v, "current": cur, "same": cur == want_v["level"], "step": step, "steps": steps,
+                             "mode": vs.get("mode") or "shadow",
                              "agree": round(100 * va["same"] / va["checks"]) if va["checks"] >= 30 else None, "efficiency": ventilation.efficiency(self.vent, st),
                              "bypass": ventilation.bypass_open(self.vent, st), "calls": ventilation.calls(self.vent, st, want_v["level"]),
                              "temps": {k: self.sensor_c(self.vent.get(k)) for k in ("outdoor", "supply", "extract", "exhaust")},
@@ -682,6 +713,16 @@ class Pilot:
 
     def set_ventilation(self, values: dict[str, Any]) -> None:
         v = self.settings.setdefault("ventilation", {})
+        if values.get("mode") in ("shadow", "control"):
+            if v.get("mode") == "control" and values["mode"] == "shadow":
+                self.vent_handback = True  # give the unit back to its own automatic mode
+            v["mode"] = values["mode"]
+        if values.get("hold") in ("boost", "away", "auto"):
+            # the card's buttons: boost for a while, low while away, or back to Heat Pilot's own choice
+            tz = ZoneInfo(self.ha.config.get("time_zone") or "UTC")
+            mins = float(values.get("minutes") or (30 if values["hold"] == "boost" else 720))
+            v["hold"] = None if values["hold"] == "auto" else {"level": "boost" if values["hold"] == "boost" else "low", "why": "card_" + values["hold"],
+                                                              "until": (datetime.now(tz) + timedelta(minutes=mins)).isoformat()}
         if "cooling_entity" in values:
             if values["cooling_entity"]:
                 v["cooling_entity"] = str(values["cooling_entity"])
