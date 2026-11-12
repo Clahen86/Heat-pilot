@@ -18,7 +18,7 @@ from .control import Sender, exercise_now
 from .learning import Learning, Model, seed
 
 _LOGGER = logging.getLogger(__name__)
-ROOM_KEYS = {"doors_extra", "evening", "evening_from", "evening_to", "price_flex", "kind", "heating", "temp_sensor", "comfort", "setback", "night", "away", "day_from", "day_to", "excluded", "fixed_hours", "owner"}
+ROOM_KEYS = {"no_learning", "doors_extra", "evening", "evening_from", "evening_to", "price_flex", "kind", "heating", "temp_sensor", "comfort", "setback", "night", "away", "day_from", "day_to", "excluded", "fixed_hours", "owner"}
 
 
 def f_to_c(v: float) -> float:
@@ -204,7 +204,7 @@ class Pilot:
             own = (self.settings.get("rooms") or {}).get(r["area_id"]) or {}
             room = {**r, **{k: v for k, v in own.items() if k in ("kind", "heating", "temp_sensor", "excluded")}}
             room["cfg"] = {**plan.defaults(room), **{k: v for k, v in own.items() if k in ROOM_KEYS - {"kind", "heating", "temp_sensor", "excluded", "fixed_hours", "owner", "doors_extra"}}}
-            if "comfort" not in own and (learned := self.model.comfort(r["area_id"])) is not None:
+            if "comfort" not in own and not own.get("no_learning") and (learned := self.model.comfort(r["area_id"])) is not None:
                 room["cfg"]["comfort"] = learned
                 room["comfort_learned"] = True
             room["fixed_hours"] = bool(own.get("fixed_hours"))
@@ -433,7 +433,9 @@ class Pilot:
             a_id = r["area_id"]
             temp = self.room_temp(r)
             rate, _n = self.learning.rate(a_id, r["heating"], outdoor)
-            own_hours = bool((self.settings.get("rooms") or {}).get(a_id, {}).get("fixed_hours"))
+            own = (self.settings.get("rooms") or {}).get(a_id, {})
+            no_learn = bool(own.get("no_learning"))  # a room hardly used: its own hours and comfort, nothing learned
+            own_hours = bool(own.get("fixed_hours")) or no_learn
             by_day = {d: (None if own_hours else self.learning.hours(a_id, d)) for d in range(7)}
             moving = any((st.get(p) or {}).get("state") == "on" or self._recent_on(st.get(p), now) for p in r["presence"])
             heating_now = any((st.get(th["entity_id"]) or {}).get("attributes", {}).get("hvac_action") == "heating" for th in r["thermostats"])
@@ -467,7 +469,7 @@ class Pilot:
                                on["shower"] and self.watch.shower(a_id, now), on["sun"] and self.watch.sun_warms(r, st, now),
                                is_summer, holiday, bool(on["people"] and people.owners_away(st, r.get("owner"))),
                                bool(coming), level if supply.is_electric(r) else None, spread, cooling, extra)
-            if manual and r["cfg"].get("comfort") and plan.NIGHT_TO <= now.hour < plan.NIGHT_FROM and not self.watch.manual.get(a_id, {}).get("learned") \
+            if manual and r["cfg"].get("comfort") and plan.NIGHT_TO <= now.hour < plan.NIGHT_FROM and not no_learn and not self.watch.manual.get(a_id, {}).get("learned") \
                     and not self.watch.manual.get(a_id, {}).get("card"):  # boost and +/- on the card: never learned from
                 self.model.learn_comfort(a_id, manual["temp"], r["cfg"]["comfort"])  # turned by hand: comfort moves a little
                 self.watch.manual[a_id]["learned"] = True
