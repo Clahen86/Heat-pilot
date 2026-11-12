@@ -831,6 +831,9 @@ function guide() {
   };
 }
 let shownTab = null;  // fade in only when a page is opened - not when the numbers refresh every 30 s
+let lastPageKey = "";
+// the same page without the animations' start points (they follow the clock, so they differ every time)
+const stableKey = (h) => h.replace(/animation-delay:\s*-?[\d.]+s;?/g, "");
 function render() {
   const app = document.getElementById("app");
   if (!data) return;
@@ -875,7 +878,15 @@ function render() {
       + `<details class="grp" data-g="msg" ${grpOpen.msg ? "open" : ""}><summary><div><b>${T.mTitle}</b><br><span>${T.gMsgH}</span></div></summary><div class="gin">${msgCard().replace('<div class="card">', "<div>")}</div></details>`;
   }
   else body = nowTab(rooms);
-  app.innerHTML = tabs + body;
+  // Every 30 s new numbers arrive: change only what changed. The painted house is kept as it is when nothing in it
+  // changed (redrawing it makes a phone flash), and the page isn't touched at all when nothing changed anywhere.
+  const html = tabs + body, key = stableKey(html);
+  if (key === lastPageKey && app.childElementCount) return;
+  lastPageKey = key;
+  const oldHouse = app.querySelector(".card.house");
+  app.innerHTML = html;
+  const newHouse = app.querySelector(".card.house");
+  if (oldHouse && newHouse && stableKey(oldHouse.innerHTML) === stableKey(newHouse.innerHTML)) newHouse.replaceWith(oldHouse);
   document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; location.hash = tab; render(); });
   document.querySelectorAll("[data-room]").forEach((el) => el.onclick = () => openRoom(el.dataset.room));
   const ash = document.getElementById("allshadow"); if (ash) ash.onclick = async () => { await api("/api/mode", { area_id: null, mode: "shadow" }); load(); };
