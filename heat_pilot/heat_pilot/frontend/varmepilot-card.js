@@ -113,7 +113,7 @@ class VarmepilotRoomCard extends HTMLElement {
     this._hist = null; this._histAt = 0; this._key = null;
   }
   getCardSize() { return 7; }
-  getGridOptions() { return { columns: 6, rows: "auto", min_columns: 4 }; }
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }  // full width of a section by default
   static getStubConfig(hass) {
     const r = (hass?.states["sensor.varmepilot"]?.attributes?.rooms || [])[0];
     return { area: r ? r.area_id : "" };
