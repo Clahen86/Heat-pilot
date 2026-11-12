@@ -316,11 +316,11 @@ const VV_T = {
   da: { title: "Ventilation", lv: { low: "Lav", normal: "Normal", high: "Høj", boost: "Boost" }, step: "TRIN", shadow: "skygge", rec: "{x} % genvundet",
         why: { shower: "Bad i gang", damp: "Fugt fra madlavning", dust: "Støv i luften", co2: "CO₂ i {r}", humidity: "Fugt i {r}", free_cooling: "Køler huset",
                away: "Ingen hjemme", night: "Stille om natten", save_heat: "Sparer på varmen", normal: "God luft" }, min: "{x} min",
-        boostT: "Boost kommer, når Varmepilot styrer ventilationen", agree: "{x} % enig med det, der styrer i dag", ok: "Luften er god i alle rum" },
+        boostT: "Boost kommer, når Varmepilot styrer ventilationen", would: "Varmepilot ville: {x}", agree: "{x} % enig med det, der styrer i dag", ok: "Luften er god i alle rum" },
   en: { title: "Ventilation", lv: { low: "Low", normal: "Normal", high: "High", boost: "Boost" }, step: "STEP", shadow: "shadow", rec: "{x} % recovered",
         why: { shower: "Shower running", damp: "Damp from cooking", dust: "Dust in the air", co2: "CO₂ in {r}", humidity: "Damp in {r}", free_cooling: "Cooling the house",
                away: "Nobody home", night: "Quiet at night", save_heat: "Saving heat", normal: "Good air" }, min: "{x} min",
-        boostT: "Boost comes when Heat Pilot runs the ventilation", agree: "{x} % agree with what runs it today", ok: "The air is good in every room" },
+        boostT: "Boost comes when Heat Pilot runs the ventilation", would: "Heat Pilot would: {x}", agree: "{x} % agree with what runs it today", ok: "The air is good in every room" },
 };
 const VV_FAN = '<path d="M12 12c0-3 1.5-6 4-6 2 0 2.5 2.5.5 3.5L12 12Zm0 0c3 0 6 1.5 6 4 0 2-2.5 2.5-3.5.5L12 12Zm0 0c0 3-1.5 6-4 6-2 0-2.5-2.5-.5-3.5L12 12Zm0 0c-3 0-6-1.5-6-4 0-2 2.5-2.5 3.5-.5L12 12Z"/>';
 class VarmepilotVentCard extends HTMLElement {
@@ -347,6 +347,8 @@ class VarmepilotVentCard extends HTMLElement {
     const lead = v.lead || {}, room = lead.name || "";
     let why = (T.why[v.why] || v.why || "").replace("{r}", room.toLowerCase());
     if (lead.minutes != null && (v.why === "shower" || v.why === "damp")) why += " · " + T.min.replace("{x}", lead.minutes);
+    // in shadow the unit runs on what something else chose: say what Heat Pilot would do, and why
+    if (v.mode !== "control" && v.current && v.current !== v.level) why = T.would.replace("{x}", (T.lv[v.level] || v.level).toLowerCase()) + " · " + why.charAt(0).toLowerCase() + why.slice(1);
     const R = 15, c = 16, seg = (i) => { const p = (x) => [c + R * Math.cos(x), c + R * Math.sin(x)], a0 = Math.PI * .75 + Math.PI * 1.5 * i / 4 + .1, a1 = Math.PI * .75 + Math.PI * 1.5 * (i + 1) / 4 - .1;
       const [x0, y0] = p(a0), [x1, y1] = p(a1); return `M${x0.toFixed(1)} ${y0.toFixed(1)} A${R} ${R} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`; };
     const ring = `<svg class="ring" viewBox="0 0 32 32">${[0, 1, 2, 3].map((i) => `<path d="${seg(i)}" fill="none" stroke="${i < n ? "var(--a)" : "var(--sbg)"}" stroke-width="2.6" stroke-linecap="round"/>`).join("")}</svg>`;
