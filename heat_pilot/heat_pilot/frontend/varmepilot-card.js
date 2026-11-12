@@ -317,12 +317,12 @@ const VV_T = {
         why: { shower: "Bad i gang", damp: "Fugt fra madlavning", dust: "Støv i luften", co2: "CO₂ i {r}", humidity: "Fugt i {r}", free_cooling: "Køler huset",
                away: "Ingen hjemme", night: "Stille om natten", save_heat: "Sparer på varmen", normal: "God luft", precool: "Forkøler før en varm dag",
                card_boost: "Boost fra kortet", card_away: "Ude", manual: "Skruet på anlægget", unit_mode: "Anlæggets egen tilstand" }, min: "{x} min", away: "Ude", auto: "Auto",
-        boostT: "Boost kommer, når Varmepilot styrer ventilationen", would: "Varmepilot ville: {x}", agree: "{x} % enig med det, der styrer i dag", ok: "Luften er god i alle rum" },
+        boostT: "Boost kommer, når Varmepilot styrer ventilationen", hxOut: "UDE", hxIn: "IND I HUSET", hxFrom: "FRA RUMMENE", hxExh: "AFKAST", would: "Varmepilot ville: {x}", agree: "{x} % enig med det, der styrer i dag", ok: "God luft i alle rum" },
   en: { title: "Ventilation", lv: { low: "Low", normal: "Normal", high: "High", boost: "Boost" }, step: "STEP", shadow: "shadow", rec: "{x} % recovered",
         why: { shower: "Shower running", damp: "Damp from cooking", dust: "Dust in the air", co2: "CO₂ in {r}", humidity: "Damp in {r}", free_cooling: "Cooling the house",
                away: "Nobody home", night: "Quiet at night", save_heat: "Saving heat", normal: "Good air", precool: "Pre-cooling before a warm day",
                card_boost: "Boost from the card", card_away: "Away", manual: "Turned on the unit", unit_mode: "The unit's own mode" }, min: "{x} min", away: "Away", auto: "Auto",
-        boostT: "Boost comes when Heat Pilot runs the ventilation", would: "Heat Pilot would: {x}", agree: "{x} % agree with what runs it today", ok: "The air is good in every room" },
+        boostT: "Boost comes when Heat Pilot runs the ventilation", hxOut: "OUTSIDE", hxIn: "INTO THE HOUSE", hxFrom: "FROM THE ROOMS", hxExh: "EXHAUST", would: "Heat Pilot would: {x}", agree: "{x} % agree with what runs it today", ok: "Good air in every room" },
 };
 const VV_FAN = '<path d="M12 12c0-3 1.5-6 4-6 2 0 2.5 2.5.5 3.5L12 12Zm0 0c3 0 6 1.5 6 4 0 2-2.5 2.5-3.5.5L12 12Zm0 0c0 3-1.5 6-4 6-2 0-2.5-2.5-.5-3.5L12 12Zm0 0c-3 0-6-1.5-6-4 0-2 2.5-2.5 3.5-.5L12 12Z"/>';
 class VarmepilotVentCard extends HTMLElement {
@@ -342,77 +342,78 @@ class VarmepilotVentCard extends HTMLElement {
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     const L = (this._hass.locale?.language || this._hass.language || "en").slice(0, 2), T = VV_T[L] || VV_T.en;
     if (!v) { this.shadowRoot.innerHTML = `<ha-card><div style="padding:12px 16px;color:var(--secondary-text-color)">${T.title} …</div></ha-card>`; return; }
-    const strong = v.level === "boost" || v.level === "high", warn = (v.warn || []).length > 0;
+    const strong = v.level === "boost" || v.level === "high", warn = (v.warn || []).length > 0, shadow = v.mode !== "control";
     const a = strong ? "#6ea8fe" : warn ? "#f5b544" : "#47c7d8";
     const n = Math.max(1, Math.min(4, v.step || { low: 1, normal: 2, high: 3, boost: 4 }[v.current || v.level] || 1));
-    const spin = n >= 4 ? .5 : n === 3 ? .9 : n === 2 ? 2 : 4;
+    const spin = n >= 4 ? .5 : n === 3 ? .9 : n === 2 ? 2 : 4, flow = n >= 4 ? 2.2 : n === 3 ? 3.4 : n === 2 ? 5 : 7;
     const lead = v.lead || {}, room = lead.name || "";
     let why = (T.why[v.why] || v.why || "").replace("{r}", room.toLowerCase());
     if (lead.minutes != null && (v.why === "shower" || v.why === "damp")) why += " · " + T.min.replace("{x}", lead.minutes);
-    // in shadow the unit runs on what something else chose: say what Heat Pilot would do, and why
-    if (v.mode !== "control" && v.current && v.current !== v.level) why = T.would.replace("{x}", (T.lv[v.level] || v.level).toLowerCase()) + " · " + why.charAt(0).toLowerCase() + why.slice(1);
-    const R = 21, c = 23, seg = (i) => { const p = (x) => [c + R * Math.cos(x), c + R * Math.sin(x)], a0 = Math.PI * .75 + Math.PI * 1.5 * i / 4 + .1, a1 = Math.PI * .75 + Math.PI * 1.5 * (i + 1) / 4 - .1;
+    if (shadow && v.current && v.current !== v.level) why = T.would.replace("{x}", (T.lv[v.level] || v.level).toLowerCase()) + " · " + why.charAt(0).toLowerCase() + why.slice(1);
+    // the ring: the four steps, the lit ones glowing
+    const R = 26, c = 29, seg = (i) => { const p = (x) => [c + R * Math.cos(x), c + R * Math.sin(x)], a0 = Math.PI * .75 + Math.PI * 1.5 * i / 4 + .09, a1 = Math.PI * .75 + Math.PI * 1.5 * (i + 1) / 4 - .09;
       const [x0, y0] = p(a0), [x1, y1] = p(a1); return `M${x0.toFixed(1)} ${y0.toFixed(1)} A${R} ${R} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`; };
-    const ring = `<svg class="ring" viewBox="0 0 46 46">${[0, 1, 2, 3].map((i) => `<path d="${seg(i)}" fill="none" stroke="${i < n ? "var(--a)" : "var(--sbg)"}" stroke-width="3.2" stroke-linecap="round"/>`).join("")}</svg>`;
-    const bars = [1, 2, 3, 4].map((k) => `<u class="${k <= n ? "l" : ""}" style="height:${4 + k * 2.5}px;animation-delay:${k * .12}s"></u>`).join("");
+    const ring = `<svg class="r" viewBox="0 0 58 58">${[0, 1, 2, 3].map((i) => `<path d="${seg(i)}" fill="none" stroke="${i < n ? "var(--a)" : "var(--sbg)"}" stroke-width="4" stroke-linecap="round" ${i < n ? 'class="lit"' : ""}/>`).join("")}</svg>`;
+    const bars = [1, 2, 3, 4].map((k) => `<u class="${k <= n ? "l" : ""}" style="height:${4 + k * 2.7}px"></u>`).join("");
     const chip = (t, k) => `<span class="chip" style="--k:${k}"><i></i>${t}</span>`;
-    const val = lead.value != null ? `${lead.value}${lead.unit === "%" ? " %" : " " + (lead.unit || "")}` : null;
-    const w0 = (v.warn || [])[0] || {};
-    const right = strong && val ? chip(val, v.why === "co2" ? "#f5b544" : "#ff6a4a")
-      : false ? ""
-      : "";
-    const air = true ? `<svg class="air" viewBox="0 0 400 110" preserveAspectRatio="none">${[0, 1, 2, 3].map((k) => `<path d="M-30 ${18 + k * 24} C 100 ${4 + k * 24}, 220 ${40 + k * 20}, 430 ${12 + k * 24}" style="animation-delay:${-k * .8}s"/>`).join("")}</svg>` : "";
-    const shadow = v.mode !== "control";
-    const hx = v.outdoor != null && v.supply != null ? `<span class="hx"><b>${v.outdoor}°</b><svg viewBox="0 0 90 14"><defs><linearGradient id="hxg" x1="3" x2="87" y1="0" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6ea8fe"/><stop offset="1" stop-color="#f5b544"/></linearGradient></defs>
-      <path d="M3 4.5 H87" stroke="url(#hxg)" stroke-width="3.4" stroke-linecap="round"/><path class="fl" d="M3 4.5 H87" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".75"/>
-      <path d="M87 10.5 H3" stroke="#ff9a4a" stroke-width="2.4" stroke-linecap="round" opacity=".45"/><path class="fl r" d="M87 10.5 H3" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".5"/></svg><b>${v.supply}°</b>${v.efficiency != null ? `<em>${v.efficiency} %</em>` : ""}</span>` : "";
-    const line2 = `<div class="l2">${hx}<span class="chips">${warn ? (v.warn || []).slice(0, 1).map((w) => chip(`${w.name.split(" ")[0]} ${w.co2 != null && w.co2 >= 1000 ? w.co2 + " ppm" : w.hum + " %"}`, w.air === "bad" ? "#ff6a4a" : "#f5b544")).join("") : strong ? "" : chip(T.why.normal, "#3ddc97")}</span></div>`;
+    // the heat exchanger: cold air in turns warm, used air out turns cool - the dots run faster the higher the step
+    const has = v.outdoor != null && v.supply != null;
+    const pin = "M20 30 C 120 30, 150 30, 205 42 S 300 54, 390 54", pout = "M390 30 C 300 30, 260 30, 205 42 S 120 54, 20 54";
+    const dots = (path, g, k) => Array.from({ length: k }, (_, i) => `<circle class="p" r="${(2.4 - (i % 3) * .4).toFixed(1)}" fill="url(#${g})" style="offset-path:path('${path}');animation-duration:${flow}s;animation-delay:-${(i * flow / k).toFixed(2)}s"/>`).join("");
+    const hx = has ? `<svg class="hx" viewBox="0 0 410 84"><defs>
+      <linearGradient id="vin" gradientUnits="userSpaceOnUse" x1="20" x2="390"><stop offset="0" stop-color="#6ea8fe"/><stop offset=".55" stop-color="#ffb347"/><stop offset="1" stop-color="#ff8a3d"/></linearGradient>
+      <linearGradient id="vout" gradientUnits="userSpaceOnUse" x1="390" x2="20"><stop offset="0" stop-color="#ff8a3d"/><stop offset=".55" stop-color="#9aa6b8"/><stop offset="1" stop-color="#7d8796"/></linearGradient></defs>
+      <path d="${pin}" fill="none" stroke="url(#vin)" stroke-width="7" stroke-linecap="round" opacity=".22"/><path d="${pout}" fill="none" stroke="url(#vout)" stroke-width="7" stroke-linecap="round" opacity=".18"/>
+      <path d="${pin}" fill="none" stroke="url(#vin)" stroke-width="1.6" stroke-linecap="round" opacity=".8"/><path d="${pout}" fill="none" stroke="url(#vout)" stroke-width="1.2" stroke-linecap="round" opacity=".6"/>
+      ${dots(pin, "vin", 9)}${dots(pout, "vout", 7)}
+      <g transform="translate(205 42) rotate(45)"><rect x="-17" y="-17" width="34" height="34" rx="7" fill="var(--ha-card-background, var(--card-background-color))" stroke="url(#vin)" stroke-width="1.6"/></g>
+      ${v.efficiency != null ? `<text x="205" y="47" text-anchor="middle" class="val" style="font-size:13px;fill:#3ddc97">${v.efficiency}%</text>` : ""}
+      <text x="20" y="16" class="lbl">${T.hxOut}</text><text x="58" y="18" class="val">${v.outdoor}°</text>
+      ${v.exhaust != null ? `<text x="20" y="80" class="lbl">${T.hxExh} ${v.exhaust}°</text>` : ""}
+      ${v.extract != null ? `<text x="390" y="16" class="lbl" text-anchor="end">${T.hxFrom} ${v.extract}°</text>` : ""}
+      <text x="390" y="80" class="lbl" text-anchor="end">${T.hxIn}</text><text x="${390 - T.hxIn.length * 6.6 - 8}" y="80" class="val" text-anchor="end">${v.supply}°</text></svg>` : "";
+    const val = lead.value != null ? `${room ? room.split(" ")[0] + " " : ""}${lead.value}${lead.unit === "%" ? " %" : " " + (lead.unit || "")}` : null;
+    const chips = (strong && val ? chip(val, v.why === "co2" ? "#f5b544" : "#ff6a4a") : "")
+      + (warn ? (v.warn || []).slice(0, 2).map((w) => chip(`${w.name.split(" ")[0]} ${w.co2 != null && w.co2 >= 1000 ? "CO₂ " + w.co2 : w.hum + " %"}`, w.air === "bad" ? "#ff6a4a" : "#f5b544")).join("") : (strong ? "" : chip(T.ok, "#3ddc97")));
     const btns = !shadow ? `<span class="seg"><b data-v="away" class="${v.hold === "card_away" ? "on" : ""}">${T.away}</b><b data-v="auto" class="${!v.hold ? "on" : ""}">${T.auto}</b></span>` : "";
-    const open = this._open ? `<div class="more">${btns}${v.efficiency != null ? `<span>${v.outdoor}° → ${v.supply}° · ${T.rec.replace("{x}", v.efficiency)}</span>` : ""}
-      ${warn ? (v.warn || []).map((w) => chip(`${w.name} ${w.co2 != null && w.co2 >= 1000 ? w.co2 + " ppm" : w.hum + " %"}`, w.air === "bad" ? "#ff6a4a" : "#f5b544")).join("") : `<span>${T.ok}</span>`}
-      ${shadow && v.agree != null ? `<span>${T.agree.replace("{x}", v.agree)}</span>` : ""}</div>` : "";
+    const open = this._open ? `<div class="more">${btns}${shadow && v.agree != null ? `<span>${T.agree.replace("{x}", v.agree)}</span>` : ""}${shadow ? `<span>${T.boostT}</span>` : ""}</div>` : "";
     this.shadowRoot.innerHTML = `<style>
       :host { --a:${a}; --sbg:color-mix(in srgb, var(--primary-text-color) 9%, transparent); }
-      ha-card { position:relative; overflow:hidden; cursor:pointer; background:radial-gradient(110% 150% at 0% 0%, color-mix(in srgb, var(--a) ${strong ? 30 : 16}%, transparent), transparent 58%), radial-gradient(80% 140% at 100% 100%, color-mix(in srgb, var(--a) ${strong ? 14 : 6}%, transparent), transparent 60%), var(--ha-card-background, var(--card-background-color)); }
-      .air { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
-      .air path { fill:none; stroke:var(--a); stroke-width:2; stroke-linecap:round; opacity:${strong ? .24 : .1}; stroke-dasharray:70 330; animation:flow ${Math.max(1.6, spin * 2.2)}s linear infinite; }
-      @keyframes flow { from { stroke-dashoffset:400; } to { stroke-dashoffset:0; } }
-      .row { position:relative; display:flex; align-items:center; gap:12px; padding:12px 14px 6px; box-sizing:border-box; }
-      .fan { position:relative; width:46px; height:46px; flex:none; }
-      .ring { position:absolute; inset:0; }
-      .b { position:absolute; inset:11px; width:24px; height:24px; color:var(--a); animation:sp ${spin}s linear infinite; filter:drop-shadow(0 0 5px color-mix(in srgb, var(--a) 70%, transparent)); }
+      ha-card { position:relative; overflow:hidden; cursor:pointer;
+        background:radial-gradient(100% 140% at 0% 0%, color-mix(in srgb, var(--a) ${strong ? 32 : 18}%, transparent), transparent 60%), radial-gradient(70% 120% at 100% 100%, color-mix(in srgb, var(--a) ${strong ? 14 : 7}%, transparent), transparent 60%), var(--ha-card-background, var(--card-background-color)); }
+      .top { position:relative; display:flex; align-items:center; gap:13px; padding:14px 14px 4px; }
+      .ring { position:relative; width:58px; height:58px; flex:none; } .ring svg.r { position:absolute; inset:0; }
+      .ring .lit { filter:drop-shadow(0 0 4px var(--a)); }
+      .ring .glow { position:absolute; inset:6px; border-radius:50%; background:radial-gradient(circle, color-mix(in srgb, var(--a) 40%, transparent), transparent 70%); animation:pulse ${spin * 1.5}s ease-in-out infinite alternate; }
+      @keyframes pulse { to { opacity:.4; transform:scale(.9); } }
+      .ring .fan { position:absolute; inset:15px; width:28px; height:28px; color:var(--a); animation:sp ${spin}s linear infinite; filter:drop-shadow(0 0 6px var(--a)); }
       @keyframes sp { to { transform:rotate(360deg); } }
       .txt { min-width:0; flex:1; }
-      .lv { font-size:18px; font-weight:750; letter-spacing:-.01em; display:flex; align-items:center; gap:6px; white-space:nowrap; }
-      .bars { display:inline-flex; align-items:flex-end; gap:2px; height:14px; }
-      .bars u { width:4px; border-radius:2px; background:var(--sbg); text-decoration:none; }
-      .bars u.l { background:var(--a); box-shadow:0 0 6px color-mix(in srgb, var(--a) 70%, transparent); animation:eq ${Math.max(.4, spin / 3)}s ease-in-out infinite alternate; }
-      @keyframes eq { to { opacity:.55; } }
-      .trin { font-size:10.5px; font-weight:750; color:var(--a); letter-spacing:.02em; }
-      .tag { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--a); background:color-mix(in srgb, var(--a) 15%, transparent); padding:2px 6px; border-radius:6px; }
-      .why { font-size:12.5px; margin-top:1px; color:var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .mini { font-size:11px; color:var(--secondary-text-color); white-space:nowrap; display:flex; align-items:center; gap:4px; }
-      .mini s { text-decoration:none; display:inline-block; width:14px; height:3px; border-radius:2px; background:linear-gradient(90deg,#6ea8fe,#f5b544); }
-      .chip { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:650; padding:3px 8px; border-radius:9px; white-space:nowrap; background:color-mix(in srgb, var(--k) 15%, transparent); }
-      .chip i { width:7px; height:7px; border-radius:50%; background:var(--k); box-shadow:0 0 6px var(--k); }
-      .bt { width:40px; height:40px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; background:var(--sbg); color:var(--secondary-text-color); border:0; padding:0; }
-      .bt.on { background:linear-gradient(135deg, var(--a), color-mix(in srgb, var(--a) 55%, #7b6dff)); color:#fff; box-shadow:0 3px 10px color-mix(in srgb, var(--a) 45%, transparent); }
-      .bt:disabled { opacity:.45; } .bt svg { width:19px; height:19px; fill:currentColor; }
+      .lv { font-size:20px; font-weight:800; letter-spacing:-.02em; display:flex; align-items:center; gap:7px; white-space:nowrap; }
+      .bars { display:inline-flex; align-items:flex-end; gap:2px; height:15px; } .bars u { width:4px; border-radius:2px; background:var(--sbg); text-decoration:none; }
+      .bars u.l { background:var(--a); box-shadow:0 0 7px var(--a); }
+      .trin { font-size:11px; font-weight:800; color:var(--a); }
+      .tag { font-size:9.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--a); background:color-mix(in srgb, var(--a) 16%, transparent); padding:2px 6px; border-radius:6px; }
+      .why { font-size:12.5px; color:var(--secondary-text-color); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .bt { width:44px; height:44px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; background:var(--sbg); color:var(--secondary-text-color); border:0; padding:0; cursor:pointer; }
+      .bt.on { background:linear-gradient(135deg, var(--a), color-mix(in srgb, var(--a) 55%, #7b6dff)); color:#fff; box-shadow:0 4px 14px color-mix(in srgb, var(--a) 50%, transparent); }
+      .bt:disabled { opacity:.45; cursor:default; } .bt svg { width:20px; height:20px; fill:currentColor; }
+      .hx { position:relative; display:block; width:100%; height:auto; }
+      .p { animation:mv 5s linear infinite; filter:drop-shadow(0 0 3px rgba(255,255,255,.5)); } @keyframes mv { from { offset-distance:0%; } to { offset-distance:100%; } }
+      .lbl { font:700 10px system-ui; letter-spacing:.09em; fill:var(--secondary-text-color); }
+      .val { font:750 15px system-ui; fill:var(--primary-text-color); }
+      .foot { position:relative; display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:0 14px 12px; }
+      .chip { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:3px 9px; border-radius:9px; white-space:nowrap; background:color-mix(in srgb, var(--k) 16%, transparent); }
+      .chip i { width:7px; height:7px; border-radius:50%; background:var(--k); box-shadow:0 0 7px var(--k); }
       .seg { display:inline-flex; gap:2px; background:var(--sbg); border-radius:9px; padding:2px; } .seg b { padding:4px 10px; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; }
       .seg b.on { background:var(--a); color:#fff; }
-      .l2 { position:relative; display:flex; align-items:center; gap:10px; padding:4px 14px 12px 72px; }
-      .hx { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--secondary-text-color); white-space:nowrap; }
-      .hx b { color:var(--primary-text-color); font-size:13px; } .hx svg { width:64px; height:14px; } .hx em { font-style:normal; margin-left:4px; }
-      .hx .fl { stroke-dasharray:2 10; animation:fl ${Math.max(.5, spin / 2)}s linear infinite; } @keyframes fl { to { stroke-dashoffset:-20; } }
-      .l2 .chips { margin-left:auto; display:flex; gap:5px; }
-      .more { position:relative; display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; padding:0 14px 12px 72px; font-size:11.5px; color:var(--secondary-text-color); }
-      @media (prefers-reduced-motion: reduce) { .b, .bars u.l, .air path { animation:none; } }
-    </style><ha-card>${air}<div class="row">
-      <div class="fan">${ring}<svg class="b" viewBox="0 0 24 24" fill="currentColor">${VV_FAN}</svg></div>
+      .more { position:relative; display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; padding:0 14px 12px; font-size:11.5px; color:var(--secondary-text-color); }
+      @media (prefers-reduced-motion: reduce) { .ring .fan, .ring .glow, .p { animation:none; } }
+    </style><ha-card><div class="top">
+      <div class="ring"><div class="glow"></div>${ring}<svg class="fan" viewBox="0 0 24 24" fill="currentColor">${VV_FAN}</svg></div>
       <div class="txt"><div class="lv">${T.lv[v.current || v.level] || v.level}<span class="bars">${bars}</span><span class="trin">${T.step} ${n}</span>${shadow ? `<span class="tag">${T.shadow}</span>` : ""}</div><div class="why">${why}</div></div>
-      ${right}
       <button class="bt ${strong ? "on" : ""}" ${shadow ? "disabled" : ""} title="${shadow ? T.boostT : ""}"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></button>
-    </div>${line2}${open}</ha-card>`;
+    </div>${hx}<div class="foot">${chips}</div>${open}</ha-card>`;
     const send = (action) => this._hass.callService("heat_pilot", "ventilation", { action });
     const bt = this.shadowRoot.querySelector(".bt");
     if (bt && !shadow) bt.onclick = (e) => { e.stopPropagation(); send(v.hold === "card_boost" ? "auto" : "boost"); };
