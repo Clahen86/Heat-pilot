@@ -115,13 +115,16 @@ class Watch:
     def wrote(self, entity: str, value: float, now: datetime) -> None:
         self.ours[entity] = (value, now)
 
-    def see_setpoint(self, area: str, entity: str, setpoint: float | None, now: datetime, controlled: bool) -> None:
+    def see_setpoint(self, area: str, entity: str, setpoint: float | None, now: datetime, controlled: bool,
+                     sensor_switched: bool = False) -> None:
         if setpoint is None:
             return
         prev = self.last_set.get(entity)
         self.last_set[entity] = setpoint
         if prev is None or abs(setpoint - prev) < 0.1 or not controlled:
             return  # only where Heat Pilot controls: in shadow, the other system's changes are not "by hand"
+        if sensor_switched:
+            return  # the valve swapped temperature sensor just now (Aqara E1 copies an old setpoint then) - not a person
         mine = self.ours.get(entity)
         if mine and abs(mine[0] - setpoint) < 0.05 and (now - mine[1]).total_seconds() <= ECHO_S:
             return  # our own write echoing back

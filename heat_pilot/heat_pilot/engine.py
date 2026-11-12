@@ -49,6 +49,26 @@ def _num(s: dict[str, Any] | None) -> float | None:
         return None
 
 
+SENSOR_SWITCH_S = 180  # a valve that swapped temperature sensor this recently: its setpoint jump isn't a person
+
+
+def sensor_switched(states: dict[str, Any], climate: str, now: datetime) -> bool:
+    """The valve's own "sensor" choice (internal/external - Aqara E1 and others in Zigbee2MQTT) changed just now.
+    When an E1 loses its room sensor for a moment it falls back to its own and copies an older setpoint over."""
+    base = climate.split(".", 1)[1]
+    for e in (f"select.{base}_sensor", f"select.{base}_sensor_type", f"select.{base}_temperature_sensor_select"):
+        t = (states.get(e) or {}).get("last_changed")
+        if not t:
+            continue
+        try:
+            when = datetime.fromisoformat(str(t).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if abs((now - when).total_seconds()) <= SENSOR_SWITCH_S:
+            return True
+    return False
+
+
 class Pilot:
     def __init__(self, ha: Any, data_dir: Path) -> None:
         self.ha = ha
@@ -341,7 +361,7 @@ class Pilot:
             for th in r["thermostats"]:
                 sp = ((st.get(th["entity_id"]) or {}).get("attributes") or {}).get("temperature")
                 self.watch.see_setpoint(a_id, th["entity_id"], self.c(sp) if isinstance(sp, (int, float)) else None, now,
-                                        controlled and on["manual"])
+                                        controlled and on["manual"], sensor_switched(st, th["entity_id"], now))
             manual = self.watch.manual_for(a_id, now) if on["manual"] else None
             hours_today = by_day[now.weekday()]
             self.model.see(a_id, now, temp, outdoor_now, heating_now, sunny, sun_up, sun_now)

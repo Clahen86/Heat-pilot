@@ -79,3 +79,18 @@ def test_features_hidden_when_missing_and_can_be_turned_off():
                     "people": False, "holiday": False, "summer": False, "district": False, "price": False, "ventilation": False, "strategy": True, "floor": False, "doors": False}
     on = features.active({"features": {"manual": False}}, have)
     assert not on["manual"]
+
+
+def test_a_valve_swapping_sensor_is_not_turning_by_hand():
+    """Aqara E1: it lost the room sensor for a moment, fell back to its own and copied an old setpoint (18 -> 20)."""
+    from heat_pilot.engine import sensor_switched
+
+    now = T0 + timedelta(minutes=1)
+    states = {"select.holly_thermostat_sensor": {"state": "external", "last_changed": (T0 + timedelta(seconds=6)).isoformat()}}
+    assert sensor_switched(states, "climate.holly_thermostat", now)
+    assert not sensor_switched(states, "climate.holly_thermostat", now + timedelta(minutes=10))
+    assert not sensor_switched({}, "climate.holly_thermostat", now)
+    w = Watch()
+    w.see_setpoint("holly", "climate.holly_thermostat", 18.0, T0, True)
+    w.see_setpoint("holly", "climate.holly_thermostat", 20.0, now, True, sensor_switched(states, "climate.holly_thermostat", now))
+    assert w.manual_for("holly", now) is None
