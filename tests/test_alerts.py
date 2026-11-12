@@ -61,3 +61,27 @@ def test_texts():
 def test_monthly_text():
     t = text({"kind": "monthly", "month": "2026-11", "degree_hours": 420, "pct": 8.5, "ontime": 92}, "da")
     assert "8.5 %" in t and "gradtimer" not in t
+
+
+def test_too_warm_for_six_hours_is_a_valve_not_closing():
+    a = Alerts({})
+    hot = {"r": {"temp": 23.0, "want": {"temp": 18.0}}}
+    a.check([room()], hot, st(), NOW, 5.0, None)
+    a.check([room()], hot, st(), NOW + timedelta(hours=5), 5.0, None)
+    assert "too_warm" not in kinds(a)  # the sun can do a few hours
+    a.check([room()], hot, st(), NOW + timedelta(hours=6), 5.0, None)
+    assert kinds(a) == ["too_warm"]
+    a.check([room()], hot, st(), NOW + timedelta(hours=7), 18.0, None)
+    assert kinds(a) == []  # a warm day outside: not the valve
+    assert "Krea" in text({"kind": "too_warm", "room": "Krea", "temp": 23.0, "want": 18.0}, "da")
+
+
+def test_rechargeable_cells_are_not_a_low_battery():
+    a = Alerts({})
+    s = {**st(b=5), "sensor.thermo_battery": {"state": "5", "attributes": {"friendly_name": "Batteri"}},
+         "sensor.thermo_voltage": {"state": "2700", "attributes": {"unit_of_measurement": "mV"}}}
+    a.check([room(batteries=["sensor.thermo_battery"])], {"r": {"temp": 20.0}}, s, NOW, 5.0, None)
+    assert a.active == []  # 2 x 1.35 V: full NiMH cells, though the valve says 5 %
+    s["sensor.thermo_voltage"]["state"] = "2100"
+    a.check([room(batteries=["sensor.thermo_battery"])], {"r": {"temp": 20.0}}, s, NOW, 5.0, None)
+    assert kinds(a) == ["battery"]  # 1.05 V a cell: really empty

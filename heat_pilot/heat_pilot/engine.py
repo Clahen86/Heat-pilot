@@ -49,6 +49,8 @@ def _num(s: dict[str, Any] | None) -> float | None:
         return None
 
 
+ROOM_SENSOR_EVERY_MIN = 5  # the room temperature to the valve this often (it falls back to its own sensor if it stops)
+ROOM_SENSOR_FRESH_H = 12  # a room sensor that hasn't changed in this long is taken as gone
 SENSOR_SWITCH_S = 180  # a valve that swapped temperature sensor this recently: its setpoint jump isn't a person
 
 
@@ -212,6 +214,9 @@ class Pilot:
 
     def set_room(self, area: str, values: dict[str, Any]) -> None:
         own = self.settings.setdefault("rooms", {}).setdefault(area, {})
+        if values.get("forget_comfort"):  # the comfort it learned was wrong (a valve that changed itself): back to the default
+            self.model.s["comfort"].pop(area, None)
+            self.learning.save()
         for k, v in values.items():
             if k in ROOM_KEYS:
                 if k == "owner":
@@ -265,6 +270,55 @@ class Pilot:
             todo += self.sender.due(calls, self.ha.states, gaps, now, steps)
         if todo:
             await self.sender.send(self.ha, todo, now, lambda e, v, t: self.watch.wrote(e, self.c(v) or v, t))
+        for r in rooms.values():  # the room temperature to the valves - often, so kept out of the log of changes
+            if self.mode(r["area_id"]) != "control":
+                continue
+            for c in self.room_sensor_calls(r, now):
+                try:
+                    await self.ha.call_service(c["domain"], c["service"], dict(c["data"]))
+                except Exception as err:  # noqa: BLE001
+                    _LOGGER.warning("Could not send the room temperature to %s: %s", c["data"].get("entity_id"), err)
+
+    def room_sensor_calls(self, r: dict[str, Any], now: datetime) -> list[dict[str, Any]]:
+        """Valves that take the room's temperature (Aqara E1, Sonoff TRVZB, Danfoss Ally, Bosch): send the room
+        sensor's reading every few minutes - also when it stands still - and keep the valve on its external sensor.
+        Only with a room sensor of its own (never the valve's own reading fed back). A sensor that is gone or hasn't
+        changed in 12 hours isn't sent: the valve then falls back to its own sensor and keeps heating."""
+        sensor = r.get("temp_sensor")
+        if not sensor:
+            return []
+        s = self.ha.states.get(sensor) or {}
+        try:
+            value = float(s.get("state"))
+            seen = datetime.fromisoformat(s.get("last_updated") or s.get("last_changed"))
+        except (TypeError, ValueError):
+            return []
+        if (now - seen).total_seconds() > ROOM_SENSOR_FRESH_H * 3600:
+            return []
+        fed = self.__dict__.setdefault("_fed", {})
+        out = []
+        for th in r["thermostats"]:
+            prof = th.get("profile") or {}
+            rule = prof.get("room_sensor")
+            if not rule:
+                continue
+            number, select, option = rule
+            base = th["entity_id"].split(".", 1)[1]
+            if select and option:
+                sel = f"select.{base}_{select}"
+                if (self.ha.states.get(sel) or {}).get("state") not in (None, option, "unavailable", "unknown"):
+                    out.append({"domain": "select", "service": "select_option", "data": {"entity_id": sel, "option": option}})
+            num = f"number.{base}_{number}"
+            if num not in self.ha.states:
+                continue
+            every = float(prof.get("room_sensor_every_min") or ROOM_SENSOR_EVERY_MIN)
+            last = fed.get(num)
+            if last and (now - last).total_seconds() < every * 60 - 5:
+                continue
+            fed[num] = now
+            v = round(value * float(prof.get("room_sensor_scale") or 1), 2)
+            out.append({"domain": "number", "service": "set_value", "data": {"entity_id": num, "value": v}})
+        return out
 
     # ---------- every minute ----------
 

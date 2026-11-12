@@ -94,3 +94,27 @@ def test_a_valve_swapping_sensor_is_not_turning_by_hand():
     w.see_setpoint("holly", "climate.holly_thermostat", 18.0, T0, True)
     w.see_setpoint("holly", "climate.holly_thermostat", 20.0, now, True, sensor_switched(states, "climate.holly_thermostat", now))
     assert w.manual_for("holly", now) is None
+
+
+def test_room_temperature_sent_to_the_valve_every_five_minutes():
+    from types import SimpleNamespace
+
+    from heat_pilot.engine import Pilot
+
+    p = Pilot.__new__(Pilot)
+    now = T0
+    p.ha = SimpleNamespace(states={
+        "sensor.room": {"state": "20.4", "last_updated": (now - timedelta(hours=3)).isoformat()},
+        "number.v_external_temperature_input": {"state": "19"},
+        "select.v_sensor": {"state": "internal"},
+    })
+    r = {"temp_sensor": "sensor.room", "thermostats": [{"entity_id": "climate.v",
+         "profile": {"room_sensor": ("external_temperature_input", "sensor", "external")}}]}
+    calls = p.room_sensor_calls(r, now)
+    assert {"domain": "select", "service": "select_option", "data": {"entity_id": "select.v_sensor", "option": "external"}} in calls
+    assert {"domain": "number", "service": "set_value", "data": {"entity_id": "number.v_external_temperature_input", "value": 20.4}} in calls
+    assert [c for c in p.room_sensor_calls(r, now + timedelta(minutes=2)) if c["domain"] == "number"] == []  # not yet
+    assert [c for c in p.room_sensor_calls(r, now + timedelta(minutes=5)) if c["domain"] == "number"]  # also when it stands still
+    p.ha.states["sensor.room"]["last_updated"] = (now - timedelta(hours=13)).isoformat()
+    assert p.room_sensor_calls(r, now + timedelta(minutes=10)) == []  # a sensor gone quiet: the valve uses its own
+    assert p.room_sensor_calls({**r, "temp_sensor": None}, now) == []  # no room sensor: never its own reading fed back
