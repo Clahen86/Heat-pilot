@@ -36,18 +36,25 @@ def test_shower_boosts_until_damp_is_back():
     out = run(st(**{"sensor.bad_h": 80, "sensor.sov_h": 45, "sensor.sov_co2": 600}), w, now)
     assert out["level"] == "boost" and out["why"] == "shower" and out["lead"]["area_id"] == "bad" and out["lead"]["value"] == 80
     back = run(st(**{"sensor.bad_h": 57, "sensor.sov_h": 45, "sensor.sov_co2": 600}), w, now + timedelta(minutes=10))
-    assert back["level"] == "normal"
+    assert back["why"] == "save_heat"  # back near normal: no more boost
 
 
 def test_co2_counts_only_where_fresh_air_comes_in():
-    out = run(st(**{"sensor.bad_h": 55, "sensor.sov_h": 45, "sensor.sov_co2": 1100, "sensor.gym_co2": 1800}))
-    assert out["level"] == "high" and out["why"] == "co2" and out["lead"]["area_id"] == "sov"  # the gym has no vents
+    out = run(st(**{"sensor.bad_h": 55, "sensor.sov_h": 45, "sensor.sov_co2": 1250, "sensor.gym_co2": 1800}))
+    assert out["level"] == "boost" and out["why"] == "co2" and out["lead"]["area_id"] == "sov"  # the gym has no vents
+
+
+def test_co2_below_the_limit_gets_no_middle_level():
+    s = st(**{"sensor.bad_h": 55, "sensor.sov_h": 45, "sensor.sov_co2": 1150})
+    assert run(s)["level"] == "low" and run(s)["why"] == "save_heat"   # cold outside: keep the heat in
+    assert run(s, outdoor=12.0)["level"] == "normal"
+    assert run(s, params={"co2_boost": 1100})["level"] == "boost"     # a limit learned elsewhere
 
 
 def test_damp_not_raised_when_outside_air_is_wetter():
     s = st(**{"sensor.bad_h": 55, "sensor.sov_h": 70, "sensor.sov_co2": 600})
     assert run(s, outdoor_dp=2.0)["why"] == "humidity"
-    assert run(s, outdoor_dp=17.0)["why"] == "normal"
+    assert run(s, outdoor_dp=17.0)["why"] == "save_heat"
 
 
 def test_night_and_away_are_low():
@@ -59,6 +66,7 @@ def test_night_and_away_are_low():
 def test_room_air_colour():
     s = st(**{"sensor.sov_h": 45, "sensor.sov_co2": 1100})
     assert air.room_air(BED, s)["air"] == "warn"
+    assert air.room_air(BED, st(**{"sensor.sov_co2": 1300}))["air"] == "bad"
     assert air.room_air(GYM, s, {"airflow": "none"})["air"] is None
 
 

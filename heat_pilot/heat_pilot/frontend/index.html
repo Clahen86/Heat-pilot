@@ -436,9 +436,9 @@ function seasonOf(now) {
 /* ---------- the ventilation in the house: the unit in the attic, the air's colour in each room, and why ---------- */
 const VT = {
   da: { low: "Lav", normal: "Normal", high: "Høj", boost: "Boost", shower: "bad i gang", damp: "fugt fra madlavning", dust: "støv i luften", co2: "CO₂ i {r}",
-        humidity: "fugt i {r}", free_cooling: "køler huset", away: "ingen hjemme", night: "stille om natten", ok: "luften er god", rec: "{x} % varme genvundet", shadow: "skygge", agree: "{x} % enig" },
+        humidity: "fugt i {r}", free_cooling: "køler huset", away: "ingen hjemme", night: "stille om natten", save_heat: "sparer på varmen", ok: "luften er god", rec: "{x} % varme genvundet", shadow: "skygge", agree: "{x} % enig" },
   en: { low: "Low", normal: "Normal", high: "High", boost: "Boost", shower: "shower running", damp: "damp from cooking", dust: "dust in the air", co2: "CO₂ in {r}",
-        humidity: "damp in {r}", free_cooling: "cooling the house", away: "nobody home", night: "quiet at night", ok: "the air is good", rec: "{x} % heat recovered", shadow: "shadow", agree: "{x} % agree" },
+        humidity: "damp in {r}", free_cooling: "cooling the house", away: "nobody home", night: "quiet at night", save_heat: "saving heat", ok: "the air is good", rec: "{x} % heat recovered", shadow: "shadow", agree: "{x} % agree" },
 };
 function ventLayer(o) {
   const v = data.vent, out = { defs: "", attic: "", over: "" };

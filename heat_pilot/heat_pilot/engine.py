@@ -433,7 +433,8 @@ class Pilot:
             want_v = air.decide([r for r in rooms if not r.get("excluded")] + self.air_rooms, st, self.airwatch, now, away=away,
                                 house_temp=sum(temps) / len(temps) if temps else None,
                                 comfort=sum(comforts) / len(comforts) if comforts else 21.0, outdoor=outdoor_now,
-                                outdoor_dp=air.outdoor_dewpoint(st), own=own_rooms)
+                                outdoor_dp=air.outdoor_dewpoint(st), own=own_rooms,
+                                params={**air.params_from_appdaemon(st), **((self.settings.get("ventilation") or {}).get("params") or {})})
             cur = ventilation.current_level(self.vent, st)
             # how often it agrees with what runs the unit today (shadow): a slowly fading count, so last week weighs most
             va = self.settings.setdefault("vent_agree", {"same": 0.0, "checks": 0.0})
