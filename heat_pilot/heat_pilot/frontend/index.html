@@ -181,6 +181,15 @@
   .chipb.on { background:color-mix(in srgb, var(--accent) 18%, var(--surface2)); color:var(--text); border-color:var(--accent); }
   .empty { text-align:center; padding:40px 10px; color:var(--muted); }
   @media (max-width:520px) { .rooms { grid-template-columns:1fr 1fr; gap:10px; } .room { padding:13px; border-radius:18px; } .now { font-size:30px; } .want { font-size:16px; } .devs { display:none; } }
+  .vl-spin { animation:vlspin 2s linear infinite; transform-box:fill-box; transform-origin:center; } @keyframes vlspin { to { transform:rotate(360deg); } }
+  .vl-rip { animation:vlrip 4s ease-out infinite; transform-box:fill-box; transform-origin:center; } @keyframes vlrip { 0% { transform:scale(.4); opacity:.7; } 100% { transform:scale(2.6); opacity:0; } }
+  .vl-in { animation:vlin 4s ease-in infinite; } @keyframes vlin { 0% { transform:translate(-14px,-12px); opacity:0; } 30% { opacity:.9; } 100% { opacity:0; } }
+  .vl-out { animation:vlout 4s ease-out infinite; } @keyframes vlout { 0% { opacity:0; } 25% { opacity:.85; } 100% { transform:translate(12px,-18px) scale(1.2); opacity:0; } }
+  .vl-steam { animation:vlst 2.6s ease-out infinite; } @keyframes vlst { 0% { transform:translateY(4px); opacity:0; } 35% { opacity:.9; } 100% { transform:translateY(-14px); opacity:0; } }
+  .vl-pulse, .vl-led { animation:vlg 2.4s ease-in-out infinite; } @keyframes vlg { 50% { opacity:.4; } }
+  .vl-whoosh { stroke-dasharray:14 220; animation:vlwh 1.8s cubic-bezier(.5,0,.3,1) infinite; } @keyframes vlwh { from { stroke-dashoffset:234; } to { stroke-dashoffset:0; } }
+  .vl-fog { animation:vlfog 6s ease-in-out infinite; } @keyframes vlfog { 50% { opacity:.35; transform:translateY(6px); } }
+  @media (prefers-reduced-motion: reduce) { .vl-spin, .vl-rip, .vl-in, .vl-out, .vl-steam, .vl-pulse, .vl-led, .vl-whoosh, .vl-fog { animation:none; } }
 </style>
 </head>
 <body>
@@ -423,6 +432,86 @@ function seasonOf(now) {
   if (f >= 8.4 && f < 11) return ["autumn", f < 9.2 ? "turning" : f < 10.3 ? "orange" : "sparse"];
   return ["winter", "bare"];
 }
+
+/* ---------- the ventilation in the house: the unit in the attic, the air's colour in each room, and why ---------- */
+const VT = {
+  da: { low: "Lav", normal: "Normal", high: "Høj", boost: "Boost", shower: "bad i gang", damp: "fugt fra madlavning", dust: "støv i luften", co2: "CO₂ i {r}",
+        humidity: "fugt i {r}", free_cooling: "køler huset", away: "ingen hjemme", night: "stille om natten", ok: "luften er god", rec: "{x} % varme genvundet", shadow: "skygge", agree: "{x} % enig" },
+  en: { low: "Low", normal: "Normal", high: "High", boost: "Boost", shower: "shower running", damp: "damp from cooking", dust: "dust in the air", co2: "CO₂ in {r}",
+        humidity: "damp in {r}", free_cooling: "cooling the house", away: "nobody home", night: "quiet at night", ok: "the air is good", rec: "{x} % heat recovered", shadow: "shadow", agree: "{x} % agree" },
+};
+function ventLayer(o) {
+  const v = data.vent, out = { defs: "", attic: "", over: "" };
+  if (!v) return out;
+  const t = VT[L] || VT.en, lvl = v.level || "normal", strong = lvl === "boost" || lvl === "high", cool = !!v.cooling;
+  const C = cool ? "#9fd6ff" : strong ? "#5ab8ff" : "#3ddc97";
+  const spin = lvl === "boost" ? .5 : lvl === "high" ? .9 : lvl === "low" ? 4 : 2.2;
+  out.defs = `<defs><linearGradient id="vl-box" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f6fa"/><stop offset="1" stop-color="#c9d0dc"/></linearGradient>
+    <linearGradient id="vl-duct" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9aa6b8"/><stop offset=".5" stop-color="#e6ebf2"/><stop offset="1" stop-color="#8d98aa"/></linearGradient>
+    <linearGradient id="vl-hx" x1="0" x2="1"><stop offset="0" stop-color="#5ab8ff"/><stop offset="1" stop-color="#ff9a4a"/></linearGradient>
+    <radialGradient id="vl-attic" cx=".5" cy=".85" r=".7"><stop offset="0" stop-color="${C}" stop-opacity=".26"/><stop offset="1" stop-color="${C}" stop-opacity="0"/></radialGradient>
+    <filter id="vl-sh" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity=".35"/></filter>
+    <filter id="vl-b2" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2"/></filter>
+    <filter id="vl-b6" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="6"/></filter>
+    ${["good", "warn", "bad"].map((k) => `<radialGradient id="vl-air-${k}" cx=".85" cy=".15" r=".9"><stop offset="0" stop-color="${{ good: "#3ddc97", warn: "#f5b544", bad: "#ff6a4a" }[k]}" stop-opacity="${k === "good" ? .12 : .3}"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>`).join("")}</defs>`;
+  const { rl, rb, roofTop: top, peak, narrow } = o;
+  const bw = narrow ? 50 : 62, bh = narrow ? 22 : 27, bx = peak - bw / 2, by = rb - bh - 5;
+  let a = `<path d="M${rl + 20} ${rb} L${peak} ${top + 10} L${o.rr - 20} ${rb} Z" fill="url(#vl-attic)"/>`;
+  // ripples spreading through the attic: quicker the more air it moves
+  a += [0, 1, 2].map((k) => `<ellipse class="vl-rip" cx="${peak}" cy="${by + bh / 2}" rx="${bw * .6}" ry="${bh * .55}" fill="none" stroke="${C}" stroke-width="1.2" style="animation-duration:${spin * 2}s;animation-delay:${k * spin * .66}s"/>`).join("");
+  // two ducts up through the roof: fresh air in, used air out (frosted in winter)
+  const capAt = (dx) => [peak + dx, top + (rb - top) * Math.abs(dx) / (peak - rl)];
+  [[-1, "in"], [1, "out"]].forEach(([sgn, k]) => {
+    const [cx, cy] = capAt(sgn * bw * .62), sx = peak + sgn * bw * .25;
+    a += `<path d="M${sx} ${by} V${cy + 6} L${cx} ${cy + 2}" stroke="url(#vl-duct)" stroke-width="${narrow ? 5 : 7}" fill="none" stroke-linejoin="round"/>
+      <rect x="${cx - 7}" y="${cy - 9}" width="14" height="9" rx="2" fill="#3a4252" stroke="#596377" stroke-width=".8"/><path d="M${cx - 10} ${cy - 9} h20 l-4 -4 h-12 z" fill="#4a5468"/>`;
+    if (o.winter) a += `<path d="M${cx - 10} ${cy - 13} h20" stroke="#eef6ff" stroke-width="2.2" stroke-linecap="round"/>` + [-6, 0, 6].map((ix, q) => `<path d="M${cx + ix} ${cy - 1} v${3 + (q % 2) * 3}" stroke="#dff0ff" stroke-width="1.2" stroke-linecap="round"/>`).join("");
+    const p = k === "in" ? `M${cx - 18} ${cy - 30} q6 2 8 8 t6 4` : `M${cx + 2} ${cy - 14} q6 -4 4 -10 t6 -8`;
+    a += [0, 1].map((q) => `<path class="${k === "in" ? "vl-in" : "vl-out"}" d="${p}" transform="translate(${k === "in" ? -q * 4 : q * 3} ${-q * 3})" fill="none" stroke="${k === "in" ? C : "#c9b8a6"}" stroke-width="2.2" stroke-linecap="round" style="animation-duration:${spin * 2.2}s;animation-delay:${q * spin}s"/>`).join("");
+  });
+  // the unit: a white box, a turning fan, the heat exchanger glowing cold to warm, and a status light
+  const fc = bh / 2, fr = bh * .36;
+  a += `<g transform="translate(${bx} ${by})" filter="url(#vl-sh)"><rect width="${bw}" height="${bh}" rx="6" fill="url(#vl-box)"/>
+    <rect x="${bw * .48}" y="5" width="${bw * .4}" height="${bh - 10}" rx="3" fill="url(#vl-hx)" opacity=".9"/><rect x="${bw * .48}" y="5" width="${bw * .4}" height="${bh - 10}" rx="3" fill="url(#vl-hx)" filter="url(#vl-b2)" opacity=".6"/>
+    ${[0, 1, 2, 3].map((k) => `<rect x="${bw * .48 + 3 + k * bw * .09}" y="5" width="1.2" height="${bh - 10}" fill="#fff" opacity=".55"/>`).join("")}
+    <circle cx="${fc}" cy="${bh / 2}" r="${fr + 2}" fill="#dfe4ec" stroke="#b5bdca"/>
+    <g class="vl-spin" style="animation-duration:${spin}s">${[0, 120, 240].map((d) => `<path d="M${fc} ${bh / 2} q-2 -${fr * .8} 3 -${fr * .9} q2 ${fr * .45} -3 ${fr * .9}z" fill="${strong ? "#2f8ef0" : "#7c8aa0"}" transform="rotate(${d} ${fc} ${bh / 2})"/>`).join("")}</g>
+    <circle cx="${fc}" cy="${bh / 2}" r="1.8" fill="#5d6b80"/><circle class="vl-led" cx="${bw - 6}" cy="6" r="2.2" fill="${C}"/></g>`;
+  out.attic = a;
+  // each room's air colour, and a dot in the corner
+  let ov = "";
+  for (const r of data.rooms || []) {
+    const pos = o.tilePos[r.area_id], ar = (r.air || {}).air;
+    if (!pos || !ar) continue;
+    const [x, y] = pos, col = { good: "#3ddc97", warn: "#f5b544", bad: "#ff6a4a" }[ar];
+    ov += `<rect x="${x}" y="${y}" width="${o.tw}" height="${o.th}" rx="16" fill="url(#vl-air-${ar})" pointer-events="none" ${ar !== "good" ? 'class="vl-pulse"' : ""}/>
+      <circle cx="${x + o.tw - 12}" cy="${y + o.th - 21}" r="3" fill="${col}"/>`;
+  }
+  // the room that decides: a soft glow, steam or a chip with the value, and the air drawn up to the attic
+  const lead = v.lead && o.tilePos[v.lead.area_id];
+  if (lead && strong) {
+    const [x, y] = lead, w = o.tw, h = o.th;
+    ov = `<rect class="vl-pulse" x="${x - 4}" y="${y - 4}" width="${w + 8}" height="${h + 8}" rx="20" fill="#5ab8ff" opacity=".5" filter="url(#vl-b6)"/>` + ov
+      + `<rect x="${x + .5}" y="${y + .5}" width="${w - 1}" height="${h - 1}" rx="15.5" fill="none" stroke="#8fd0ff" stroke-opacity=".75"/>`;
+    if (v.why === "shower" || v.why === "damp") ov += [0, 1, 2].map((k) => `<path class="vl-steam" d="M${x + w - 34 + k * 6} ${y + 52} q-3 -5 0 -9 q3 -4 0 -9" fill="none" stroke="#d8ecff" stroke-width="1.6" stroke-linecap="round" style="animation-delay:${k * .5}s"/>`).join("");
+    if (v.lead.value != null) {
+      const txt = `${v.lead.value}${v.lead.unit === "%" ? " %" : " " + v.lead.unit}`, cw = txt.length * 6.2 + 16;
+      ov += `<g transform="translate(${x + 10} ${y + h - 9})"><rect width="${cw}" height="18" rx="9" fill="#1e6fd9"/><text x="${cw / 2}" y="12.5" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${txt}</text></g>`;
+    }
+    const path = `M${x + w - 22} ${y + 18} C ${x + w + 10} ${y - 40}, ${peak - 10} ${by + bh + 40}, ${peak - 6} ${by + bh}`;
+    ov += `<path class="vl-whoosh" d="${path}" fill="none" stroke="#8fd0ff" stroke-width="6" stroke-linecap="round" filter="url(#vl-b2)" opacity=".6"/>
+      <path class="vl-whoosh" d="${path}" fill="none" stroke="#e6f5ff" stroke-width="1.8" stroke-linecap="round"/>`;
+  }
+  // summer: cool air pouring in through the bypass
+  if (cool) ov += `<rect class="vl-fog" x="${o.bx + o.wallT}" y="${rb}" width="${o.bw - 2 * o.wallT}" height="200" fill="url(#vl-attic)" opacity=".7"/>`;
+  // what it does, as a small caption under the roof
+  const roomName = v.lead ? v.lead.name : "";
+  const why = (t[v.why] || (v.why === "normal" ? (v.efficiency != null ? t.rec.replace("{x}", v.efficiency) : t.ok) : v.why || "")).replace("{r}", roomName);
+  const right = o.bx + o.bw - o.wallT - o.inner;
+  ov += `<text x="${right}" y="${rb + 22}" text-anchor="end" font-size="${narrow ? 10.5 : 12}" font-weight="650" fill="${o.D ? "#dfe9f7" : "#33415a"}"><tspan fill="${C}">${t[lvl] || lvl}</tspan> · ${esc(why)}</text>`;
+  out.over = ov;
+  return out;
+}
 function houseSvg(rooms) {
   const narrow = (window.innerWidth || 800) < 600;
   const W = narrow ? 390 : 760, cols = narrow ? 2 : 4, pad = narrow ? 30 : 92, gx = 10, gy = 10, th = narrow ? 90 : 94, wallT = narrow ? 9 : 14, inner = narrow ? 10 : 18;
@@ -451,6 +540,7 @@ function houseSvg(rooms) {
   const loose = rooms.filter((r) => !floors.some((f) => f.floor_id === r.floor_id));
   if (loose.length) bands.push({ floor_id: "", name: "", level: 0, rooms: loose });
   let y = roofTop + roofH + 6, inside = "", tiles = "", ground = null, slabs = "";
+  const tilePos = {};
   const ink = D ? "#f1f3f8" : "#141824", sub = D ? "#c3c9d6" : "#4a505e";
   bands.forEach((b, bi) => {
     const rows = Math.ceil(b.rooms.length / cols), h = rows * th + (rows - 1) * gy + 42, below = b.level < 0;
@@ -467,6 +557,7 @@ function houseSvg(rooms) {
       const prog = r.temp != null && w.temp != null ? Math.max(0, Math.min(1, 1 - (w.temp - r.temp) / 3)) : 0;
       const label = w.temp == null ? (win ? "🪟 " : "") + T.off : "→ " + num(deg(w.temp)) + "° " + (T.why[why] || why);
       const icon = hot || r.occupied;
+      tilePos[r.area_id] = [x, ty];
       tiles += `<g class="tile${hot ? " hot" : ""}" data-room="${esc(r.area_id)}">
         ${hot && D ? `<rect x="${x - 6}" y="${ty - 6}" width="${tw + 12}" height="${th + 12}" rx="22" fill="#ff9a4a" opacity=".32" filter="url(#hp-b10)"/>` : ""}
         <rect class="bg" x="${x}" y="${ty}" width="${tw}" height="${th}" rx="16" fill="${D ? "rgba(28,32,44,.88)" : "rgba(255,255,255,.9)"}" filter="url(#hp-card)"/>
@@ -618,7 +709,8 @@ function houseSvg(rooms) {
     <filter id="hp-b10" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="10"/></filter><filter id="hp-b14" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter>
     <filter id="hp-b30" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="30"/></filter></defs>`;
   const grain = `<rect width="${W}" height="${H}" filter="url(#hp-grainf)" opacity="${D ? .22 : .14}" style="mix-blend-mode:overlay;pointer-events:none"/>`;
-  return `<svg viewBox="0 0 ${W} ${H}" role="img">${defs}${sk}${gd}${house}${inside}${slabs}${roof}${deco}${tiles}${wx}${veil}${out}${grain}</svg>`;
+  const air = ventLayer({ tilePos, tw, th, rl, rr, rb, roofTop, peak, bx, bw, wallT, inner, D, narrow, winter: season === "winter" || snowLies, ph });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img">${defs}${air.defs}${sk}${gd}${house}${inside}${slabs}${roof}${air.attic}${deco}${tiles}${air.over}${wx}${veil}${out}${grain}</svg>`;
 }
 
 function tuneLabel(v, u, k) {

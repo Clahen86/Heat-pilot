@@ -96,6 +96,7 @@ def find(areas: list[dict[str, Any]], devices_list: list[dict[str, Any]], entiti
         humidity = pick(lambda e, a: e["entity_id"].startswith("sensor.") and a.get("device_class") == "humidity"
                         and e.get("device_id") not in climate_devs)
         co2 = pick(lambda e, a: e["entity_id"].startswith("sensor.") and a.get("device_class") == "carbon_dioxide")
+        pm25 = pick(lambda e, a: e["entity_id"].startswith("sensor.") and a.get("device_class") == "pm25")
         lights = pick(lambda e, a: e["entity_id"].startswith("light."))
         # Batteries of the room's own devices (thermostats, sensors) - for the low-battery message.
         own_devs = {e.get("device_id") for e in ents if e.get("device_id") and (e["entity_id"].startswith("climate.") or e["entity_id"] in temps[:1])}
@@ -110,7 +111,7 @@ def find(areas: list[dict[str, Any]], devices_list: list[dict[str, Any]], entiti
         electric = powered or any(ELECTRIC_WORDS.search(f"{t['entity_id']} {t['name']} {t.get('model') or ''}") for t in thermostats)
         rooms.append({"area_id": area, "name": name, "kind": room_kind(name), "floor_id": area_floor.get(area), "heating": "floor" if floor else "radiator",
                       "floor_kind": ("electric" if electric else "water") if floor else None, "thermostats": thermostats, "temp_sensor": temps[0] if temps else None, "temp_options": temps,
-                      "windows": windows, "doors": doors, "presence": presence, "humidity": humidity[:1], "co2": co2[:1], "lights": lights, "batteries": batteries})
+                      "windows": windows, "doors": doors, "presence": presence, "humidity": humidity[:1], "co2": co2[:1], "pm25": pm25[:1], "lights": lights, "batteries": batteries})
     # Thermostats with no area (a single Nest or ecobee is often never put in a room): each is a room of its own,
     # named after it - with nothing but the thermostat's own temperature.
     for e in entities:

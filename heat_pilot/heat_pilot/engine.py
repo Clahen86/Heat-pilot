@@ -12,13 +12,13 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from . import alerts, brands, discover, features, people, plan, pricefeed, sunfeed, supply, ventilation
+from . import air, alerts, brands, discover, features, people, plan, pricefeed, sunfeed, supply, ventilation
 from .signals import Watch
 from .control import Sender, exercise_now
 from .learning import Learning, Model, seed
 
 _LOGGER = logging.getLogger(__name__)
-ROOM_KEYS = {"no_learning", "doors_extra", "evening", "evening_from", "evening_to", "price_flex", "kind", "heating", "temp_sensor", "comfort", "setback", "night", "away", "day_from", "day_to", "excluded", "fixed_hours", "owner"}
+ROOM_KEYS = {"no_learning", "doors_extra", "evening", "evening_from", "evening_to", "price_flex", "kind", "heating", "temp_sensor", "comfort", "setback", "night", "away", "day_from", "day_to", "excluded", "fixed_hours", "owner", "airflow"}
 
 
 def f_to_c(v: float) -> float:
@@ -90,6 +90,8 @@ class Pilot:
         self.agree = {"same": 0, "checks": 0}
         self.learning = Learning(data_dir)
         self.watch = Watch()
+        self.airwatch = air.AirWatch()
+        self.air_rooms: list[dict[str, Any]] = []
         self.doors: list[str] = []
         self.all_doors: list[str] = []
         self.have: dict[str, bool] = {}
@@ -158,6 +160,7 @@ class Pilot:
         self.all_doors = discover.all_doors(entities, self.ha.states)
         self.meter = supply.find_heat_meter(entities, devices, self.ha.states)
         self.vent = ventilation.find(entities, devices, self.ha.states)
+        self.air_rooms = air.find_air_rooms(areas, devices, entities, self.ha.states, {r["area_id"] for r in self.found})
         try:
             svc = await self.ha.command({"type": "get_services"})
             names = sorted((svc.get("notify") or {}).keys())
@@ -206,7 +209,7 @@ class Pilot:
         for r in self.found:
             own = (self.settings.get("rooms") or {}).get(r["area_id"]) or {}
             room = {**r, **{k: v for k, v in own.items() if k in ("kind", "heating", "temp_sensor", "excluded")}}
-            room["cfg"] = {**plan.defaults(room), **{k: v for k, v in own.items() if k in ROOM_KEYS - {"kind", "heating", "temp_sensor", "excluded", "fixed_hours", "owner", "doors_extra"}}}
+            room["cfg"] = {**plan.defaults(room), **{k: v for k, v in own.items() if k in ROOM_KEYS - {"kind", "heating", "temp_sensor", "excluded", "fixed_hours", "owner", "doors_extra", "airflow"}}}
             if "comfort" not in own and not own.get("no_learning") and (learned := self.model.comfort(r["area_id"])) is not None:
                 room["cfg"]["comfort"] = learned
                 room["comfort_learned"] = True
@@ -426,11 +429,19 @@ class Pilot:
         if on["ventilation"] and self.vent:
             temps = [t for r in rooms if (t := self.room_temp(r)) is not None]
             comforts = [r["cfg"]["comfort"] for r in rooms]
-            shower = on["shower"] and any(self.watch.shower(r["area_id"], now) for r in rooms)
-            want_v = ventilation.decide(rooms, st, shower, away, sum(temps) / len(temps) if temps else None,
-                                        sum(comforts) / len(comforts) if comforts else 21.0, outdoor_now)
+            own_rooms = self.settings.get("rooms") or {}
+            want_v = air.decide([r for r in rooms if not r.get("excluded")] + self.air_rooms, st, self.airwatch, now, away=away,
+                                house_temp=sum(temps) / len(temps) if temps else None,
+                                comfort=sum(comforts) / len(comforts) if comforts else 21.0, outdoor=outdoor_now,
+                                outdoor_dp=air.outdoor_dewpoint(st), own=own_rooms)
             cur = ventilation.current_level(self.vent, st)
-            self.vent_now = {**want_v, "current": cur, "same": cur == want_v["level"], "efficiency": ventilation.efficiency(self.vent, st),
+            # how often it agrees with what runs the unit today (shadow): a slowly fading count, so last week weighs most
+            va = self.settings.setdefault("vent_agree", {"same": 0.0, "checks": 0.0})
+            if cur is not None:
+                va["checks"] = va["checks"] * 0.9995 + 1
+                va["same"] = va["same"] * 0.9995 + (cur == want_v["level"])
+            self.vent_now = {**want_v, "current": cur, "same": cur == want_v["level"],
+                             "agree": round(100 * va["same"] / va["checks"]) if va["checks"] >= 30 else None, "efficiency": ventilation.efficiency(self.vent, st),
                              "bypass": ventilation.bypass_open(self.vent, st), "calls": ventilation.calls(self.vent, st, want_v["level"]),
                              "temps": {k: self.sensor_c(self.vent.get(k)) for k in ("outdoor", "supply", "extract", "exhaust")},
                              "name": self.vent["name"], "model": self.vent.get("model")}
@@ -759,6 +770,10 @@ class Pilot:
                          | {"heat_type": r["heating"], "cfg": r["cfg"],
                             "temp_names": {e: ((self.ha.states.get(e) or {}).get("attributes") or {}).get("friendly_name") or e for e in r.get("temp_options") or []}, "thermostats": [{k: t[k] for k in ("entity_id", "name", "brand", "platform", "model")}
                                                              for t in r["thermostats"]]} | n)
+        own_rooms = self.settings.get("rooms") or {}
+        for room in rooms:
+            src = next((r for r in self.found if r["area_id"] == room["area_id"]), room)
+            room["air"] = air.room_air(src, self.ha.states, own_rooms.get(room["area_id"]))
         a = self.agree
         tz = ZoneInfo(self.ha.config.get("time_zone") or "UTC")
         now = datetime.now(tz)
@@ -783,7 +798,9 @@ class Pilot:
                            for a in self.alerts.active],
                 "messages": self.settings.get("messages") or {}, "notify": self.notify, "alert_kinds": alerts.KINDS,
                 "watchdog_restart": bool(self.settings.get("watchdog_restart")),
-                "vent": getattr(self, "vent_now", None), "ventilation": self.settings.get("ventilation") or {},
+                "vent": getattr(self, "vent_now", None),
+                "air_rooms": [{"area_id": r["area_id"], "name": r["name"], "floor_id": r.get("floor_id"),
+                               **air.room_air(r, self.ha.states, own_rooms.get(r["area_id"]))} for r in self.air_rooms], "ventilation": self.settings.get("ventilation") or {},
                 "cooling_options": [{"entity_id": e, "name": (self.ha.states.get(e) or {}).get("attributes", {}).get("friendly_name") or e} for e in self.cooling_options]}
 
     def outdoor_sensor(self) -> str | None:
