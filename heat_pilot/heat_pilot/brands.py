@@ -69,7 +69,8 @@ GROUP_PLATFORMS = {"group", "climate_group", "climate_group_helper"}
 MODELS: list[tuple[str, dict[str, Any]]] = [
     (r"SRTS-A01|lumi\.airrtc\.agl001|radiator thermostat E1|Aqara.*E1", {"name": "Aqara E1", "manual_preset": "manual", "away_is_frost": True,
                                                   "room_sensor": ("external_temperature_input", "sensor", "external")}),
-    (r"W600|lumi\.airrtc\.aeu005", {"name": "Aqara W600", "manual_hvac": "heat", "own_schedule": True}),
+    (r"W600|lumi\.airrtc\.aeu005", {"name": "Aqara W600", "manual_hvac": "heat", "own_schedule": True,
+                                    "room_sensor": ("external_temperature_input", "sensor", "external")}),
     (r"TRVZB", {"name": "SONOFF TRVZB", "manual_hvac": "heat",
                 "room_sensor": ("external_temperature_input", "temperature_sensor_select", "external")}),
     (r"014G246[13]|eTRV0100|Ally", {"name": "Danfoss Ally", "no_off": True, "own_schedule": True,
