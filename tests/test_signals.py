@@ -118,3 +118,24 @@ def test_room_temperature_sent_to_the_valve_every_five_minutes():
     p.ha.states["sensor.room"]["last_updated"] = (now - timedelta(hours=13)).isoformat()
     assert p.room_sensor_calls(r, now + timedelta(minutes=10)) == []  # a sensor gone quiet: the valve uses its own
     assert p.room_sensor_calls({**r, "temp_sensor": None}, now) == []  # no room sensor: never its own reading fed back
+
+
+def test_card_hold_and_boost_are_never_learned_from():
+    from types import SimpleNamespace
+
+    from heat_pilot.engine import Pilot
+
+    p = Pilot.__new__(Pilot)
+    p.ha = SimpleNamespace(config={"time_zone": "Europe/Copenhagen", "unit_system": {"temperature": "°C"}}, states={})
+    p.watch = Watch()
+    p.now = {"r": {"want": {"temp": 18.0, "why": "setback"}}}
+    p.rooms = lambda: [{"area_id": "r", "cfg": {"comfort": 20.0}}]
+    b = p.hold("r", boost=True)
+    assert b["temp"] == 22.0 and b["boost"]  # comfort + 2
+    assert p.watch.manual["r"]["card"]
+    s = p.hold("r", step=-0.5)
+    assert s["temp"] == 21.5 and not s["boost"]  # a step from the hold now
+    assert p.hold("r", temp=40)["temp"] == 28.0  # kept sane
+    assert p.hold("nowhere", boost=True) is None
+    p.resume("r")
+    assert "r" not in p.watch.manual

@@ -49,6 +49,9 @@ def _num(s: dict[str, Any] | None) -> float | None:
         return None
 
 
+HOLD_MIN_CARD = 60  # a boost or +/- on the card lasts this long
+BOOST_UP = 2.0  # a boost: this much above comfort (or above what it was)
+MIN_HOLD, MAX_HOLD = 5.0, 28.0
 ROOM_SENSOR_EVERY_MIN = 5  # the room temperature to the valve this often (it falls back to its own sensor if it stops)
 ROOM_SENSOR_FRESH_H = 12  # a room sensor that hasn't changed in this long is taken as gone
 SENSOR_SWITCH_S = 180  # a valve that swapped temperature sensor this recently: its setpoint jump isn't a person
@@ -226,6 +229,31 @@ class Pilot:
                 else:
                     own[k] = v
         self.save()
+
+    def hold(self, area: str, temp: float | None = None, step: float | None = None, boost: bool = False,
+             minutes: float = HOLD_MIN_CARD) -> dict[str, Any] | None:
+        """The dashboard card: a temperature for a while (or a boost) - kept apart from turning by hand, so nothing
+        is learned from it. The hold ends by itself; resume() ends it now."""
+        tz = ZoneInfo(self.ha.config.get("time_zone") or "UTC")
+        now = datetime.now(tz)
+        room = next((r for r in self.rooms() if r["area_id"] == area), None)
+        if room is None:
+            return None
+        n = self.now.get(area) or {}
+        cur = self.watch.manual_for(area, now)
+        base_t = cur["temp"] if cur else ((n.get("want") or {}).get("temp") or room["cfg"].get("comfort") or 20.0)
+        if boost:
+            t = max(base_t, float(room["cfg"].get("comfort") or 20.0)) + BOOST_UP
+        elif temp is not None:
+            t = self.c(float(temp))  # the home's unit in, °C inside
+        else:
+            t = base_t + float(step or 0) * (5 / 9 if self.fahrenheit else 1)
+        t = round(min(MAX_HOLD, max(MIN_HOLD, t)) * 2) / 2
+        self.watch.manual[area] = {"temp": t, "until": now + timedelta(minutes=float(minutes)), "card": True, "boost": bool(boost)}
+        return {"temp": t, "until": self.watch.manual[area]["until"].isoformat(), "boost": bool(boost)}
+
+    def resume(self, area: str) -> None:
+        self.watch.clear_manual(area)
 
     def mode(self, area: str) -> str:
         """shadow (the start for every room), control or off."""
@@ -416,7 +444,8 @@ class Pilot:
                 sp = ((st.get(th["entity_id"]) or {}).get("attributes") or {}).get("temperature")
                 self.watch.see_setpoint(a_id, th["entity_id"], self.c(sp) if isinstance(sp, (int, float)) else None, now,
                                         controlled and on["manual"], sensor_switched(st, th["entity_id"], now))
-            manual = self.watch.manual_for(a_id, now) if on["manual"] else None
+            held = self.watch.manual_for(a_id, now)
+            manual = held if (on["manual"] or (held and held.get("card"))) else None  # the card's hold works without the feature
             hours_today = by_day[now.weekday()]
             self.model.see(a_id, now, temp, outdoor_now, heating_now, sunny, sun_up, sun_now)
             nxt = plan.next_comfort({**plan.defaults(r), **r["cfg"]}, hours_today, now)
@@ -438,7 +467,8 @@ class Pilot:
                                on["shower"] and self.watch.shower(a_id, now), on["sun"] and self.watch.sun_warms(r, st, now),
                                is_summer, holiday, bool(on["people"] and people.owners_away(st, r.get("owner"))),
                                bool(coming), level if supply.is_electric(r) else None, spread, cooling, extra)
-            if manual and r["cfg"].get("comfort") and plan.NIGHT_TO <= now.hour < plan.NIGHT_FROM and not self.watch.manual.get(a_id, {}).get("learned"):
+            if manual and r["cfg"].get("comfort") and plan.NIGHT_TO <= now.hour < plan.NIGHT_FROM and not self.watch.manual.get(a_id, {}).get("learned") \
+                    and not self.watch.manual.get(a_id, {}).get("card"):  # boost and +/- on the card: never learned from
                 self.model.learn_comfort(a_id, manual["temp"], r["cfg"]["comfort"])  # turned by hand: comfort moves a little
                 self.watch.manual[a_id]["learned"] = True
             if want["temp"] is not None and temp is not None:

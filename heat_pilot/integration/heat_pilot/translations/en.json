@@ -1,0 +1,71 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Varmepilot",
+        "description": "The Heat Pilot app's address",
+        "data": {
+          "url": "Address"
+        }
+      },
+      "confirm": {
+        "title": "Varmepilot",
+        "description": "Add Varmepilot? It gives the dashboard card its buttons."
+      }
+    },
+    "error": {
+      "cannot_connect": "Heat Pilot isn't answering on that address"
+    },
+    "abort": {
+      "already_configured": "Already added"
+    }
+  },
+  "services": {
+    "boost": {
+      "name": "Boost",
+      "description": "A room warmer for a while - not learned from.",
+      "fields": {
+        "area_id": {
+          "name": "Room",
+          "description": "The room"
+        },
+        "minutes": {
+          "name": "Minutes",
+          "description": "How long"
+        }
+      }
+    },
+    "set_temperature": {
+      "name": "Temperature for a while",
+      "description": "A temperature, or a step up or down, for a while - not learned from.",
+      "fields": {
+        "area_id": {
+          "name": "Room",
+          "description": "The room"
+        },
+        "temperature": {
+          "name": "Temperature",
+          "description": "The temperature"
+        },
+        "step": {
+          "name": "Step",
+          "description": "Up or down from now"
+        },
+        "minutes": {
+          "name": "Minutes",
+          "description": "How long"
+        }
+      }
+    },
+    "resume": {
+      "name": "Back to the plan",
+      "description": "Ends a boost or a temperature for a while.",
+      "fields": {
+        "area_id": {
+          "name": "Room",
+          "description": "The room"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,32 @@
+boost:
+  fields:
+    area_id:
+      required: true
+      selector:
+        area:
+    minutes:
+      default: 60
+      selector:
+        number: { min: 5, max: 720, unit_of_measurement: min }
+set_temperature:
+  fields:
+    area_id:
+      required: true
+      selector:
+        area:
+    temperature:
+      selector:
+        number: { min: 5, max: 28, step: 0.5 }
+    step:
+      selector:
+        number: { min: -5, max: 5, step: 0.5 }
+    minutes:
+      default: 60
+      selector:
+        number: { min: 5, max: 720, unit_of_measurement: min }
+resume:
+  fields:
+    area_id:
+      required: true
+      selector:
+        area:

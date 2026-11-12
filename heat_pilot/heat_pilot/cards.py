@@ -48,16 +48,32 @@ class Publisher:
     def __init__(self) -> None:
         self._last = ""
 
+    @staticmethod
+    def room(r: dict[str, Any], pilot: Any, conv) -> dict[str, Any]:
+        """One room for the cards: now, the target and why, a hold from the card, and the plan for the next 24 hours."""
+        want = r.get("want") or {}
+        held = (getattr(pilot, "watch", None) and pilot.watch.manual.get(r["area_id"])) or {}
+        tl = r.get("timeline") or []
+        step = max(1, len(tl) // 24) if len(tl) > 24 else 1
+        plan_ = [[q["t"], conv(q.get("temp")), q.get("why")] for q in tl[::step]][:25]
+        after = want.get("until") or ""  # a hold: the next change is when it ends
+        nxt = next(({"t": q["t"], "temp": conv(q.get("temp")), "why": q.get("why")} for q in tl
+                    if q["t"] >= after and (q.get("temp") != want.get("temp") or q.get("why") != want.get("why"))), None)
+        return {"area_id": r["area_id"], "name": r["name"], "sensor": r.get("temp_sensor"), "temp": conv(r.get("temp")),
+                "want": conv(want.get("temp")), "why": want.get("why"), "until": want.get("until"), "heating": r.get("heating"),
+                "comfort": conv((r.get("cfg") or {}).get("comfort")), "mode": r.get("mode", "shadow"),
+                "card": bool(held.get("card")) and want.get("why") == "manual", "boost": bool(held.get("boost")) and want.get("why") == "manual",
+                "humidity": (r.get("humidity") or [None])[0], "windows": r.get("windows") or [], "next": nxt, "plan": plan_}
+
     async def publish(self, ha: Any, pilot: Any) -> None:
         st = pilot.status()
         conv = lambda v: None if v is None else pilot.out_unit(v)  # the card shows the home's own unit (°F in the US)
-        rooms = [{"area_id": r["area_id"], "name": r["name"], "sensor": r.get("temp_sensor"), "temp": conv(r.get("temp")),
-                  "want": conv((r.get("want") or {}).get("temp")), "why": (r.get("want") or {}).get("why"), "heating": r.get("heating")}
-                 for r in st["rooms"] if not r.get("excluded")]
+        rooms = [self.room(r, pilot, conv) for r in st["rooms"] if not r.get("excluded")]
         attrs = {"friendly_name": "Varmepilot", "icon": "mdi:radiator", "rooms": rooms, "sentence": pilot.sentence(),
                  "mode": "shadow" if all(r.get("mode", "shadow") == "shadow" for r in st["rooms"]) else "control",
                  "heating": sum(1 for r in rooms if r["heating"]), "alerts": len(st.get("alerts") or [])}
-        key = json.dumps([{k: v for k, v in r.items() if k != "temp"} for r in rooms] + [attrs["sentence"], attrs["alerts"]], sort_keys=True, default=str)
+        key = json.dumps([{k: v for k, v in r.items() if k not in ("temp", "plan")} for r in rooms]
+                         + [[(r["plan"] or [[None]])[0][0] for r in rooms], attrs["sentence"], attrs["alerts"]], sort_keys=True, default=str)
         if key == self._last and SENSOR in ha.states:
             return
         await ha.set_state(SENSOR, attrs["heating"], attrs)

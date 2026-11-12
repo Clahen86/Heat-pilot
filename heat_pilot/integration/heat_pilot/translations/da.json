@@ -1,0 +1,71 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Varmepilot",
+        "description": "Varmepilot-appens adresse",
+        "data": {
+          "url": "Adresse"
+        }
+      },
+      "confirm": {
+        "title": "Varmepilot",
+        "description": "Tilføj Varmepilot? Den giver dashboard-kortet dets knapper."
+      }
+    },
+    "error": {
+      "cannot_connect": "Varmepilot svarer ikke på den adresse"
+    },
+    "abort": {
+      "already_configured": "Allerede tilføjet"
+    }
+  },
+  "services": {
+    "boost": {
+      "name": "Boost",
+      "description": "Et rum varmere et stykke tid - Varmepilot lærer ikke af det.",
+      "fields": {
+        "area_id": {
+          "name": "Rum",
+          "description": "Rummet"
+        },
+        "minutes": {
+          "name": "Minutter",
+          "description": "Hvor længe"
+        }
+      }
+    },
+    "set_temperature": {
+      "name": "Temperatur et stykke tid",
+      "description": "En temperatur, eller et skridt op eller ned, et stykke tid - Varmepilot lærer ikke af det.",
+      "fields": {
+        "area_id": {
+          "name": "Rum",
+          "description": "Rummet"
+        },
+        "temperature": {
+          "name": "Temperatur",
+          "description": "Temperaturen"
+        },
+        "step": {
+          "name": "Skridt",
+          "description": "Op eller ned fra nu"
+        },
+        "minutes": {
+          "name": "Minutter",
+          "description": "Hvor længe"
+        }
+      }
+    },
+    "resume": {
+      "name": "Tilbage til planen",
+      "description": "Stopper en boost eller en midlertidig temperatur.",
+      "fields": {
+        "area_id": {
+          "name": "Rum",
+          "description": "Rummet"
+        }
+      }
+    }
+  }
+}

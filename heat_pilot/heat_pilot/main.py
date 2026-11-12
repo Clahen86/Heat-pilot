@@ -28,6 +28,15 @@ async def main() -> None:
         except Exception:  # noqa: BLE001
             logging.getLogger("heat_pilot").warning("Card not installed", exc_info=True)
         pub = cards.Publisher()
+        pilot.card_pub = pub  # the card's buttons show their result at once
+        try:
+            from . import companion
+
+            companion.install()
+            if ha.session is not None:
+                await companion.announce(ha.session)
+        except Exception:  # noqa: BLE001
+            logging.getLogger("heat_pilot").warning("Companion integration not installed", exc_info=True)
         rounds = 0
         while True:
             try:

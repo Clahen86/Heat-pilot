@@ -29,6 +29,24 @@ def make_app(pilot) -> web.Application:
         pilot.tick()
         return web.json_response({"ok": True})
 
+    async def hold(req: web.Request) -> web.Response:
+        """The dashboard card (through the companion integration): boost, +/-, a temperature, or back to the plan."""
+        body = await req.json()
+        area = str(body.get("area_id", ""))
+        if body.get("resume"):
+            pilot.resume(area)
+            out = {"ok": True}
+        else:
+            r = pilot.hold(area, body.get("temperature"), body.get("step"), bool(body.get("boost")), float(body.get("minutes") or 60))
+            if r is None:
+                return web.json_response({"ok": False, "error": "unknown room"}, status=404)
+            out = {"ok": True, **r}
+        pilot.tick()
+        await pilot.control()
+        if getattr(pilot, "card_pub", None):
+            await pilot.card_pub.publish(pilot.ha, pilot)
+        return web.json_response(out)
+
     async def feature(req: web.Request) -> web.Response:
         body = await req.json()
         pilot.set_feature(str(body.get("key")), bool(body.get("on")))
@@ -126,6 +144,7 @@ def make_app(pilot) -> web.Application:
     app.router.add_post("/api/room", room)
     app.router.add_post("/api/discover", rediscover)
     app.router.add_post("/api/feature", feature)
+    app.router.add_post("/api/hold", hold)
     app.router.add_post("/api/district", district)
     app.router.add_post("/api/ventilation", vent)
     app.router.add_post("/api/messages", messages)
