@@ -327,8 +327,8 @@ const VV_T = {
 const VV_FAN = '<path d="M12 12c0-3 1.5-6 4-6 2 0 2.5 2.5.5 3.5L12 12Zm0 0c3 0 6 1.5 6 4 0 2-2.5 2.5-3.5.5L12 12Zm0 0c0 3-1.5 6-4 6-2 0-2.5-2.5-.5-3.5L12 12Zm0 0c-3 0-6-1.5-6-4 0-2 2.5-2.5 3.5-.5L12 12Z"/>';
 class VarmepilotVentCard extends HTMLElement {
   setConfig(config) { this.config = config || {}; this._open = false; }
-  getCardSize() { return 1; }
-  getGridOptions() { return { columns: 12, rows: 1, min_rows: 1 }; }
+  getCardSize() { return 2; }
+  getGridOptions() { return { columns: 12, rows: 2, min_rows: 2 }; }
   static getStubConfig() { return {}; }
   set hass(hass) {
     this._hass = hass;
@@ -351,59 +351,68 @@ class VarmepilotVentCard extends HTMLElement {
     if (lead.minutes != null && (v.why === "shower" || v.why === "damp")) why += " · " + T.min.replace("{x}", lead.minutes);
     // in shadow the unit runs on what something else chose: say what Heat Pilot would do, and why
     if (v.mode !== "control" && v.current && v.current !== v.level) why = T.would.replace("{x}", (T.lv[v.level] || v.level).toLowerCase()) + " · " + why.charAt(0).toLowerCase() + why.slice(1);
-    const R = 15, c = 16, seg = (i) => { const p = (x) => [c + R * Math.cos(x), c + R * Math.sin(x)], a0 = Math.PI * .75 + Math.PI * 1.5 * i / 4 + .1, a1 = Math.PI * .75 + Math.PI * 1.5 * (i + 1) / 4 - .1;
+    const R = 21, c = 23, seg = (i) => { const p = (x) => [c + R * Math.cos(x), c + R * Math.sin(x)], a0 = Math.PI * .75 + Math.PI * 1.5 * i / 4 + .1, a1 = Math.PI * .75 + Math.PI * 1.5 * (i + 1) / 4 - .1;
       const [x0, y0] = p(a0), [x1, y1] = p(a1); return `M${x0.toFixed(1)} ${y0.toFixed(1)} A${R} ${R} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`; };
-    const ring = `<svg class="ring" viewBox="0 0 32 32">${[0, 1, 2, 3].map((i) => `<path d="${seg(i)}" fill="none" stroke="${i < n ? "var(--a)" : "var(--sbg)"}" stroke-width="2.6" stroke-linecap="round"/>`).join("")}</svg>`;
+    const ring = `<svg class="ring" viewBox="0 0 46 46">${[0, 1, 2, 3].map((i) => `<path d="${seg(i)}" fill="none" stroke="${i < n ? "var(--a)" : "var(--sbg)"}" stroke-width="3.2" stroke-linecap="round"/>`).join("")}</svg>`;
     const bars = [1, 2, 3, 4].map((k) => `<u class="${k <= n ? "l" : ""}" style="height:${4 + k * 2.5}px;animation-delay:${k * .12}s"></u>`).join("");
     const chip = (t, k) => `<span class="chip" style="--k:${k}"><i></i>${t}</span>`;
     const val = lead.value != null ? `${lead.value}${lead.unit === "%" ? " %" : " " + (lead.unit || "")}` : null;
     const w0 = (v.warn || [])[0] || {};
     const right = strong && val ? chip(val, v.why === "co2" ? "#f5b544" : "#ff6a4a")
-      : warn ? chip(w0.co2 != null && w0.co2 >= 1000 ? `${w0.co2} ppm` : `${w0.hum} %`, w0.air === "bad" ? "#ff6a4a" : "#f5b544")
-      : v.outdoor != null && v.supply != null ? `<span class="mini">${v.outdoor}° <s></s> ${v.supply}°${v.efficiency != null ? ` · ${v.efficiency} %` : ""}</span>` : "";
-    const air = strong ? `<svg class="air" viewBox="0 0 400 60" preserveAspectRatio="none">${[0, 1, 2].map((k) => `<path d="M-30 ${14 + k * 16} C 100 ${4 + k * 16}, 220 ${26 + k * 14}, 430 ${10 + k * 16}" style="animation-delay:${-k * .8}s"/>`).join("")}</svg>` : "";
+      : false ? ""
+      : "";
+    const air = true ? `<svg class="air" viewBox="0 0 400 110" preserveAspectRatio="none">${[0, 1, 2, 3].map((k) => `<path d="M-30 ${18 + k * 24} C 100 ${4 + k * 24}, 220 ${40 + k * 20}, 430 ${12 + k * 24}" style="animation-delay:${-k * .8}s"/>`).join("")}</svg>` : "";
     const shadow = v.mode !== "control";
+    const hx = v.outdoor != null && v.supply != null ? `<span class="hx"><b>${v.outdoor}°</b><svg viewBox="0 0 90 14"><defs><linearGradient id="hxg" x1="3" x2="87" y1="0" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#6ea8fe"/><stop offset="1" stop-color="#f5b544"/></linearGradient></defs>
+      <path d="M3 4.5 H87" stroke="url(#hxg)" stroke-width="3.4" stroke-linecap="round"/><path class="fl" d="M3 4.5 H87" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".75"/>
+      <path d="M87 10.5 H3" stroke="#ff9a4a" stroke-width="2.4" stroke-linecap="round" opacity=".45"/><path class="fl r" d="M87 10.5 H3" stroke="#fff" stroke-width="1.2" stroke-linecap="round" opacity=".5"/></svg><b>${v.supply}°</b>${v.efficiency != null ? `<em>${v.efficiency} %</em>` : ""}</span>` : "";
+    const line2 = `<div class="l2">${hx}<span class="chips">${warn ? (v.warn || []).slice(0, 1).map((w) => chip(`${w.name.split(" ")[0]} ${w.co2 != null && w.co2 >= 1000 ? w.co2 + " ppm" : w.hum + " %"}`, w.air === "bad" ? "#ff6a4a" : "#f5b544")).join("") : strong ? "" : chip(T.why.normal, "#3ddc97")}</span></div>`;
     const btns = !shadow ? `<span class="seg"><b data-v="away" class="${v.hold === "card_away" ? "on" : ""}">${T.away}</b><b data-v="auto" class="${!v.hold ? "on" : ""}">${T.auto}</b></span>` : "";
     const open = this._open ? `<div class="more">${btns}${v.efficiency != null ? `<span>${v.outdoor}° → ${v.supply}° · ${T.rec.replace("{x}", v.efficiency)}</span>` : ""}
       ${warn ? (v.warn || []).map((w) => chip(`${w.name} ${w.co2 != null && w.co2 >= 1000 ? w.co2 + " ppm" : w.hum + " %"}`, w.air === "bad" ? "#ff6a4a" : "#f5b544")).join("") : `<span>${T.ok}</span>`}
       ${shadow && v.agree != null ? `<span>${T.agree.replace("{x}", v.agree)}</span>` : ""}</div>` : "";
     this.shadowRoot.innerHTML = `<style>
       :host { --a:${a}; --sbg:color-mix(in srgb, var(--primary-text-color) 9%, transparent); }
-      ha-card { position:relative; overflow:hidden; cursor:pointer; ${strong ? `background:radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--a) 28%, transparent), transparent 55%), radial-gradient(80% 140% at 100% 100%, color-mix(in srgb, var(--a) 12%, transparent), transparent 60%), var(--ha-card-background, var(--card-background-color));` : ""} }
+      ha-card { position:relative; overflow:hidden; cursor:pointer; background:radial-gradient(110% 150% at 0% 0%, color-mix(in srgb, var(--a) ${strong ? 30 : 16}%, transparent), transparent 58%), radial-gradient(80% 140% at 100% 100%, color-mix(in srgb, var(--a) ${strong ? 14 : 6}%, transparent), transparent 60%), var(--ha-card-background, var(--card-background-color)); }
       .air { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
-      .air path { fill:none; stroke:var(--a); stroke-width:2; stroke-linecap:round; opacity:.22; stroke-dasharray:70 330; animation:flow 2.4s linear infinite; }
+      .air path { fill:none; stroke:var(--a); stroke-width:2; stroke-linecap:round; opacity:${strong ? .24 : .1}; stroke-dasharray:70 330; animation:flow ${Math.max(1.6, spin * 2.2)}s linear infinite; }
       @keyframes flow { from { stroke-dashoffset:400; } to { stroke-dashoffset:0; } }
-      .row { position:relative; display:flex; align-items:center; gap:10px; padding:7px 10px 7px 12px; min-height:46px; box-sizing:border-box; }
-      .fan { position:relative; width:32px; height:32px; flex:none; }
+      .row { position:relative; display:flex; align-items:center; gap:12px; padding:12px 14px 6px; box-sizing:border-box; }
+      .fan { position:relative; width:46px; height:46px; flex:none; }
       .ring { position:absolute; inset:0; }
-      .b { position:absolute; inset:8px; width:16px; height:16px; color:var(--a); animation:sp ${spin}s linear infinite; filter:drop-shadow(0 0 5px color-mix(in srgb, var(--a) 70%, transparent)); }
+      .b { position:absolute; inset:11px; width:24px; height:24px; color:var(--a); animation:sp ${spin}s linear infinite; filter:drop-shadow(0 0 5px color-mix(in srgb, var(--a) 70%, transparent)); }
       @keyframes sp { to { transform:rotate(360deg); } }
       .txt { min-width:0; flex:1; }
-      .lv { font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+      .lv { font-size:18px; font-weight:750; letter-spacing:-.01em; display:flex; align-items:center; gap:6px; white-space:nowrap; }
       .bars { display:inline-flex; align-items:flex-end; gap:2px; height:14px; }
       .bars u { width:4px; border-radius:2px; background:var(--sbg); text-decoration:none; }
       .bars u.l { background:var(--a); box-shadow:0 0 6px color-mix(in srgb, var(--a) 70%, transparent); animation:eq ${Math.max(.4, spin / 3)}s ease-in-out infinite alternate; }
       @keyframes eq { to { opacity:.55; } }
       .trin { font-size:10.5px; font-weight:750; color:var(--a); letter-spacing:.02em; }
       .tag { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--a); background:color-mix(in srgb, var(--a) 15%, transparent); padding:2px 6px; border-radius:6px; }
-      .why { font-size:11.5px; color:var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .why { font-size:12.5px; margin-top:1px; color:var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .mini { font-size:11px; color:var(--secondary-text-color); white-space:nowrap; display:flex; align-items:center; gap:4px; }
       .mini s { text-decoration:none; display:inline-block; width:14px; height:3px; border-radius:2px; background:linear-gradient(90deg,#6ea8fe,#f5b544); }
       .chip { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:650; padding:3px 8px; border-radius:9px; white-space:nowrap; background:color-mix(in srgb, var(--k) 15%, transparent); }
       .chip i { width:7px; height:7px; border-radius:50%; background:var(--k); box-shadow:0 0 6px var(--k); }
-      .bt { width:30px; height:30px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; background:var(--sbg); color:var(--secondary-text-color); border:0; padding:0; }
+      .bt { width:40px; height:40px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; background:var(--sbg); color:var(--secondary-text-color); border:0; padding:0; }
       .bt.on { background:linear-gradient(135deg, var(--a), color-mix(in srgb, var(--a) 55%, #7b6dff)); color:#fff; box-shadow:0 3px 10px color-mix(in srgb, var(--a) 45%, transparent); }
-      .bt:disabled { opacity:.45; } .bt svg { width:15px; height:15px; fill:currentColor; }
+      .bt:disabled { opacity:.45; } .bt svg { width:19px; height:19px; fill:currentColor; }
       .seg { display:inline-flex; gap:2px; background:var(--sbg); border-radius:9px; padding:2px; } .seg b { padding:4px 10px; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; }
       .seg b.on { background:var(--a); color:#fff; }
-      .more { position:relative; display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; padding:0 12px 10px 54px; font-size:11.5px; color:var(--secondary-text-color); }
+      .l2 { position:relative; display:flex; align-items:center; gap:10px; padding:4px 14px 12px 72px; }
+      .hx { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--secondary-text-color); white-space:nowrap; }
+      .hx b { color:var(--primary-text-color); font-size:13px; } .hx svg { width:64px; height:14px; } .hx em { font-style:normal; margin-left:4px; }
+      .hx .fl { stroke-dasharray:2 10; animation:fl ${Math.max(.5, spin / 2)}s linear infinite; } @keyframes fl { to { stroke-dashoffset:-20; } }
+      .l2 .chips { margin-left:auto; display:flex; gap:5px; }
+      .more { position:relative; display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; padding:0 14px 12px 72px; font-size:11.5px; color:var(--secondary-text-color); }
       @media (prefers-reduced-motion: reduce) { .b, .bars u.l, .air path { animation:none; } }
     </style><ha-card>${air}<div class="row">
       <div class="fan">${ring}<svg class="b" viewBox="0 0 24 24" fill="currentColor">${VV_FAN}</svg></div>
       <div class="txt"><div class="lv">${T.lv[v.current || v.level] || v.level}<span class="bars">${bars}</span><span class="trin">${T.step} ${n}</span>${shadow ? `<span class="tag">${T.shadow}</span>` : ""}</div><div class="why">${why}</div></div>
       ${right}
       <button class="bt ${strong ? "on" : ""}" ${shadow ? "disabled" : ""} title="${shadow ? T.boostT : ""}"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></button>
-    </div>${open}</ha-card>`;
+    </div>${line2}${open}</ha-card>`;
     const send = (action) => this._hass.callService("heat_pilot", "ventilation", { action });
     const bt = this.shadowRoot.querySelector(".bt");
     if (bt && !shadow) bt.onclick = (e) => { e.stopPropagation(); send(v.hold === "card_boost" ? "auto" : "boost"); };
