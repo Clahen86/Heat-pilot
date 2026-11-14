@@ -1,7 +1,8 @@
 """How Heat Pilot is set up - sent once a day with the daily question when sharing is on (see support.py), so the
 developer can fix the brand profiles: the thermostats, the ventilation, the heat meter, the hot water tank and the
 price sensor - each with its integration, maker and model and what each entity is used for. Entity names are sent
-with the user's own device name taken out ("climate.<device>"), and only in full when "Share my setup" is on.
+nearly whole - only the user's own names in them (people, rooms, zones, the home, device names) are swapped - and in
+full when "Share my setup" is on.
 Never sent: room or person names, states over time, addresses.
 """
 
@@ -18,30 +19,62 @@ def _slug(text: str) -> str:
     return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", str(text).lower())).strip("_")
 
 
-def mask(entity_id: str, regs: dict[str, dict], devs: dict[str, dict]) -> str:
-    """The name without the user's own names: the device's name becomes <device>; else the integration's own key;
-    else nothing."""
+def personal_words(states: dict[str, Any], config: dict[str, Any], devs: dict[str, dict], areas: list[str]) -> list[tuple[str, str]]:
+    """The user's own names in this Home Assistant - people, rooms, zones, the home and devices named by the user - as
+    slugs with what they become. Longest first, so "lilly_room" goes before "lilly"."""
+    words: dict[str, str] = {}
+
+    def add(name: Any, token: str, split: bool = False) -> None:
+        s = _slug(name or "")
+        if len(s) >= 3:
+            words.setdefault(s, token)
+        if split:  # a person's first name alone too
+            for part in s.split("_"):
+                if len(part) >= 3:
+                    words.setdefault(part, token)
+                    words.setdefault(part + "s", token)  # "lillys_rum" (Lilly's room)
+    for e, st in states.items():
+        nm = (st.get("attributes") or {}).get("friendly_name")
+        if e.startswith("person."):
+            add(nm, "<person>", True)
+            add(e.split(".", 1)[1], "<person>", True)
+        elif e.startswith("zone."):
+            add(nm, "<zone>")
+            add(e.split(".", 1)[1], "<zone>")
+    add((config or {}).get("location_name"), "<home>")
+    for a in areas:
+        add(a, "<area>")
+    for d in devs.values():
+        if d.get("name_by_user"):
+            add(d["name_by_user"], "<device>")
+    return sorted(words.items(), key=lambda kv: -len(kv[0]))
+
+
+def mask(entity_id: str, regs: dict[str, dict], devs: dict[str, dict], words: list[tuple[str, str]] | None = None) -> str:
+    """Nearly the whole name: only the user's own names in it are swapped - this device's name for <device>, and
+    people, rooms, zones and the home for <person>, <area>, <zone>, <home>."""
     dom, obj = entity_id.split(".", 1)
     reg = regs.get(entity_id) or {}
     dev = devs.get(reg.get("device_id") or "") or {}
     for n in [x for x in (dev.get("name_by_user"), dev.get("name")) if x]:
         s = _slug(n)
         if s and (obj == s or obj.startswith(s + "_")):
-            return f"{dom}.<device>{obj[len(s):]}"
-    key = reg.get("translation_key") or (reg.get("has_entity_name") and reg.get("original_name"))
-    if key:
-        return f"{dom}.<device>_{_slug(key)}"
-    return f"{dom}.<name>"
+            obj = "<device>" + obj[len(s):]
+            break
+    parts = f"_{obj}_"
+    for w, token in words or []:
+        parts = parts.replace(f"_{w}_", f"_{token}_")
+    return f"{dom}.{parts.strip('_')}"
 
 
 def entity(entity_id: str | None, use: str, states: dict[str, Any], regs: dict[str, dict], devs: dict[str, dict],
-           full: bool) -> dict[str, Any] | None:
+           full: bool, words: list[tuple[str, str]] | None = None) -> dict[str, Any] | None:
     if not entity_id:
         return None
     reg = regs.get(entity_id) or {}
     st = states.get(entity_id) or {}
     a = st.get("attributes") or {}
-    out: dict[str, Any] = {"name": entity_id if full else mask(entity_id, regs, devs), "use": use, "platform": reg.get("platform")}
+    out: dict[str, Any] = {"name": entity_id if full else mask(entity_id, regs, devs, words), "use": use, "platform": reg.get("platform")}
     for k in ATTR_NUM:
         if isinstance(a.get(k), (str, int, float)) and len(str(a[k])) < 30:
             out[k] = a[k]
@@ -68,7 +101,8 @@ def collect(p: Any, full: bool) -> dict[str, Any]:
     """The setup of the pilot `p` (engine.Pilot)."""
     st = p.ha.states
     regs, devs = getattr(p, "reg_entities", {}) or {}, getattr(p, "reg_devices", {}) or {}
-    ent = lambda e, use: entity(e, use, st, regs, devs, full)  # noqa: E731
+    words = [] if full else personal_words(st, getattr(p.ha, "config", {}) or {}, devs, getattr(p, "reg_areas", None) or [])
+    ent = lambda e, use: entity(e, use, st, regs, devs, full, words)  # noqa: E731
     failed: dict[str, int] = {}
     for x in getattr(getattr(p, "sender", None), "log", []) or []:
         if not x.get("ok"):

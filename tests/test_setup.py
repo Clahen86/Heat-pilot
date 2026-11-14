@@ -14,9 +14,11 @@ DEVS = {"d1": {"id": "d1", "name": "Stue termostat", "manufacturer": "Aqara", "m
 
 
 def test_mask():
-    assert setup.mask("climate.stue_termostat", REGS, DEVS) == "climate.<device>"
-    assert setup.mask("climate.lillys_rum", REGS, DEVS) == "climate.<name>"  # can't be cleaned: left out
-    assert setup.mask("sensor.vvb_temp", REGS, DEVS) == "sensor.<device>_tank_temperature"
+    words = setup.personal_words({"person.lilly": {"attributes": {"friendly_name": "Lilly"}}}, {"location_name": "Hjem"}, {}, ["Stue", "Køkken"])
+    assert setup.mask("climate.stue_termostat", REGS, DEVS, words) == "climate.<device>"
+    assert setup.mask("climate.lillys_rum", REGS, DEVS, words) == "climate.<person>_rum"  # Lilly's room
+    assert setup.mask("climate.stue_radiator", REGS, DEVS, words) == "climate.<area>_radiator"
+    assert setup.mask("sensor.vvb_temp", REGS, DEVS, words) == "sensor.vvb_temp"  # nothing personal: the whole name
 
 
 class Pilot:
