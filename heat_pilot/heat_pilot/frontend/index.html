@@ -698,9 +698,12 @@ function isoHouse(rooms, sk, floorId) {
       <rect x="-37" y="-16" width="74" height="30" rx="15" class="lbg"/>${ic ? `<circle cx="-22" cy="-1" r="10" fill="${col}" opacity=".16"/><text x="-22" y="3" text-anchor="middle" font-size="10.5">${ic}</text>` : ""}
       <text x="${ic ? 6 : 0}" y="0" class="rt">${o.r.temp == null ? "–" : num(deg(o.r.temp))}°</text><text x="${ic ? 6 : 0}" y="10" class="rn">${esc(nm)}</text></g>`;
   });
-  // the outer front walls, low, so you look into the house
-  g += `<polygon points="${pts([P(BW, 0, F), P(BW, BH, F), P(BW, BH, .5), P(BW, 0, .5)])}" style="fill:var(--wallA)" opacity=".5"/><polygon points="${pts([P(BW, 0, .5), P(BW + T2, 0, .5), P(BW + T2, BH, .5), P(BW, BH, .5)])}" style="fill:var(--wallCap)"/>`;
-  g += `<polygon points="${pts([P(0, BH, F), P(BW, BH, F), P(BW, BH, .5), P(0, BH, .5)])}" style="fill:var(--wallA)" opacity=".55"/><polygon points="${pts([P(0, BH, .5), P(BW, BH, .5), P(BW, BH + T2, .5), P(0, BH + T2, .5)])}" style="fill:var(--wallCap)"/>`;
+  // the outer front walls: low and solid (so you look into the house), with the same white top as the others
+  const FH = .5;
+  g += `<polygon points="${pts([P(0, BH, 0), P(BW, BH, 0), P(BW, BH, FH), P(0, BH, FH)])}" style="fill:var(--wallB)"/>`;
+  g += `<polygon points="${pts([P(BW, 0, 0), P(BW, BH, 0), P(BW, BH, FH), P(BW, 0, FH)])}" style="fill:var(--plinthR)"/>`;
+  g += `<polygon points="${pts([P(-T2, BH, FH), P(BW, BH, FH), P(BW, BH + T2, FH), P(-T2, BH + T2, FH)])}" style="fill:var(--wallCap);stroke:var(--wallLine)" stroke-width=".7"/>`;
+  g += `<polygon points="${pts([P(BW, -T2, FH), P(BW + T2, -T2, FH), P(BW + T2, BH + T2, FH), P(BW, BH + T2, FH)])}" style="fill:var(--wallCap);stroke:var(--wallLine)" stroke-width=".7"/>`;
   // the season and the holidays, on the house itself
   let deco = "";
   if (sk.season === "winter" || sk.snowing || sk.holiday === "jul")
