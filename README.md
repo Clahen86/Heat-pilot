@@ -2,6 +2,9 @@
 
 **Smart heating for every room in Home Assistant – found by itself, in shadow first, as easy as it gets.**
 
+<p align="center"><img src="docs/now_dark.png" width="260" alt="Now"> <img src="docs/now_light.png" width="260" alt="Light theme"> <img src="docs/christmas.png" width="260" alt="At Christmas"></p>
+<p align="center"><img src="docs/rooms.png" width="260" alt="Rooms"></p>
+
 Heat Pilot finds your rooms, thermostats, room sensors, windows, doors, motion sensors, people, ventilation and
 district heating meter by itself, learns how your home is used, and shows what it would do in each room. It
 **always starts in shadow**: nothing is sent to a thermostat until you turn control on – room by room.
