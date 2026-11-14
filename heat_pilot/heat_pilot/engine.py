@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from . import air, alerts, brands, discover, features, people, plan, pricefeed, sunfeed, supply, ventilation
+from . import air, alerts, brands, discover, features, hotwater, people, plan, pricefeed, sunfeed, supply, ventilation
 from .signals import Watch
 from .control import Sender, exercise_now
 from .learning import Learning, Model, seed
@@ -313,6 +313,15 @@ class Pilot:
                 lv = next((c["data"].get("option") for c in vcalls if c["data"].get("entity_id") == self.vent.get("level_select")), None)
                 if lv is not None:
                     self.vent_sent = (str(lv), now)
+        hw = getattr(self, "hw_now", None)
+        if hw and hw.get("mode") == "control" and hw.get("calls"):
+            last = getattr(self, "hw_last_call", None)
+            if not (last and (now - last).total_seconds() < 300):  # the tank isn't written more than every five minutes
+                todo += hw["calls"]
+                self.hw_last_call = now
+        if getattr(self, "hw_handback", None):
+            todo += hotwater.handback(self.hw_handback, self.ha.states)
+            self.hw_handback = None
         if self.vent and getattr(self, "vent_handback", False):
             todo += ventilation.handback_calls(self.vent, self.ha.states)
             self.vent_handback = False
@@ -421,6 +430,12 @@ class Pilot:
             prices, _ = pricefeed.collect(st, self.price_entity, [], tz)
             level = supply.price_level(prices, now)
         self.price_level = level
+        hw_cfg = self.settings.get("hotwater") or {}
+        hw_state = self.settings.setdefault("hotwater_state", {})
+        hot_before = hw_state.get("hot")
+        self.hw_now = hotwater.decide(hw_cfg, hw_state, st, level, now) if hw_cfg.get("entity") else None
+        if hw_state.get("hot") != hot_before and (not hot_before or hw_state["hot"][:13] != hot_before[:13]):
+            self.save()  # when the tank was last hot enough (against legionella) - at most once an hour
         sun_attr = (st.get("sun.sun") or {}).get("attributes") or {}
         try:
             sun_up = float(sun_attr.get("elevation", 0)) > 5
@@ -711,6 +726,31 @@ class Pilot:
                     d[k] = float(values[k])
         self.save()
 
+    def set_hotwater(self, values: dict[str, Any]) -> None:
+        """Settings -> Hot water: which tank, the temperatures, the shower times, and shadow or control."""
+        h = self.settings.setdefault("hotwater", {})
+        if values.get("mode") in ("shadow", "control"):
+            if h.get("mode") == "control" and values["mode"] == "shadow":
+                self.hw_handback = dict(h)  # the tank back to its normal temperature
+            h["mode"] = values["mode"]
+        for k in ("entity", "temp"):
+            if k in values:
+                if values[k] and str(values[k]).split(".")[0] in ("water_heater", "switch", "sensor"):
+                    h[k] = str(values[k])
+                else:
+                    h.pop(k, None)
+                    if k == "entity":
+                        h["mode"] = "shadow"
+        for k, lo, hi in (("min", 35, 60), ("normal", 40, 65), ("max", 45, 80), ("legionella", 60, 80)):
+            if k in values:
+                try:
+                    h[k] = max(lo, min(hi, float(values[k])))
+                except (TypeError, ValueError):
+                    pass
+        if "ready" in values and isinstance(values["ready"], list):
+            h["ready"] = [str(t)[:5] for t in values["ready"] if re.fullmatch(r"\d{1,2}:\d{2}", str(t)[:5])][:4]
+        self.save()
+
     def set_ventilation(self, values: dict[str, Any]) -> None:
         v = self.settings.setdefault("ventilation", {})
         if values.get("mode") in ("shadow", "control"):
@@ -853,6 +893,8 @@ class Pilot:
                 "messages": self.settings.get("messages") or {}, "notify": self.notify, "alert_kinds": alerts.KINDS,
                 "watchdog_restart": bool(self.settings.get("watchdog_restart")),
                 "vent": getattr(self, "vent_now", None),
+                "hotwater": getattr(self, "hw_now", None), "hotwater_cfg": {**hotwater.DEFAULT, **(self.settings.get("hotwater") or {})},
+                "hotwater_found": hotwater.find(self.ha.states),
                 "air_rooms": [{"area_id": r["area_id"], "name": r["name"], "floor_id": r.get("floor_id"),
                                **air.room_air(r, self.ha.states, own_rooms.get(r["area_id"]))} for r in self.air_rooms], "ventilation": self.settings.get("ventilation") or {},
                 "cooling_options": [{"entity_id": e, "name": (self.ha.states.get(e) or {}).get("attributes", {}).get("friendly_name") or e} for e in self.cooling_options]}

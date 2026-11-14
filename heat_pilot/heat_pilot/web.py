@@ -61,6 +61,11 @@ def make_app(pilot) -> web.Application:
         pilot.tick()
         return web.json_response({"ok": True})
 
+    async def hotwater(req: web.Request) -> web.Response:
+        pilot.set_hotwater(await req.json())
+        pilot.tick()
+        return web.json_response({"ok": True})
+
     async def vent(req: web.Request) -> web.Response:
         pilot.set_ventilation(await req.json())
         pilot.tick()
@@ -252,6 +257,7 @@ def make_app(pilot) -> web.Application:
     app.router.add_post("/api/hold", hold)
     app.router.add_post("/api/district", district)
     app.router.add_post("/api/ventilation", vent)
+    app.router.add_post("/api/hotwater", hotwater)
     app.router.add_post("/api/messages", messages)
     app.router.add_post("/api/tune", tune)
     app.router.add_get("/api/history", history)

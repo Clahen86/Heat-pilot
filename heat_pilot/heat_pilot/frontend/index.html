@@ -543,6 +543,15 @@ function seasonOf(now) {
   return ["winter", "bare"];
 }
 
+// Hot water (hotwater.py): the tank heated when power is cheap, cooler in the dear hours, warm before the showers.
+const HW_T = {
+  da: { t: "Varmtvand", h: "Varmer beholderen op, når strømmen er billig, og lader den køle lidt af, når den er dyr.", none: "Ingen", temp: "Føler i beholderen", tempH: "Gør det mere præcist", mode: "Skygge eller styring", min: "Laveste (°)", normal: "Normal (°)", max: "Når billig (°)", leg: "Legionella, ugentligt (°)", ready: "Varmt til bad kl.", readyH: "Fx 06:30, 19:00", why: { cheap: "billig strøm", dear: "dyr strøm", ready: "varmt til bad", legionella: "ugentlig legionella-opvarmning", normal: "normal", no_price: "ingen pris" } },
+  en: { t: "Hot water", h: "Heats the tank when power is cheap and lets it cool a little when it's dear.", none: "None", temp: "Tank sensor", tempH: "Makes it more precise", mode: "Shadow or control", min: "Lowest (°)", normal: "Normal (°)", max: "When cheap (°)", leg: "Legionella, weekly (°)", ready: "Hot for showers at", readyH: "E.g. 06:30, 19:00", why: { cheap: "cheap power", dear: "dear power", ready: "hot for showers", legionella: "weekly legionella heat-up", normal: "normal", no_price: "no price" } },
+  de: { t: "Warmwasser", h: "Heizt den Speicher bei günstigem Strom und lässt ihn bei teurem etwas abkühlen.", none: "Keiner", temp: "Speicherfühler", tempH: "Macht es genauer", mode: "Schatten oder Steuerung", min: "Niedrigste (°)", normal: "Normal (°)", max: "Bei günstigem Strom (°)", leg: "Legionellen, wöchentlich (°)", ready: "Warm zum Duschen um", readyH: "z. B. 06:30, 19:00", why: { cheap: "günstiger Strom", dear: "teurer Strom", ready: "warm zum Duschen", legionella: "wöchentliche Legionellenschaltung", normal: "normal", no_price: "kein Preis" } },
+  nl: { t: "Warm water", h: "Verwarmt de boiler als stroom goedkoop is en laat hem iets afkoelen als het duur is.", none: "Geen", temp: "Boilersensor", tempH: "Maakt het nauwkeuriger", mode: "Schaduw of sturing", min: "Laagste (°)", normal: "Normaal (°)", max: "Als het goedkoop is (°)", leg: "Legionella, wekelijks (°)", ready: "Warm om te douchen om", readyH: "Bijv. 06:30, 19:00", why: { cheap: "goedkope stroom", dear: "dure stroom", ready: "warm om te douchen", legionella: "wekelijkse legionella-verwarming", normal: "normaal", no_price: "geen prijs" } },
+  fr: { t: "Eau chaude", h: "Chauffe le ballon quand l'électricité est bon marché et le laisse refroidir un peu quand elle est chère.", none: "Aucun", temp: "Sonde du ballon", tempH: "Plus précis", mode: "Ombre ou pilotage", min: "Minimum (°)", normal: "Normal (°)", max: "Quand c'est bon marché (°)", leg: "Légionelle, chaque semaine (°)", ready: "Chaud pour la douche à", readyH: "Ex. 06:30, 19:00", why: { cheap: "électricité bon marché", dear: "électricité chère", ready: "chaud pour la douche", legionella: "chauffe anti-légionelle", normal: "normal", no_price: "pas de prix" } },
+  sv: { t: "Varmvatten", h: "Värmer beredaren när elen är billig och låter den svalna lite när den är dyr.", none: "Ingen", temp: "Givare i beredaren", tempH: "Gör det mer exakt", mode: "Skugga eller styrning", min: "Lägsta (°)", normal: "Normal (°)", max: "När billigt (°)", leg: "Legionella, varje vecka (°)", ready: "Varmt till dusch kl.", readyH: "T.ex. 06:30, 19:00", why: { cheap: "billig el", dear: "dyr el", ready: "varmt till dusch", legionella: "veckovis legionella-uppvärmning", normal: "normal", no_price: "inget pris" } },
+  nb: { t: "Varmtvann", h: "Varmer berederen når strømmen er billig, og lar den kjøles litt når den er dyr.", none: "Ingen", temp: "Føler i berederen", tempH: "Gjør det mer presist", mode: "Skygge eller styring", min: "Laveste (°)", normal: "Normal (°)", max: "Når billig (°)", leg: "Legionella, ukentlig (°)", ready: "Varmt til dusj kl.", readyH: "F.eks. 06:30, 19:00", why: { cheap: "billig strøm", dear: "dyr strøm", ready: "varmt til dusj", legionella: "ukentlig legionella-oppvarming", normal: "normal", no_price: "ingen pris" } } };
 const VC_T = {
   da: { t: "Styr ventilationen", shadow: "Skygge", control: "Styrer", off: "Skygge: viser, hvad den ville gøre – anlægget styres af noget andet", on: "Varmepilot styrer anlægget – slår du skygge til igen, får anlægget sin egen automatik tilbage",
         q: "Lad Varmepilot styre ventilationen? Sæt din egen styring (fx AppDaemon) på pause først, så kun én styrer." },
@@ -1110,10 +1119,18 @@ function render() {
         <div class="row"><div class="t"><b>${T.dhSet}</b><span>${T.dhSetH}</span></div><input class="num" type="number" step="1" data-dh="need" value="${data.district.need ?? 25}"></div>
         <div class="row"><div class="t"><b>${T.dhPen}</b><span>${T.dhUnit}</span></div><input class="num" type="number" step="0.01" data-dh="penalty" value="${data.district.penalty ?? ""}"></div>
         <div class="row"><div class="t"><b>${T.dhBon}</b><span>${T.dhUnit}</span></div><input class="num" type="number" step="0.01" data-dh="bonus" value="${data.district.bonus ?? ""}"></div></details>` : "";
+    const HW = HW_T[L] || HW_T.en, hc = data.hotwater_cfg || {}, hf = data.hotwater_found || {}, hn = data.hotwater, hmode = hc.mode || "shadow";
+    const tanks = [...(hf.heaters || []), ...(hf.switches || [])];
+    const hw = (tanks.length || hc.entity) ? `<div class="row"><div class="t"><b>🚿 ${HW.t}</b><span>${HW.h}</span></div><select data-hw="entity"><option value="">${HW.none}</option>${tanks.map((o) => `<option value="${esc(o.entity_id)}" ${hc.entity === o.entity_id ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select></div>
+      ${hc.entity ? `${String(hc.entity).startsWith("switch.") ? `<div class="row"><div class="t"><b>${HW.temp}</b><span>${HW.tempH}</span></div><select data-hw="temp"><option value="">${HW.none}</option>${(hf.temps || []).map((o) => `<option value="${esc(o.entity_id)}" ${hc.temp === o.entity_id ? "selected" : ""}>${esc(o.name)}</option>`).join("")}</select></div>` : ""}
+      <div class="row"><div class="t"><b>${HW.mode}</b><span>${hn ? `${hn.temp != null ? `${Math.round(hn.temp)}° → ` : ""}${Math.round(hn.target)}° · ${esc(HW.why[hn.why] || hn.why)}` : ""}</span></div><div class="seg">${["shadow", "control"].map((m) => `<button class="${hmode === m ? "on" : ""}" data-hwmode="${m}">${VC[m]}</button>`).join("")}</div></div>
+      <details class="adj"><summary>${HW.t} – ${T.adjust.toLowerCase()}</summary>
+        ${[["min", HW.min], ["normal", HW.normal], ["max", HW.max], ["legionella", HW.leg]].map(([k, lbl]) => `<div class="row"><div class="t"><b>${lbl}</b></div><input class="num" type="number" step="1" data-hw="${k}" value="${hc[k] ?? ""}"></div>`).join("")}
+        <div class="row"><div class="t"><b>${HW.ready}</b><span>${HW.readyH}</span></div><input class="num" style="width:120px" data-hw="ready" value="${esc((hc.ready || []).join(", "))}"></div></details>` : ""}` : "";
     body = ctlCard
       + grp("comfort", T.gComfort, T.gComfortH, ["signals", "shower", "sun", "weather", "manual", "strategy", "floor"].map(featRow).join("") + generalOf(["night_from", "night_to", "window_min"]))
       + grp("away", T.gAway, T.gAwayH, ["people", "door", "doors", "holiday", "summer"].map(featRow).join("") + generalOf(["away_temp"]))
-      + grp("energy", T.gEnergy, T.gEnergyH, featRow("district") + dh + featRow("price") + featRow("ventilation") + vent)
+      + grp("energy", T.gEnergy, T.gEnergyH, featRow("district") + dh + featRow("price") + featRow("ventilation") + vent + hw)
       + `<details class="grp" data-g="msg" ${grpOpen.msg ? "open" : ""}><summary><div><b>${T.mTitle}</b><br><span>${T.gMsgH}</span></div></summary><div class="gin">${msgCard().replace('<div class="card">', "<div>")}</div></details>`
       + `<button class="helpLink" data-tab="help"><span>${T.helpLink}</span><span>›</span></button>`;
   }
@@ -1141,6 +1158,9 @@ function render() {
   document.querySelectorAll("[data-vmode]").forEach((b) => b.onclick = async () => {
     if (b.dataset.vmode === "control" && !confirm((VC_T[L] || VC_T.en).q)) return;
     await api("/api/ventilation", { mode: b.dataset.vmode }); load(); });
+  document.querySelectorAll("[data-hw]").forEach((el) => el.onchange = async () => { const k = el.dataset.hw, v = el.value;
+    await api("/api/hotwater", { [k]: k === "ready" ? v.split(/[ ,;]+/).filter(Boolean) : ["entity", "temp"].includes(k) ? (v || null) : Number(v.replace(",", ".")) }); load(); });
+  document.querySelectorAll("[data-hwmode]").forEach((b) => b.onclick = async () => { await api("/api/hotwater", { mode: b.dataset.hwmode }); load(); });
   document.querySelectorAll("[data-vcool]").forEach((el) => el.onchange = async () => { await api("/api/ventilation", { cooling_entity: el.value || null }); load(); });
   document.querySelectorAll("[data-dh]").forEach((el) => el.onchange = async () => { await api("/api/district", { [el.dataset.dh]: el.value === "" ? null : Number(el.value.replace(",", ".")) }); load(); });
   document.querySelectorAll("[data-feat]").forEach((b) => b.onclick = async () => { await api("/api/feature", { key: b.dataset.feat, on: !b.classList.contains("on") }); load(); });
