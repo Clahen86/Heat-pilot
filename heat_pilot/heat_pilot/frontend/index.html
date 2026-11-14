@@ -628,8 +628,8 @@ function skyNow() {
 function planOf(rooms, floorId) {
   const L = data.layout || {}, out = [];
   const placed = rooms.filter((r) => L[r.area_id]), loose = rooms.filter((r) => !L[r.area_id]);
-  placed.forEach((r) => out.push({ r, ...L[r.area_id] }));
-  (data.layout_extra || []).filter((e) => (e.floor || null) === (floorId || null)).forEach((e) => out.push({ extra: e, ...e }));
+  placed.forEach((r) => out.push({ r, ...L[r.area_id], parts: (L[r.area_id].parts || []).map((q) => ({ ...q })) }));
+  (data.layout_extra || []).filter((e) => (e.floor || null) === (floorId || null)).forEach((e) => out.push({ extra: e, ...e, parts: (e.parts || []).map((q) => ({ ...q })) }));
   if (loose.length) {  // the ones not placed yet: a neat grid below the rest
     const top = out.length ? Math.max(...out.map((o) => o.y + o.h)) : 0;
     const n = loose.length, cols = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(n * 1.6)))), rows = Math.ceil(n / cols);
@@ -648,13 +648,14 @@ const roomIcon = (n) => (ROOM_ICON.find(([re]) => re.test(n || "")) || [0, ""])[
 function isoHouse(rooms, sk, floorId) {
   const items = planOf(rooms, floorId);
   if (!items.length) return "";
-  const x0 = Math.min(...items.map((o) => o.x)), y0 = Math.min(...items.map((o) => o.y));
-  items.forEach((o) => { o.x -= x0; o.y -= y0; });
-  const BW = Math.max(...items.map((o) => o.x + o.w)), BH = Math.max(...items.map((o) => o.y + o.h));
-  const C = Math.cos(Math.PI / 6), SN = 0.5, VW = 364, VH = 270;
+  const rectsOf = (o) => [{ x: o.x, y: o.y, w: o.w, h: o.h }, ...(o.parts || [])];
+  const all = items.flatMap(rectsOf), x0 = Math.min(...all.map((q) => q.x)), y0 = Math.min(...all.map((q) => q.y));
+  items.forEach((o) => { o.x -= x0; o.y -= y0; (o.parts || []).forEach((q) => { q.x -= x0; q.y -= y0; }); });
+  const BW = Math.max(...items.flatMap(rectsOf).map((q) => q.x + q.w)), BH = Math.max(...items.flatMap(rectsOf).map((q) => q.y + q.h));
+  const C = Math.cos(Math.PI / 6), SN = 0.5, VW = 364, VH = 290;
   const WH = 1.25, F = 0.1, T2 = 0.16;
-  const S = Math.min((VW - 30) / ((BW + BH + 1) * C), (VH - 50) / ((BW + BH + 1) * SN + WH + 1.4));
-  const ox = VW / 2 - ((BW - BH) / 2) * C * S, oy = 30 + WH * S;
+  const S = Math.min((VW - 8) / ((BW + BH + 7.8) * C), (VH - 10) / ((BW + BH + 7.8) * SN + 3.4));
+  const ox = VW / 2 - ((BW - BH) / 2) * C * S, oy = 10 + 1.9 * S + 2.6 * S;
   const P = (x, y, z = 0) => [ox + (x - y) * C * S, oy + (x + y) * SN * S - z * S];
   const pts = (a) => a.map((p) => p.map((v) => v.toFixed(1)).join(",")).join(" ");
   const dark = !matchMedia("(prefers-color-scheme: light)").matches || document.documentElement.dataset.theme === "dark";
@@ -665,32 +666,85 @@ function isoHouse(rooms, sk, floorId) {
     <radialGradient id="hs-cool"><stop offset="0" stop-color="#7fb2ff" stop-opacity=".45"/><stop offset="1" stop-color="#7fb2ff" stop-opacity="0"/></radialGradient>
     <linearGradient id="hs-wN" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--wallA)"/><stop offset="1" style="stop-color:var(--wallB)"/></linearGradient>
     <linearGradient id="hs-wW" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--wallA)"/><stop offset="1" style="stop-color:var(--wallC)"/></linearGradient>`;
-  let g = `<polygon points="${pts([P(-.5, -.5), P(BW + .5, -.5), P(BW + .5, BH + .5), P(-.5, BH + .5)])}" transform="translate(5,18)" fill="#1b1230" opacity="${dark ? .5 : .25}" filter="url(#hs-sh)"/>`;
-  if (sk.season === "winter" || sk.snowing || sk.holiday === "jul") g += `<ellipse cx="${VW / 2}" cy="${P(BW / 2 + .5, BH / 2 + .5)[1] + 10}" rx="${VW / 2 - 4}" ry="${(BW + BH) * SN * S / 2 + 18}" fill="#fff" opacity="${dark ? .14 : .85}"/>`;
+  // the garden: a lawn round the house (snow in winter), a path to the door, plants that follow the season, soft shadows
+  const snowy = sk.season === "winter" || sk.snowing || sk.holiday === "jul";
+  const rnd = (k) => { const h = Math.sin(k * 127.1 + 311.7) * 43758.5453; return h - Math.floor(h); };
+  const LAWN = snowy ? (dark ? ["#cfd8ea", "#aab6cf"] : ["#ffffff", "#e9eef6"]) : sk.season === "autumn" ? (dark ? ["#4a5530", "#384124"] : ["#cdd38a", "#aab866"])
+    : sk.season === "spring" ? (dark ? ["#2f5e3c", "#244a30"] : ["#b9e39a", "#8fcf78"]) : (dark ? ["#2c5a38", "#1f452b"] : ["#a9dc8c", "#7fc56c"]);
+  defs += `<linearGradient id="hs-lawn" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${LAWN[0]}"/><stop offset="1" stop-color="${LAWN[1]}"/></linearGradient>
+    <radialGradient id="hs-bush"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <filter id="hs-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3"/></filter>`;
+  const G = 1.9;  // the lawn reaches this far round the house
+  let g = `<polygon points="${pts([P(-G, -G), P(BW + G, -G), P(BW + G, BH + G), P(-G, BH + G)])}" transform="translate(4,14)" fill="#1b1230" opacity="${dark ? .45 : .2}" filter="url(#hs-sh)"/>`;
+  g += `<polygon points="${pts([P(-G, -G), P(BW + G, -G), P(BW + G, BH + G), P(-G, BH + G)])}" fill="url(#hs-lawn)" stroke="url(#hs-lawn)" stroke-width="14" stroke-linejoin="round"/>`;
+  g += `<polygon points="${pts([P(BW + G, -G), P(BW + G, BH + G), P(BW + G, BH + G, -.35), P(BW + G, -G, -.35)])}" fill="${LAWN[1]}" style="filter:brightness(.8)"/>`;
+  g += `<polygon points="${pts([P(-G, BH + G), P(BW + G, BH + G), P(BW + G, BH + G, -.35), P(-G, BH + G, -.35)])}" fill="${LAWN[1]}" style="filter:brightness(.9)"/>`;
+  if (!snowy) for (let k = 0; k < 70; k++) {  // tufts of grass
+    const side = k % 4, u = rnd(k), v = rnd(k + 50) * (G - .4) + .2;
+    const [gx, gy] = side === 0 ? [u * (BW + 2 * G) - G, -v] : side === 1 ? [BW + v, u * (BH + 2 * G) - G] : side === 2 ? [u * (BW + 2 * G) - G, BH + v] : [-v, u * (BH + 2 * G) - G];
+    const [a, b] = P(gx, gy); g += `<path d="M${(a - 2).toFixed(1)} ${b.toFixed(1)} l2 -4 l2 4 M${(a + 1).toFixed(1)} ${b.toFixed(1)} l2 -3" stroke="${LAWN[1]}" stroke-width="1.1" fill="none" style="filter:brightness(.82)" opacity=".8"/>`;
+  }
+  // stepping stones from the front of the house
+  [[.55, 0], [.9, .2], [1.3, -.1]].forEach(([d, sx], k) => { const [a, b] = P(BW * .45 + sx, BH + d); g += `<ellipse cx="${a.toFixed(1)}" cy="${b.toFixed(1)}" rx="${(S * .32).toFixed(1)}" ry="${(S * .17).toFixed(1)}" fill="${dark ? "#55607a" : "#e8e3ea"}" stroke="${dark ? "#3c4560" : "#d2cbd6"}" stroke-width=".8"/>`; });
+  // a tree behind the house (it follows the season) and bushes round it
+  const tree = (x, y, sc) => { const [a, b] = P(x, y); const crown = sk.season === "autumn" ? ["#f0a040", "#d9682a"] : sk.season === "spring" ? ["#ffc6dd", "#9bd27a"] : snowy ? null : ["#7fc864", "#4f9e48"];
+    let t = `<ellipse cx="${a.toFixed(1)}" cy="${(b + 2).toFixed(1)}" rx="${(14 * sc).toFixed(1)}" ry="${(5 * sc).toFixed(1)}" fill="#1b1230" opacity=".22" filter="url(#hs-soft)"/><rect x="${(a - 2 * sc).toFixed(1)}" y="${(b - 22 * sc).toFixed(1)}" width="${(4 * sc).toFixed(1)}" height="${(22 * sc).toFixed(1)}" rx="2" fill="#8a5a3a"/>`;
+    if (crown) t += `<circle cx="${a.toFixed(1)}" cy="${(b - 30 * sc).toFixed(1)}" r="${(15 * sc).toFixed(1)}" fill="${crown[1]}"/><circle cx="${(a - 7 * sc).toFixed(1)}" cy="${(b - 34 * sc).toFixed(1)}" r="${(10 * sc).toFixed(1)}" fill="${crown[0]}"/><circle cx="${a.toFixed(1)}" cy="${(b - 30 * sc).toFixed(1)}" r="${(15 * sc).toFixed(1)}" fill="url(#hs-bush)"/>`;
+    else t += `<path d="M${a.toFixed(1)} ${(b - 18 * sc).toFixed(1)} l${(-9 * sc).toFixed(1)} ${(-12 * sc).toFixed(1)} M${a.toFixed(1)} ${(b - 22 * sc).toFixed(1)} l${(8 * sc).toFixed(1)} ${(-13 * sc).toFixed(1)} M${a.toFixed(1)} ${(b - 20 * sc).toFixed(1)} l0 ${(-18 * sc).toFixed(1)}" stroke="#7a5236" stroke-width="${(2 * sc).toFixed(1)}" stroke-linecap="round"/><circle cx="${a.toFixed(1)}" cy="${(b - 38 * sc).toFixed(1)}" r="${(3 * sc).toFixed(1)}" fill="#fff"/>`;
+    return t; };
+  const bush = (x, y, sc) => { const [a, b] = P(x, y), c = snowy ? ["#f4f7fc", "#d6dfec", "#bfcbdc"] : sk.season === "autumn" ? ["#9cc25a", "#6f9a3e", "#d98a3a"] : ["#8fd06e", "#5aa84c", "#3f8a3c"];
+    const blob = (dx, dy, r, col) => `<circle cx="${(a + dx * sc).toFixed(1)}" cy="${(b + dy * sc).toFixed(1)}" r="${(r * sc).toFixed(1)}" fill="${col}"/>`;
+    return `<ellipse cx="${a.toFixed(1)}" cy="${(b + 1).toFixed(1)}" rx="${(16 * sc).toFixed(1)}" ry="${(6 * sc).toFixed(1)}" fill="#1b1230" opacity=".22" filter="url(#hs-soft)"/>`
+      + blob(-8, -6, 8, c[2]) + blob(7, -6, 8.5, c[1]) + blob(0, -11, 10, c[0]) + blob(-3, -14, 4, "rgba(255,255,255,.25)")
+      + (sk.season === "spring" ? blob(-4, -12, 1.6, "#ffb3cf") + blob(5, -9, 1.6, "#fff") + blob(1, -16, 1.6, "#ffb3cf") : "")
+      + (sk.season === "summer" ? blob(-4, -12, 1.5, "#ffe066") + blob(6, -8, 1.5, "#ff8fb3") : ""); };
+  g += tree(-1.1, -1.0, 1) + bush(BW + 1.05, -.7, .95) + bush(-1.1, BH * .25, .85);
+  const front = bush(-1.0, BH * .7, 1) + bush(BW + 1.1, BH * .5, .9) + bush(BW * .8, BH + 1.2, .8);  // in front of the house: drawn after it
+  // the house's soft shadow on the lawn (light from the north-west)
+  g += `<polygon points="${pts([P(.2, .2), P(BW + 1.1, .2), P(BW + 1.1, BH + 1.1), P(.2, BH + 1.1)])}" fill="#1b1230" opacity="${dark ? .35 : .18}" filter="url(#hs-soft)"/>`;
   g += `<polygon points="${pts([P(BW + .4, -.4), P(BW + .4, BH + .4), P(BW + .4, BH + .4, -.8), P(BW + .4, -.4, -.8)])}" style="fill:var(--plinthR)"/>`;
   g += `<polygon points="${pts([P(-.4, BH + .4), P(BW + .4, BH + .4), P(BW + .4, BH + .4, -.8), P(-.4, BH + .4, -.8)])}" style="fill:var(--plinthL)"/>`;
   g += `<polygon points="${pts([P(-.4, -.4), P(BW + .4, -.4), P(BW + .4, BH + .4), P(-.4, BH + .4)])}" style="fill:var(--plinthTop)"/>`;
+  // A wall along the north (horizontal) or west (vertical) edge. An inner wall that runs out to the low front walls
+  // slopes down over its last metre, so it meets them instead of ending cut off.
   const wall = (ax, ay, bx, by, fill) => {
-    const horiz = ay === by, A = P(ax, ay, F), B = P(bx, by, F), At = P(ax, ay, WH), Bt = P(bx, by, WH);
-    const cap = horiz ? [P(ax, ay - T2, WH), P(bx, by - T2, WH), P(bx, by, WH), P(ax, ay, WH)] : [P(ax - T2, ay, WH), P(ax, ay, WH), P(bx, by, WH), P(bx - T2, by, WH)];
-    return `<polygon points="${pts([A, B, Bt, At])}" style="fill:${fill}"/><polygon points="${pts(cap)}" style="fill:var(--wallCap);stroke:var(--wallLine)" stroke-width=".7"/>`;
+    const horiz = ay === by, len = horiz ? bx - ax : by - ay, front = horiz ? bx >= BW - .01 : by >= BH - .01;
+    const A = P(ax, ay, F), B = P(bx, by, F), At = P(ax, ay, WH);
+    const s1 = front ? Math.max(0, len - 1) : len, M = horiz ? [ax + s1, ay] : [ax, ay + s1];
+    const Mt = P(M[0], M[1], WH), Bt = P(bx, by, front ? FH : WH);
+    const cap = (p, q, zp, zq) => horiz ? [P(p, ay - T2, zp), P(q, ay - T2, zq), P(q, ay, zq), P(p, ay, zp)] : [P(ax - T2, p, zp), P(ax, p, zp), P(ax, q, zq), P(ax - T2, q, zq)];
+    const p0 = horiz ? ax : ay, pm = horiz ? M[0] : M[1], pb = horiz ? bx : by;
+    let out = `<polygon points="${pts(front ? [A, B, Bt, Mt, At] : [A, B, Bt, At])}" style="fill:${fill}"/>`;
+    out += `<polygon points="${pts(cap(p0, pm, WH, WH))}" style="fill:var(--wallCap);stroke:var(--wallLine)" stroke-width=".7"/>`;
+    if (front) out += `<polygon points="${pts(cap(pm, pb, WH, FH))}" style="fill:var(--wallCap);stroke:var(--wallLine)" stroke-width=".7"/>`;
+    return out;
   };
+  // the stretches of an edge not shared with another part of the same room (an L-shaped room has no wall inside)
+  const open = (a, b, cuts) => { let segs = [[a, b]]; cuts.forEach(([c, d]) => { segs = segs.flatMap(([p, q]) => d <= p || c >= q ? [[p, q]] : [...(c > p ? [[p, c]] : []), ...(d < q ? [[d, q]] : [])]); }); return segs.filter(([p, q]) => q - p > .05); };
+  const FH = .5;
   let labels = "", fx = "";
-  items.slice().sort((a, b) => (a.x + a.y) - (b.x + b.y)).forEach((o, i) => {
-    const k = o.r ? roomState(o.r) : "none", [c1, c2] = COLS[k] || COLS.ok, X0 = o.x, Y0 = o.y, X1 = o.x + o.w, Y1 = o.y + o.h, id = "hr" + i;
+  const rects = [];
+  items.forEach((o, i) => rectsOf(o).forEach((q, j) => rects.push({ o, i, j, ...q })));
+  rects.sort((a, b) => (a.x + a.y) - (b.x + b.y)).forEach((q, n) => {
+    const o = q.o, k = o.r ? roomState(o.r) : "none", [c1, c2] = COLS[k] || COLS.ok, X0 = q.x, Y0 = q.y, X1 = q.x + q.w, Y1 = q.y + q.h, id = "hr" + n;
+    const sib = rectsOf(o).filter((_, j) => j !== q.j);
     defs += `<linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient><clipPath id="${id}c"><polygon points="${pts([P(X0, Y0, F), P(X1, Y0, F), P(X1, Y1, F), P(X0, Y1, F)])}"/></clipPath>`;
     const floor = [P(X0, Y0, F), P(X1, Y0, F), P(X1, Y1, F), P(X0, Y1, F)];
-    let planks = ""; for (let q = X0 + .5; q < X1; q += .5) { const a = P(q, Y0, F), b = P(q, Y1, F); planks += `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}"/>`; }
+    let planks = ""; for (let v = X0 + .5; v < X1; v += .5) { const a = P(v, Y0, F), b = P(v, Y1, F); planks += `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}"/>`; }
     const [cx, cy] = P((X0 + X1) / 2, (Y0 + Y1) / 2, F);
     g += `<g class="cell"${o.r ? ` data-room="${esc(o.r.area_id)}"` : ""}><polygon points="${pts(floor)}" fill="url(#${id})" opacity="${dark ? .92 : 1}"/>
       <g clip-path="url(#${id}c)"><g stroke="#fff" stroke-opacity=".26" stroke-width="1">${planks}</g>
-      ${k === "heat" ? `<ellipse class="glow2" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${(o.w * S).toFixed(1)}" ry="${(o.h * S * .55).toFixed(1)}" fill="url(#hs-glow)"/>` : k === "low" ? `<ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${(o.w * S * .9).toFixed(1)}" ry="${(o.h * S * .5).toFixed(1)}" fill="url(#hs-cool)"/>` : ""}
-      <polygon points="${pts([P(X0, Y0, F), P(X1, Y0, F), P(X1, Y0 + .7, F), P(X0, Y0 + .7, F)])}" fill="#1b1230" opacity=".08"/><polygon points="${pts([P(X0, Y0, F), P(X0 + .7, Y0, F), P(X0 + .7, Y1, F), P(X0, Y1, F)])}" fill="#1b1230" opacity=".06"/></g></g>`;
+      ${k === "heat" ? `<ellipse class="glow2" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${(q.w * S).toFixed(1)}" ry="${(q.h * S * .55).toFixed(1)}" fill="url(#hs-glow)"/>` : k === "low" ? `<ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${(q.w * S * .9).toFixed(1)}" ry="${(q.h * S * .5).toFixed(1)}" fill="url(#hs-cool)"/>` : ""}
+      <polygon points="${pts([P(X0, Y0, F), P(X1, Y0, F), P(X1, Y0 + .9, F), P(X0, Y0 + .9, F)])}" fill="#1b1230" opacity="${dark ? .3 : .16}" filter="url(#hs-soft)"/><polygon points="${pts([P(X0, Y0, F), P(X0 + .9, Y0, F), P(X0 + .9, Y1, F), P(X0, Y1, F)])}" fill="#1b1230" opacity="${dark ? .22 : .11}" filter="url(#hs-soft)"/>
+      <polygon points="${pts(floor)}" fill="url(#hs-bush)" opacity=".5"/></g></g>`;
     const tint = k === "heat" ? (dark ? "#5a3a2c" : "#ffe8da") : k === "low" ? (dark ? "#2c3a5a" : "#e6f0ff") : null;
-    g += wall(X0, Y0, X1, Y0, tint || "url(#hs-wN)") + wall(X0, Y0, X0, Y1, tint || "url(#hs-wW)");
+    open(X0, X1, sib.filter((s2) => Math.abs(s2.y + s2.h - Y0) < .01).map((s2) => [s2.x, s2.x + s2.w])).forEach(([a, b]) => { g += wall(a, Y0, b, Y0, tint || "url(#hs-wN)"); });
+    open(Y0, Y1, sib.filter((s2) => Math.abs(s2.x + s2.w - X0) < .01).map((s2) => [s2.y, s2.y + s2.h])).forEach(([a, b]) => { g += wall(X0, a, X0, b, tint || "url(#hs-wW)"); });
     const win = night ? "#ffd98a" : (dark ? "#3b5a85" : "#bfe0ff");
-    if (Y0 === 0 && o.w > 2) { const m = (X0 + X1) / 2; g += `<polygon points="${pts([P(m - .6, 0, .5), P(m + .6, 0, .5), P(m + .6, 0, 1), P(m - .6, 0, 1)])}" fill="${win}" stroke="var(--wallCap)" stroke-width="2"/>`; }
-    if (X0 === 0 && o.h > 2) { const m = (Y0 + Y1) / 2; g += `<polygon points="${pts([P(0, m - .6, .5), P(0, m + .6, .5), P(0, m + .6, 1), P(0, m - .6, 1)])}" fill="${win}" stroke="var(--wallCap)" stroke-width="2"/>`; }
+    if (Y0 === 0 && q.w > 2) { const m = (X0 + X1) / 2; g += `<polygon points="${pts([P(m - .6, 0, .5), P(m + .6, 0, .5), P(m + .6, 0, 1), P(m - .6, 0, 1)])}" fill="${win}" stroke="var(--wallCap)" stroke-width="2"/>`; }
+    if (X0 === 0 && q.h > 2) { const m = (Y0 + Y1) / 2; g += `<polygon points="${pts([P(0, m - .6, .5), P(0, m + .6, .5), P(0, m + .6, 1), P(0, m - .6, 1)])}" fill="${win}" stroke="var(--wallCap)" stroke-width="2"/>`; }
+    const big = rectsOf(o).reduce((m, r2, j) => r2.w * r2.h > m.a ? { a: r2.w * r2.h, j } : m, { a: -1, j: 0 }).j;
+    if (q.j !== big) return;  // one label and one set of heat waves per room, on its biggest part
     if (k === "heat") [-10, 2, 14].forEach((dx, j) => { fx += `<path d="M${(cx + dx).toFixed(1)} ${(cy - 14).toFixed(1)} q5 -9 0 -18 q-5 -9 0 -18" class="wave" style="animation-delay:${j * .35}s"/>`; });
     if (!o.r) { labels += `<text x="${cx.toFixed(1)}" y="${(cy + 3).toFixed(1)}" class="rx">${esc((o.name || "").toUpperCase())}</text>`; return; }
     const col = k === "heat" ? "#ff6a2b" : k === "low" ? "#3f84f5" : k === "off" ? "#8a93a3" : "#e39a2b", nm = o.r.name.length > 14 ? o.r.name.slice(0, 13) + "…" : o.r.name, ic = roomIcon(o.r.name);
@@ -699,15 +753,15 @@ function isoHouse(rooms, sk, floorId) {
       <text x="${ic ? 6 : 0}" y="0" class="rt">${o.r.temp == null ? "–" : num(deg(o.r.temp))}°</text><text x="${ic ? 6 : 0}" y="10" class="rn">${esc(nm)}</text></g>`;
   });
   // the outer front walls: low and solid (so you look into the house), with the same white top as the others
-  const FH = .5;
   g += `<polygon points="${pts([P(0, BH, 0), P(BW, BH, 0), P(BW, BH, FH), P(0, BH, FH)])}" style="fill:var(--wallB)"/>`;
   g += `<polygon points="${pts([P(BW, 0, 0), P(BW, BH, 0), P(BW, BH, FH), P(BW, 0, FH)])}" style="fill:var(--plinthR)"/>`;
   g += `<polygon points="${pts([P(-T2, BH, FH), P(BW, BH, FH), P(BW, BH + T2, FH), P(-T2, BH + T2, FH)])}" style="fill:var(--wallCap);stroke:var(--wallLine)" stroke-width=".7"/>`;
   g += `<polygon points="${pts([P(BW, -T2, FH), P(BW + T2, -T2, FH), P(BW + T2, BH + T2, FH), P(BW, BH + T2, FH)])}" style="fill:var(--wallCap);stroke:var(--wallLine)" stroke-width=".7"/>`;
+  g += front;
   // the season and the holidays, on the house itself
   let deco = "";
   if (sk.season === "winter" || sk.snowing || sk.holiday === "jul")
-    items.forEach((o) => { deco += `<polyline points="${pts([P(o.x, o.y + o.h, WH + .12), P(o.x, o.y, WH + .12), P(o.x + o.w, o.y, WH + .12)])}" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity=".95"/>`; });
+    rects.forEach((o) => { deco += `<polyline points="${pts([P(o.x, Math.min(o.y + o.h, BH - 1), WH + .12), P(o.x, o.y, WH + .12), P(Math.min(o.x + o.w, BW - 1), o.y, WH + .12)])}" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity=".95"/>`; });
   const corner = P(BW + 1.1, BH + 1.1, 0);
   if (sk.holiday === "jul") {
     const cl = ["#ff4d5e", "#ffd34d", "#4dff9a", "#4dc3ff", "#ff7af0"]; let n = 0;
@@ -733,13 +787,13 @@ function isoHouse(rooms, sk, floorId) {
 }
 // ---- "Fit the plan": drag the rooms to where they are on your own floor plan (top-down, in metres) ----
 const TP_T = {
-  da: { edit: "Tilpas plan", title: "Tilpas plan", hint: "Træk et rum for at flytte det · træk i hjørnet for at gøre det større", done: "Færdig", cancel: "Annuller", image: "📐 Plantegning bag", imageOff: "Fjern plantegning", imageSize: "Plantegningens bredde", add: "+ Rum uden termostat", addQ: "Navn på rummet (fx Gang)", rotate: "↻ Drej", name: "Navn", del: "Slet", noThermo: "Uden termostat", m: "m", reset: "Start forfra", resetQ: "Lægge alle rum på etagen tilbage i et gitter?" },
-  en: { edit: "Fit the plan", title: "Fit the plan", hint: "Drag a room to move it · drag a corner to make it bigger", done: "Done", cancel: "Cancel", image: "📐 Floor plan behind", imageOff: "Remove floor plan", imageSize: "Width of the floor plan", add: "+ Room without thermostat", addQ: "Name of the room (e.g. Hall)", rotate: "↻ Rotate", name: "Name", del: "Delete", noThermo: "No thermostat", m: "m", reset: "Start over", resetQ: "Put all rooms on this floor back in a grid?" },
-  de: { edit: "Plan anpassen", title: "Plan anpassen", hint: "Raum ziehen zum Verschieben · Ecke ziehen zum Vergrößern", done: "Fertig", cancel: "Abbrechen", image: "📐 Grundriss dahinter", imageOff: "Grundriss entfernen", imageSize: "Breite des Grundrisses", add: "+ Raum ohne Thermostat", addQ: "Name des Raums (z. B. Flur)", rotate: "↻ Drehen", name: "Name", del: "Löschen", noThermo: "Ohne Thermostat", m: "m", reset: "Neu anfangen", resetQ: "Alle Räume dieser Etage wieder im Raster anordnen?" },
-  sv: { edit: "Anpassa planen", title: "Anpassa planen", hint: "Dra ett rum för att flytta det · dra i hörnet för att göra det större", done: "Klar", cancel: "Avbryt", image: "📐 Planritning bakom", imageOff: "Ta bort planritning", imageSize: "Planritningens bredd", add: "+ Rum utan termostat", addQ: "Rummets namn (t.ex. Hall)", rotate: "↻ Vrid", name: "Namn", del: "Ta bort", noThermo: "Utan termostat", m: "m", reset: "Börja om", resetQ: "Lägga alla rum på våningen i ett rutnät igen?" },
-  nb: { edit: "Tilpass planen", title: "Tilpass planen", hint: "Dra et rom for å flytte det · dra i hjørnet for å gjøre det større", done: "Ferdig", cancel: "Avbryt", image: "📐 Plantegning bak", imageOff: "Fjern plantegning", imageSize: "Plantegningens bredde", add: "+ Rom uten termostat", addQ: "Navn på rommet (f.eks. Gang)", rotate: "↻ Drei", name: "Navn", del: "Slett", noThermo: "Uten termostat", m: "m", reset: "Start på nytt", resetQ: "Legge alle rom på etasjen tilbake i et rutenett?" },
-  nl: { edit: "Plattegrond aanpassen", title: "Plattegrond aanpassen", hint: "Sleep een ruimte om te verplaatsen · sleep een hoek om te vergroten", done: "Klaar", cancel: "Annuleren", image: "📐 Plattegrond erachter", imageOff: "Plattegrond weghalen", imageSize: "Breedte van de plattegrond", add: "+ Ruimte zonder thermostaat", addQ: "Naam van de ruimte (bijv. Hal)", rotate: "↻ Draaien", name: "Naam", del: "Verwijderen", noThermo: "Zonder thermostaat", m: "m", reset: "Opnieuw beginnen", resetQ: "Alle ruimtes op deze verdieping weer in een raster zetten?" },
-  fr: { edit: "Ajuster le plan", title: "Ajuster le plan", hint: "Glissez une pièce pour la déplacer · glissez un coin pour l'agrandir", done: "Terminé", cancel: "Annuler", image: "📐 Plan derrière", imageOff: "Retirer le plan", imageSize: "Largeur du plan", add: "+ Pièce sans thermostat", addQ: "Nom de la pièce (ex. Entrée)", rotate: "↻ Pivoter", name: "Nom", del: "Supprimer", noThermo: "Sans thermostat", m: "m", reset: "Recommencer", resetQ: "Remettre toutes les pièces de cet étage en grille ?" },
+  da: { addPart: "+ Del", delPart: "Fjern del", edit: "Tilpas plan", title: "Tilpas plan", hint: "Træk et rum for at flytte det · træk i hjørnet for at gøre det større", done: "Færdig", cancel: "Annuller", image: "📐 Plantegning bag", imageOff: "Fjern plantegning", imageSize: "Plantegningens bredde", add: "+ Rum uden termostat", addQ: "Navn på rummet (fx Gang)", rotate: "↻ Drej", name: "Navn", del: "Slet", noThermo: "Uden termostat", m: "m", reset: "Start forfra", resetQ: "Lægge alle rum på etagen tilbage i et gitter?" },
+  en: { addPart: "+ Part", delPart: "Remove part", edit: "Fit the plan", title: "Fit the plan", hint: "Drag a room to move it · drag a corner to make it bigger", done: "Done", cancel: "Cancel", image: "📐 Floor plan behind", imageOff: "Remove floor plan", imageSize: "Width of the floor plan", add: "+ Room without thermostat", addQ: "Name of the room (e.g. Hall)", rotate: "↻ Rotate", name: "Name", del: "Delete", noThermo: "No thermostat", m: "m", reset: "Start over", resetQ: "Put all rooms on this floor back in a grid?" },
+  de: { addPart: "+ Teil", delPart: "Teil entfernen", edit: "Plan anpassen", title: "Plan anpassen", hint: "Raum ziehen zum Verschieben · Ecke ziehen zum Vergrößern", done: "Fertig", cancel: "Abbrechen", image: "📐 Grundriss dahinter", imageOff: "Grundriss entfernen", imageSize: "Breite des Grundrisses", add: "+ Raum ohne Thermostat", addQ: "Name des Raums (z. B. Flur)", rotate: "↻ Drehen", name: "Name", del: "Löschen", noThermo: "Ohne Thermostat", m: "m", reset: "Neu anfangen", resetQ: "Alle Räume dieser Etage wieder im Raster anordnen?" },
+  sv: { addPart: "+ Del", delPart: "Ta bort del", edit: "Anpassa planen", title: "Anpassa planen", hint: "Dra ett rum för att flytta det · dra i hörnet för att göra det större", done: "Klar", cancel: "Avbryt", image: "📐 Planritning bakom", imageOff: "Ta bort planritning", imageSize: "Planritningens bredd", add: "+ Rum utan termostat", addQ: "Rummets namn (t.ex. Hall)", rotate: "↻ Vrid", name: "Namn", del: "Ta bort", noThermo: "Utan termostat", m: "m", reset: "Börja om", resetQ: "Lägga alla rum på våningen i ett rutnät igen?" },
+  nb: { addPart: "+ Del", delPart: "Fjern del", edit: "Tilpass planen", title: "Tilpass planen", hint: "Dra et rom for å flytte det · dra i hjørnet for å gjøre det større", done: "Ferdig", cancel: "Avbryt", image: "📐 Plantegning bak", imageOff: "Fjern plantegning", imageSize: "Plantegningens bredde", add: "+ Rom uten termostat", addQ: "Navn på rommet (f.eks. Gang)", rotate: "↻ Drei", name: "Navn", del: "Slett", noThermo: "Uten termostat", m: "m", reset: "Start på nytt", resetQ: "Legge alle rom på etasjen tilbake i et rutenett?" },
+  nl: { addPart: "+ Deel", delPart: "Deel weghalen", edit: "Plattegrond aanpassen", title: "Plattegrond aanpassen", hint: "Sleep een ruimte om te verplaatsen · sleep een hoek om te vergroten", done: "Klaar", cancel: "Annuleren", image: "📐 Plattegrond erachter", imageOff: "Plattegrond weghalen", imageSize: "Breedte van de plattegrond", add: "+ Ruimte zonder thermostaat", addQ: "Naam van de ruimte (bijv. Hal)", rotate: "↻ Draaien", name: "Naam", del: "Verwijderen", noThermo: "Zonder thermostaat", m: "m", reset: "Opnieuw beginnen", resetQ: "Alle ruimtes op deze verdieping weer in een raster zetten?" },
+  fr: { addPart: "+ Partie", delPart: "Retirer la partie", edit: "Ajuster le plan", title: "Ajuster le plan", hint: "Glissez une pièce pour la déplacer · glissez un coin pour l'agrandir", done: "Terminé", cancel: "Annuler", image: "📐 Plan derrière", imageOff: "Retirer le plan", imageSize: "Largeur du plan", add: "+ Pièce sans thermostat", addQ: "Nom de la pièce (ex. Entrée)", rotate: "↻ Pivoter", name: "Nom", del: "Supprimer", noThermo: "Sans thermostat", m: "m", reset: "Recommencer", resetQ: "Remettre toutes les pièces de cet étage en grille ?" },
 };
 const TP = () => TP_T[LANG] || TP_T.en;
 let ed = null;
@@ -765,7 +819,7 @@ function planEditor(open) {
   if (open) {
     const { floors } = edFloors();
     ed = { layout: JSON.parse(JSON.stringify(data.layout || {})), extra: JSON.parse(JSON.stringify(data.layout_extra || [])),
-           plans: JSON.parse(JSON.stringify(data.layout_plans || {})), floor: floors.length ? (floorSel || floors[0].floor_id) : null, sel: null, t: Date.now() };
+           plans: JSON.parse(JSON.stringify(data.layout_plans || {})), floor: floors.length ? (floorSel || floors[0].floor_id) : null, sel: null, part: -1, t: Date.now() };
     if (!box) { box = document.createElement("div"); box.id = "planEd"; document.body.appendChild(box); }
   }
   if (!ed || !box) return;
@@ -779,11 +833,11 @@ function planEditor(open) {
       <button class="peChip" data-pe="add">${t.add}</button><button class="peChip" data-pe="reset">${t.reset}</button></div>
     ${plan ? `<div class="peSize"><span>${t.imageSize}</span><input type="range" min="4" max="40" step="0.5" value="${plan.w || 14}" data-pesize><b>${fm(plan.w || 14)} ${t.m}</b><button class="peLink" data-pe="imgoff">${t.imageOff}</button></div>` : ""}
     <div class="peCanvas"><svg id="peSvg"></svg></div>
-    ${sel ? `<div class="peSheet"><div class="peSh1"><span>${roomIcon(sel.name) || "🏠"}</span><b>${esc(sel.name)}</b><em>${fm(sel.ref.w)} × ${fm(sel.ref.h)} ${t.m}${sel.extra ? " · " + t.noThermo : ""}</em></div>
-      <div class="peTools"><button class="peChip" data-pe="rotate">${t.rotate}</button>${sel.extra ? `<button class="peChip" data-pe="rename">${t.name}</button><button class="peChip" data-pe="del">${t.del}</button>` : ""}</div></div>` : ""}
+    ${sel ? `<div class="peSheet"><div class="peSh1"><span>${roomIcon(sel.name) || "🏠"}</span><b>${esc(sel.name)}</b><em>${fm(edRect(sel).w)} × ${fm(edRect(sel).h)} ${t.m}${sel.extra ? " · " + t.noThermo : ""}</em></div>
+      <div class="peTools"><button class="peChip" data-pe="rotate">${t.rotate}</button><button class="peChip" data-pe="addpart">${t.addPart}</button>${ed.part >= 0 ? `<button class="peChip" data-pe="delpart">${t.delPart}</button>` : ""}${sel.extra ? `<button class="peChip" data-pe="rename">${t.name}</button><button class="peChip" data-pe="del">${t.del}</button>` : ""}</div></div>` : ""}
   </div>`;
   edDraw(items);
-  box.querySelectorAll("[data-pefloor]").forEach((b) => b.onclick = () => { ed.floor = b.dataset.pefloor; ed.sel = null; planEditor(); });
+  box.querySelectorAll("[data-pefloor]").forEach((b) => b.onclick = () => { ed.floor = b.dataset.pefloor; ed.sel = null; ed.part = -1; planEditor(); });
   box.querySelectorAll("[data-pe]").forEach((b) => b.onclick = () => edAct(b.dataset.pe));
   const sz = box.querySelector("[data-pesize]"); if (sz) sz.oninput = () => { ed.plans[fk] = { ...(ed.plans[fk] || {}), w: Number(sz.value) }; sz.nextElementSibling.textContent = fm(Number(sz.value)) + " " + t.m; edDraw(edItems()); };
   const fi = box.querySelector("[data-peimg]"); if (fi) fi.onchange = async () => {
@@ -793,38 +847,69 @@ function planEditor(open) {
     ed.plans[fk] = { w: (ed.plans[fk] || {}).w || 14, ratio: 1 }; ed.t = Date.now(); planEditor();
   };
 }
+function edRect(it) { return ed.part >= 0 && (it.ref.parts || [])[ed.part] ? it.ref.parts[ed.part] : it.ref; }
+// A part always touches the room: after a drag it jumps to the nearest edge of the room or of another part.
+function edAttach(it, j) {
+  const q = it.ref.parts[j], others = [it.ref, ...it.ref.parts.filter((_, k) => k !== j)];
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  let best = null;
+  for (const R of others) {
+    const opts = [
+      { x: R.x - q.w, y: clamp(q.y, R.y - q.h + .5, R.y + R.h - .5) }, { x: R.x + R.w, y: clamp(q.y, R.y - q.h + .5, R.y + R.h - .5) },
+      { y: R.y - q.h, x: clamp(q.x, R.x - q.w + .5, R.x + R.w - .5) }, { y: R.y + R.h, x: clamp(q.x, R.x - q.w + .5, R.x + R.w - .5) }];
+    for (const o of opts) { const d = Math.hypot(o.x - q.x, o.y - q.y); if (o.x >= 0 && o.y >= 0 && (!best || d < best.d)) best = { ...o, d }; }
+  }
+  if (best) { q.x = snap(best.x); q.y = snap(best.y); }
+}
 function edDraw(items) {
   const svg = document.getElementById("peSvg"); if (!svg) return;
   const fk = ed.floor || "_", plan = ed.plans[fk];
-  const BW = Math.max(12, ...items.map((i) => i.ref.x + i.ref.w + 1), plan ? plan.w : 0), wpx = svg.parentElement.clientWidth || 360;
-  const E = (wpx - 16) / BW, BH = Math.max(9, ...items.map((i) => i.ref.y + i.ref.h + 1)), H = BH * E + 16;
+  const allR = items.flatMap((i) => [i.ref, ...(i.ref.parts || [])]);
+  const BW = Math.max(12, ...allR.map((q) => q.x + q.w + 1), plan ? plan.w : 0), wpx = svg.parentElement.clientWidth || 360;
+  const E = (wpx - 16) / BW, BH = Math.max(9, ...allR.map((q) => q.y + q.h + 1)), H = BH * E + 16;
   svg.setAttribute("viewBox", `0 0 ${wpx} ${H}`); svg.setAttribute("height", H);
   const X = (m) => 8 + m * E;
   let o = `<defs><pattern id="peGrid" width="${E / 2}" height="${E / 2}" patternUnits="userSpaceOnUse" x="8" y="8"><path d="M ${E / 2} 0 L 0 0 0 ${E / 2}" fill="none" class="peGl"/></pattern></defs><rect width="${wpx}" height="${H}" fill="url(#peGrid)"/>`;
   if (plan) o += `<image href="api/plan?floor=${encodeURIComponent(fk)}&t=${ed.t}" x="8" y="8" width="${plan.w * E}" preserveAspectRatio="xMinYMin meet" opacity=".4"/>`;
   const COLS = { heat: ["#ffd2b3", "#ff7a3d"], ok: ["#ffe7bd", "#f0b85a"], low: ["#d8e8ff", "#6aa0ef"], off: ["#eceff4", "#b9c0cc"] };
   items.forEach((i) => {
-    const r = data.rooms.find((x) => x.area_id === i.key), k = r ? roomState(r) : "off", [f, s] = COLS[k] || COLS.ok, on = i.key === ed.sel, R = i.ref;
-    o += `<g class="peRoom" data-key="${esc(i.key)}"><rect x="${X(R.x) + 2}" y="${X(R.y) + 2}" width="${R.w * E - 4}" height="${R.h * E - 4}" rx="9" fill="${f}" stroke="${on ? "#ff6a3d" : s}" stroke-width="${on ? 3 : 1.5}" ${i.extra ? 'stroke-dasharray="5 4"' : ""}/>
-      <text x="${X(R.x + R.w / 2)}" y="${X(R.y + R.h / 2) - 3}" text-anchor="middle" font-size="14">${roomIcon(i.name)}</text><text x="${X(R.x + R.w / 2)}" y="${X(R.y + R.h / 2) + 12}" text-anchor="middle" class="peName">${esc(i.name.length > 14 ? i.name.slice(0, 13) + "…" : i.name)}</text></g>`;
+    const r = data.rooms.find((x) => x.area_id === i.key), k = r ? roomState(r) : "off", [f, s] = COLS[k] || COLS.ok, on = i.key === ed.sel, M = i.ref;
+    const rs = [M, ...(M.parts || [])];
+    rs.forEach((R, j) => {  // the room and its parts: one colour; the selected one has an orange edge
+      const act = on && ed.part === j - 1;
+      o += `<rect class="peRoom" data-key="${esc(i.key)}" data-part="${j - 1}" x="${X(R.x) + 2}" y="${X(R.y) + 2}" width="${R.w * E - 4}" height="${R.h * E - 4}" rx="9" fill="${f}" stroke="${act ? "#ff6a3d" : on ? "#ffb08a" : s}" stroke-width="${act ? 3 : 1.5}" ${i.extra ? 'stroke-dasharray="5 4"' : ""}/>`;
+    });
+    // where the parts touch, the joint is painted over: it reads as one room
+    rs.forEach((A, a) => rs.forEach((B, b) => { if (b <= a) return;
+      const vx = Math.abs(A.x + A.w - B.x) < .01 ? A.x + A.w : Math.abs(B.x + B.w - A.x) < .01 ? A.x : null, hy = Math.abs(A.y + A.h - B.y) < .01 ? A.y + A.h : Math.abs(B.y + B.h - A.y) < .01 ? A.y : null;
+      if (vx != null) { const y1 = Math.max(A.y, B.y), y2 = Math.min(A.y + A.h, B.y + B.h); if (y2 - y1 > .2) o += `<rect x="${X(vx) - 4}" y="${X(y1) + 4}" width="8" height="${(y2 - y1) * E - 8}" fill="${f}" pointer-events="none"/>`; }
+      if (hy != null) { const x1 = Math.max(A.x, B.x), x2 = Math.min(A.x + A.w, B.x + B.w); if (x2 - x1 > .2) o += `<rect x="${X(x1) + 4}" y="${X(hy) - 4}" width="${(x2 - x1) * E - 8}" height="8" fill="${f}" pointer-events="none"/>`; } }));
+    const big = rs.reduce((m, R) => R.w * R.h > m.w * m.h ? R : m, rs[0]);
+    o += `<text x="${X(big.x + big.w / 2)}" y="${X(big.y + big.h / 2) - 3}" text-anchor="middle" font-size="14" pointer-events="none">${roomIcon(i.name)}</text><text x="${X(big.x + big.w / 2)}" y="${X(big.y + big.h / 2) + 12}" text-anchor="middle" class="peName" pointer-events="none">${esc(i.name.length > 14 ? i.name.slice(0, 13) + "…" : i.name)}</text>`;
     if (on) {
+      const R = edRect(i);
       o += `<text x="${X(R.x + R.w / 2)}" y="${X(R.y) - 4}" text-anchor="middle" class="peDim">${fm(R.w)} m</text><text x="${X(R.x + R.w) + 4}" y="${X(R.y + R.h / 2)}" class="peDim">${fm(R.h)} m</text>`;
-      o += `<circle class="peHandle" data-key="${esc(i.key)}" cx="${X(R.x + R.w)}" cy="${X(R.y + R.h)}" r="9"/>`;
+      o += `<circle class="peHandle" data-key="${esc(i.key)}" data-part="${ed.part}" cx="${X(R.x + R.w)}" cy="${X(R.y + R.h)}" r="9"/>`;
     }
   });
   svg.innerHTML = o;
   // drag: a room moves, its corner resizes - in steps of 25 cm
   svg.querySelectorAll(".peRoom, .peHandle").forEach((el) => el.onpointerdown = (ev) => {
     ev.preventDefault(); const it = items.find((i) => i.key === el.dataset.key); if (!it) return;
-    const resize = el.classList.contains("peHandle"), R = it.ref, st = { x: ev.clientX, y: ev.clientY, R: { ...R } }, scale = svg.getBoundingClientRect().width / wpx;
-    ed.sel = it.key;
+    const part = Number(el.dataset.part ?? -1), resize = el.classList.contains("peHandle");
+    ed.sel = it.key; ed.part = part;
+    const R = edRect(it), parts = it.ref.parts || [], st = { x: ev.clientX, y: ev.clientY, R: { ...R }, P: parts.map((q) => ({ ...q })) }, scale = svg.getBoundingClientRect().width / wpx;
     el.setPointerCapture(ev.pointerId);
     el.onpointermove = (m) => {
       const dx = (m.clientX - st.x) / scale / E, dy = (m.clientY - st.y) / scale / E;
-      if (resize) { R.w = Math.max(1, snap(st.R.w + dx)); R.h = Math.max(1, snap(st.R.h + dy)); } else { R.x = Math.max(0, snap(st.R.x + dx)); R.y = Math.max(0, snap(st.R.y + dy)); }
+      if (resize) { R.w = Math.max(1, snap(st.R.w + dx)); R.h = Math.max(1, snap(st.R.h + dy)); }
+      else {
+        R.x = Math.max(0, snap(st.R.x + dx)); R.y = Math.max(0, snap(st.R.y + dy));
+        if (part < 0) parts.forEach((q, j) => { q.x = Math.max(0, st.P[j].x + (R.x - st.R.x)); q.y = Math.max(0, st.P[j].y + (R.y - st.R.y)); });  // the parts follow the room
+      }
       edDraw(items);
     };
-    el.onpointerup = () => { el.onpointermove = null; planEditor(); };
+    el.onpointerup = () => { el.onpointermove = null; if (part >= 0) edAttach(it, part); planEditor(); };
   });
 }
 async function edAct(a) {
@@ -842,7 +927,13 @@ async function edAct(a) {
     if (!confirm(t.resetQ)) return;
     items.forEach((i) => { if (!i.extra) delete ed.layout[i.key]; }); ed.extra = ed.extra.filter((e) => (e.floor || null) !== (ed.floor || null)); ed.sel = null;
   } else if (a === "imgoff") { await api("/api/plan", { floor: fk, image: null }); delete ed.plans[fk]; }
-  else if (sel && a === "rotate") { [sel.ref.w, sel.ref.h] = [sel.ref.h, sel.ref.w]; }
+  else if (sel && a === "rotate") { const R = edRect(sel); [R.w, R.h] = [R.h, R.w]; if (ed.part >= 0) edAttach(sel, ed.part); }
+  else if (sel && a === "addpart") {  // a new part right below the room, already attached
+    const M = sel.ref; M.parts = M.parts || [];
+    if (M.parts.length >= 4) return;
+    M.parts.push({ x: M.x, y: M.y + M.h, w: Math.min(3, M.w), h: 2 }); ed.part = M.parts.length - 1; edAttach(sel, ed.part);
+  }
+  else if (sel && a === "delpart" && ed.part >= 0) { sel.ref.parts.splice(ed.part, 1); ed.part = -1; }
   else if (sel && a === "rename") { const n = prompt(t.name, sel.name); if (n && n.trim()) sel.ref.name = n.trim().slice(0, 30); }
   else if (sel && a === "del") { ed.extra = ed.extra.filter((e) => "x:" + e.id !== sel.key); ed.sel = null; }
   planEditor();

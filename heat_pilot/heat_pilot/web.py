@@ -168,10 +168,15 @@ def make_app(pilot) -> web.Application:
         """"Fit the plan": each room's place on the floor plan in metres, rooms without a thermostat, the plan's width."""
         b = await req.json()
         rooms = {r["area_id"] for r in pilot.rooms()}
-        lay = {a: {k: _num(v[k], 0 if k in "xy" else 0.5, 60) for k in ("x", "y", "w", "h")}
-               for a, v in (b.get("layout") or {}).items() if a in rooms and isinstance(v, dict) and all(k in v for k in "xywh")}
-        extra = [{"id": str(e.get("id"))[:12], "name": str(e.get("name") or "")[:30], "floor": e.get("floor"),
-                  **{k: _num(e[k], 0 if k in "xy" else 0.5, 60) for k in ("x", "y", "w", "h")}}
+
+        def rect(v: dict) -> dict:  # a room's place, and its parts (an L-shaped room has more than one)
+            out = {k: _num(v[k], 0 if k in "xy" else 0.5, 60) for k in ("x", "y", "w", "h")}
+            parts = [{k: _num(q[k], 0 if k in "xy" else 0.5, 60) for k in ("x", "y", "w", "h")}
+                     for q in (v.get("parts") or [])[:4] if isinstance(q, dict) and all(k in q for k in "xywh")]
+            return out | ({"parts": parts} if parts else {})
+
+        lay = {a: rect(v) for a, v in (b.get("layout") or {}).items() if a in rooms and isinstance(v, dict) and all(k in v for k in "xywh")}
+        extra = [{"id": str(e.get("id"))[:12], "name": str(e.get("name") or "")[:30], "floor": e.get("floor"), **rect(e)}
                  for e in (b.get("extra") or [])[:40] if isinstance(e, dict) and all(k in e for k in "xywh")]
         plans = {str(f)[:64]: {"w": _num((v or {}).get("w", 14), 2, 60)} for f, v in (b.get("plans") or {}).items() if _plan_file(str(f)).exists()}
         pilot.settings.update({"layout": lay, "layout_extra": extra, "layout_plans": plans})
