@@ -150,7 +150,7 @@ def make_app(pilot) -> web.Application:
         if a == "send":
             res = await sup.send(b.get("note", ""), b.get("images") or [], build_diagnostics())
         elif a == "reply":
-            res = await sup.reply(b.get("id", ""), b.get("text", ""))
+            res = await sup.reply(b.get("report", ""), b.get("text", ""))
         elif a == "hide":
             sup.hide(str(b.get("key", "")))
         elif a == "share":
