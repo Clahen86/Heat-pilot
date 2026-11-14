@@ -130,13 +130,37 @@ def make_app(pilot) -> web.Application:
         pilot.tick()
         return web.json_response({"ok": True})
 
-    async def diagnostics(_req: web.Request) -> web.Response:
+    def build_diagnostics() -> dict:
         st = pilot.ha.states
         ents = {t["entity_id"] for r in pilot.found for t in r["thermostats"]}
         ents |= {e for r in pilot.found for e in [r.get("temp_sensor"), *r.get("windows", []), *r.get("presence", [])] if e}
-        return web.json_response({"settings": pilot.settings, "found": pilot.found, "now": pilot.now,
-                                  "states": {e: st.get(e) for e in sorted(ents)}},
-                                 headers={"Content-Disposition": "attachment; filename=heat_pilot_diagnostics.json"})
+        settings = {k: v for k, v in pilot.settings.items() if k != "support"}
+        return {"settings": settings, "found": pilot.found, "now": pilot.now, "states": {e: st.get(e) for e in sorted(ents)}}
+
+    async def diagnostics(_req: web.Request) -> web.Response:
+        return web.json_response(build_diagnostics(), headers={"Content-Disposition": "attachment; filename=heat_pilot_diagnostics.json"})
+
+    async def support(req: web.Request) -> web.Response:
+        """Help and answers (support.py) - the same actions as the integrations' websocket."""
+        sup = getattr(pilot, "support", None)
+        if not sup:
+            return web.json_response({"error": "not_ready"}, status=503)
+        b = await req.json() if req.can_read_body else {}
+        a, res = str(b.get("action") or "status"), {}
+        if a == "send":
+            res = await sup.send(b.get("note", ""), b.get("images") or [], build_diagnostics())
+        elif a == "reply":
+            res = await sup.reply(b.get("id", ""), b.get("text", ""))
+        elif a == "hide":
+            sup.hide(str(b.get("key", "")))
+        elif a == "share":
+            sup.d["share"] = bool(b.get("on", True))
+            pilot.save()
+        return web.json_response({**res, **(await sup.status())})
+
+    async def support_js(_req: web.Request) -> web.Response:
+        return web.Response(text=(FRONTEND / "support.js").read_text(), content_type="application/javascript",
+                            headers={"Cache-Control": "no-cache"})
 
     app = web.Application()
     app.router.add_get("/", index)
@@ -153,4 +177,6 @@ def make_app(pilot) -> web.Application:
     app.router.add_post("/api/setup", setup)
     app.router.add_post("/api/mode", mode)
     app.router.add_get("/api/diagnostics", diagnostics)
+    app.router.add_post("/api/support", support)
+    app.router.add_get("/support.js", support_js)
     return app

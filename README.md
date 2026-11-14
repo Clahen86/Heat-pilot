@@ -38,6 +38,10 @@ schedules, request limits, manual setpoints that expire), **Homematic IP**, **FR
 Climate groups are skipped (their thermostats are driven directly). A thermostat without a room becomes a room of
 its own.
 
+### Help and answers
+
+Press **🛟 Help** (the last tab) to write what's wrong and attach up to 3 pictures. It goes privately to the developer with the diagnostics – only when you press *Send*. When the developer answers – also on an error the app reported – the answer shows under 🛟 Help with a notification in Home Assistant, and you can write back. Errors in the app are sent anonymously so they can be fixed; turn it off under 🛟 Help.
+
 ## Install
 
 **Home Assistant OS / Supervised:** Settings → Add-ons → Add-on store → ⋮ → Repositories →

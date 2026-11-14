@@ -20,6 +20,11 @@ async def main() -> None:
     ha = HomeAssistant()
     pilot = Pilot(ha, Path(os.environ.get("DATA_DIR", "/data")))
     asyncio.create_task(ha.run())
+    from .support import ErrorHandler, Support
+
+    pilot.support = Support(pilot)  # Get help, answers from the developer, errors sent anonymously
+    logging.getLogger("heat_pilot").addHandler(ErrorHandler(pilot.support))
+    asyncio.create_task(pilot.support.run())
 
     async def loop() -> None:
         await ha.connected.wait()

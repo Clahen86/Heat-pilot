@@ -199,6 +199,15 @@
     <div class="badge"><i></i><span id="mode"></span></div>
   </div>
   <div id="app"></div>
+  <div id="support-wrap" hidden></div>
+  <script type="module">
+    // Help and answers from the developer: one element kept outside the page that redraws every 30 s.
+    import { defineSupport } from "./support.js";
+    const el = document.createElement(defineSupport("heat_pilot"));
+    el.lang = document.documentElement.dataset.lang || "en";
+    el.api = (action, data) => fetch("api/support", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...data }) }).then((r) => r.json());
+    document.getElementById("support-wrap").appendChild(el);
+  </script>
 </main>
 <div class="sheet" id="sheet"><div class="box" id="sheetbox"></div></div>
 <div class="guide" id="guide"></div>
@@ -206,6 +215,7 @@
 const HA_LANG = "__HA_LANG__";
 const L0 = (((HA_LANG.startsWith("__") ? navigator.language : HA_LANG) || "en").slice(0, 2)).replace(/^(no|nn)$/, "nb");
 const LANG = ["da", "en", "de", "fr", "nl", "sv", "nb"].includes(L0) ? L0 : "en";
+document.documentElement.dataset.lang = LANG;
 const L = LANG === "da" ? "da" : "en";  // the texts are written in Danish and English; the others are translated from English below
 const T = {
   da: { shadow: "Skygge", hero: "Kører i skygge", heroP: "Den viser, hvad den ville gøre i hvert rum – men styrer intet endnu.",
@@ -856,9 +866,12 @@ function render() {
   const nCtl = data.rooms.filter((r) => r.mode === "control").length;
   document.getElementById("mode").textContent = nCtl ? T.controlling.replace("{n}", nCtl) : T.shadow;
   document.querySelector(".badge").classList.toggle("live", !!nCtl);
-  const tabs = `<div class="tabs">${["now", "plan", "rooms", "settings"].map((k) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${T.tabs[k]}</button>`).join("")}</div>`;
+  const HELP = { da: "🛟 Hjælp", en: "🛟 Help", de: "🛟 Hilfe", fr: "🛟 Aide", nl: "🛟 Hulp", sv: "🛟 Hjälp", nb: "🛟 Hjelp" };
+  const tabs = `<div class="tabs">${["now", "plan", "rooms", "settings", "help"].map((k) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${k === "help" ? HELP[LANG] || HELP.en : T.tabs[k]}</button>`).join("")}</div>`;
+  document.getElementById("support-wrap").hidden = tab !== "help";
   let body = "";
-  if (tab === "plan") body = planTab(rooms);
+  if (tab === "help") body = "";
+  else if (tab === "plan") body = planTab(rooms);
   else if (tab === "rooms") body = `<div class="rooms">${data.rooms.map(roomCard).join("")}</div>
     <p class="muted" style="margin-top:14px">${T.found.replace("{n}", rooms.length).replace("{t}", nT)}</p>
     <p class="muted"><a href="api/diagnostics" style="color:var(--muted)">${T.diag}</a></p>`;
