@@ -25,7 +25,7 @@ district heating meter by itself, learns how your home is used, and shows what i
 - **Warnings**: mould risk, stale air, windows left open, thermostats not responding, low batteries, rooms that
   don't get warm – in the app, and as phone messages only if you want (each kind can be turned off).
 - **Turned by hand** is respected, with an echo guard for Zigbee thermostats.
-- A house drawing by floors, a 48-hour chart per room, a 24-hour plan, a dashboard card and a monthly report.
+- **The house in 3D**: every room glows in its colour (heating, comfort, lowered), floor by floor – with the real weather, night and day, the seasons and the holidays (Christmas lights, fireworks, Easter eggs …). Rooms as thermostat dials, a 48-hour chart per room, a 24-hour plan, a dashboard card and a monthly report.
 - **7 languages** (English, Danish, German, French, Dutch, Swedish, Norwegian), **°C and °F**.
 
 ## Thermostats
@@ -40,7 +40,7 @@ its own.
 
 ### Help and answers
 
-Press **🛟 Help** (the last tab) to write what's wrong and attach up to 3 pictures. It goes privately to the developer with the diagnostics – only when you press *Send*. When the developer answers – also on an error the app reported – the answer shows under 🛟 Help with a notification in Home Assistant, and you can write back. Errors in the app are sent anonymously so they can be fixed; turn it off under 🛟 Help.
+Press **🛟 Help** (under Settings) to write what's wrong and attach up to 3 pictures. It goes privately to the developer with the diagnostics – only when you press *Send*. When the developer answers – also on an error the app reported – the answer shows under 🛟 Help with a notification in Home Assistant, and you can write back. Errors in the app are sent anonymously so they can be fixed; turn it off under 🛟 Help.
 
 ## Install
 

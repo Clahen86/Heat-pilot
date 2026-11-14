@@ -48,3 +48,14 @@ def test_preheat_starts_in_time():
     assert plan.target(room, {}, {}, at, False, None, hours, 18.0, 12.0)["why"] == "setback"
     assert plan.target(room, {}, {}, at.replace(minute=30), False, None, hours, 18.0, 12.0)["why"] == "preheat"
     assert plan.target(room, {}, {}, at, False, None, hours, 18.0, 12.0, occupied=True)["why"] == "occupied"
+
+
+def test_on_time_is_a_share_of_the_times_measured_not_of_the_rooms(tmp_path):
+    from datetime import datetime
+
+    from heat_pilot.learning import Learning
+
+    lg = Learning(tmp_path)
+    lg.s["ontime"] = {"a": {"ok": 9, "n": 10}, "b": {"ok": 1, "n": 2}}
+    s = lg.summary(datetime(2026, 11, 14, 12), ["a", "b"])
+    assert s["ontime"] == 83 and s["ontime_n"] == 12

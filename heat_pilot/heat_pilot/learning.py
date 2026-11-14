@@ -162,7 +162,7 @@ class Learning:
         week = days[-7:]
         dh_week = sum(sum(self.s["saved"][d].values()) for d in week)
         ot = [self.s["ontime"].get(r) for r in rooms if self.s["ontime"].get(r)]
-        ok, n = sum(x["ok"] for x in ot), sum(x["n"] for x in ot)
+        ok, seen = sum(x["ok"] for x in ot), sum(x["n"] for x in ot)
         hours_today = max(1.0, now.hour + now.minute / 60)
         n = max(1, len(rooms))
         dh_today = sum(today.values())
@@ -171,7 +171,7 @@ class Learning:
                 "today_avg_down": round(dh_today / (hours_today * n), 1), "today_pct": round(dh_today / (hours_today * n) * 6),
                 # Rule of thumb: each degree lower for a day saves about 6 % of the heating that day.
                 "week_pct": round(dh_week / (24 * max(1, len(week)) * max(1, len(rooms))) * 6, 1) if week else None,
-                "ontime": round(100 * ok / n) if n else None, "ontime_n": n}
+                "ontime": round(100 * ok / seen) if seen else None, "ontime_n": seen}  # was overwritten by the room count
 
 
 HOLD_MIN = 10  # a motion sensor's "on" counts as someone in the room for this long after it
