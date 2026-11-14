@@ -149,6 +149,8 @@ class Pilot:
         devices = await self.ha.command({"type": "config/device_registry/list"})
         entities = await self.ha.command({"type": "config/entity_registry/list"})
         self.found = discover.find(areas, devices, entities, self.ha.states)
+        self.reg_entities = {e["entity_id"]: e for e in entities}  # for the setup sent to the developer (setup.py)
+        self.reg_devices = {d["id"]: d for d in devices}
         try:
             floors = await self.ha.command({"type": "config/floor_registry/list"})
         except Exception:  # noqa: BLE001 - older Home Assistant: no floors

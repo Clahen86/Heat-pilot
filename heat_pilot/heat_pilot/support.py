@@ -68,6 +68,25 @@ class Support:
     def share(self) -> bool:
         return self.d.get("share", True) is not False
 
+    @property
+    def full(self) -> bool:
+        """"Share my setup": the full entity names too (off unless the user turns it on)."""
+        return bool(self.d.get("full")) and self.share
+
+    def setup_info(self) -> dict[str, Any] | None:
+        """How it is set up (setup.py) - only when sharing is on."""
+        if not self.share:
+            return None
+        try:
+            from . import setup
+
+            info = setup.collect(self.pilot, self.full)
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Setup for the developer failed", exc_info=True)
+            return {"failed": True}
+        info["full"] = self.full
+        return info
+
     def _save(self) -> None:
         self.pilot.save()
 
@@ -144,7 +163,10 @@ class Support:
             await asyncio.sleep(600)
 
     async def fetch_answers(self) -> None:
-        d = await self._post("/replies", {"install": self.d["install"], "version": self.version()})
+        body: dict[str, Any] = {"install": self.d["install"], "version": self.version()}
+        if (su := self.setup_info()) is not None:
+            body["setup"] = su
+        d = await self._post("/replies", body)
         if not d or "reports" not in d:
             return
         self.d["replies"] = {"reports": d["reports"][:5], "notes": (d.get("notes") or [])[:5], "t": time.time()}
@@ -258,7 +280,7 @@ class Support:
     async def status(self) -> dict[str, Any]:
         if self.answer_every() and time.time() - float((self.d.get("replies") or {}).get("t") or 0) > 300:
             await self.fetch_answers()
-        out = {"share": self.share, "last_help": self.d.get("last_help"), "answers": self.visible(mark_seen=True), "update": self.update()}
+        out = {"share": self.share, "full": self.full, "has_setup": True, "last_help": self.d.get("last_help"), "answers": self.visible(mark_seen=True), "update": self.update()}
         self._save()
         return out
 

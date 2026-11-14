@@ -164,6 +164,9 @@ def make_app(pilot) -> web.Application:
         elif a == "share":
             sup.d["share"] = bool(b.get("on", True))
             pilot.save()
+        elif a == "full":  # "Share my setup": the full entity names too
+            sup.d["full"] = bool(b.get("on", False))
+            pilot.save()
         elif a == "snooze":
             sup.snooze()
         return web.json_response({**res, **(await sup.status())})

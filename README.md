@@ -50,7 +50,7 @@ its own.
 
 ### Help and answers
 
-Press **🛟 Help** (under Settings) to write what's wrong and attach up to 3 pictures. It goes privately to the developer with the diagnostics – only when you press *Send*. When the developer answers – also on an error the app reported – the answer shows under 🛟 Help with a notification in Home Assistant, and you can write back. Errors in the app are sent anonymously so they can be fixed; turn it off under 🛟 Help.
+Press **🛟 Help** (under Settings) to write what's wrong and attach up to 3 pictures. It goes privately to the developer with the diagnostics – only when you press *Send*. When the developer answers – also on an error the app reported – the answer shows under 🛟 Help with a notification in Home Assistant, and you can write back. Errors in the app are sent anonymously so they can be fixed, and once a day how it is set up: the thermostats, ventilation, heat meter, hot water tank and price sensor – their integration, maker and model and what each entity is used for, with the entity names cleaned of your own device names (never room or person names). Turn it off under 🛟 Help. *Share my setup* (off by default) also sends the full entity names, so brand profiles can be fixed.
 
 ## Install
 
