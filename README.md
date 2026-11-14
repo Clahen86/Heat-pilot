@@ -3,7 +3,7 @@
 **Smart heating for every room in Home Assistant – found by itself, in shadow first, as easy as it gets.**
 
 <p align="center"><img src="docs/now_dark.png" width="260" alt="Now"> <img src="docs/now_light.png" width="260" alt="Light theme"> <img src="docs/christmas.png" width="260" alt="At Christmas"></p>
-<p align="center"><img src="docs/rooms.png" width="260" alt="Rooms"></p>
+<p align="center"><img src="docs/plan.png" width="260" alt="Fit the plan"> <img src="docs/rooms.png" width="260" alt="Rooms"></p>
 
 Heat Pilot finds your rooms, thermostats, room sensors, windows, doors, motion sensors, people, ventilation and
 district heating meter by itself, learns how your home is used, and shows what it would do in each room. It
@@ -28,7 +28,8 @@ district heating meter by itself, learns how your home is used, and shows what i
 - **Warnings**: mould risk, stale air, windows left open, thermostats not responding, low batteries, rooms that
   don't get warm – in the app, and as phone messages only if you want (each kind can be turned off).
 - **Turned by hand** is respected, with an echo guard for Zigbee thermostats.
-- **The house in 3D**: every room glows in its colour (heating, comfort, lowered), floor by floor – with the real weather, night and day, the seasons and the holidays (Christmas lights, fireworks, Easter eggs …). Rooms as thermostat dials, a 48-hour chart per room, a 24-hour plan, a dashboard card and a monthly report.
+- **The house in 3D**: rooms with walls, windows and wood floors – a warm glow where it heats, a cool blue where it's lowered – floor by floor, with the real weather, night and day, the seasons and the holidays (snow on the walls, Christmas lights and a tree, fireworks, Easter eggs, a pumpkin …).
+- **Fit the plan**: drag the rooms to where they are in your home and resize them (25 cm steps, sizes in metres), add rooms without a thermostat such as the hall, and put a picture of your own floor plan faintly behind to trace it. Rooms as thermostat dials, a 48-hour chart per room, a 24-hour plan, a dashboard card and a monthly report.
 - **7 languages** (English, Danish, German, French, Dutch, Swedish, Norwegian), **°C and °F**.
 
 ## Thermostats
@@ -70,4 +71,4 @@ Then open `http://<host>:8099`. (Add `-v /path/to/ha/config:/homeassistant` to h
 ---
 
 **Dansk:** Varme i hvert rum – finder selv rum, termostater, følere, vinduer, personer, ventilation og fjernvarme,
-lærer hvordan huset bruges, og starter altid i skygge. Styring slås til rum for rum.
+lærer hvordan huset bruges, og starter altid i skygge. Styring slås til rum for rum. Huset vises i 3D med vægge, vinduer og trægulv, og med **Tilpas plan** flytter du rummene, så de passer til din egen plantegning.
