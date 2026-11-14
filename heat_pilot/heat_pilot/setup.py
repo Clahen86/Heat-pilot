@@ -15,11 +15,20 @@ ATTR_NUM = ("unit_of_measurement", "device_class", "min", "max", "step", "min_te
 ATTR_LIST = ("options", "hvac_modes", "preset_modes", "fan_modes", "operation_list")
 
 
+_TRANSLIT = str.maketrans({"æ": "ae", "ø": "o", "å": "a", "ä": "a", "ö": "o", "ü": "u", "ß": "ss", "œ": "oe", "ð": "d", "þ": "th", "ł": "l", "đ": "d"})
+
+
 def _slug(text: str) -> str:
-    return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", str(text).lower())).strip("_")
+    """Like Home Assistant's own slugify: "Badeværelse" -> "badevaerelse", "Küche" -> "kuche" - so the names match the
+    entity ids Home Assistant made."""
+    import unicodedata
+
+    t = str(text).lower().translate(_TRANSLIT)
+    t = unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode()
+    return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", t)).strip("_")
 
 
-def personal_words(states: dict[str, Any], config: dict[str, Any], devs: dict[str, dict], areas: list[str]) -> list[tuple[str, str]]:
+def personal_words(states: dict[str, Any], config: dict[str, Any], devs: dict[str, dict], areas: list[str], floors: list[str] | None = None) -> list[tuple[str, str]]:
     """The user's own names in this Home Assistant - people, rooms, zones, the home and devices named by the user - as
     slugs with what they become. Longest first, so "lilly_room" goes before "lilly"."""
     words: dict[str, str] = {}
@@ -42,8 +51,7 @@ def personal_words(states: dict[str, Any], config: dict[str, Any], devs: dict[st
             add(nm, "<zone>")
             add(e.split(".", 1)[1], "<zone>")
     add((config or {}).get("location_name"), "<home>")
-    for a in areas:
-        add(a, "<area>")
+    # Rooms and floors stay in the names (the developer wants them - they help the profiles); people do not.
     for d in devs.values():
         if d.get("name_by_user"):
             add(d["name_by_user"], "<device>")

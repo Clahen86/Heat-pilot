@@ -17,7 +17,7 @@ def test_mask():
     words = setup.personal_words({"person.lilly": {"attributes": {"friendly_name": "Lilly"}}}, {"location_name": "Hjem"}, {}, ["Stue", "Køkken"])
     assert setup.mask("climate.stue_termostat", REGS, DEVS, words) == "climate.<device>"
     assert setup.mask("climate.lillys_rum", REGS, DEVS, words) == "climate.<person>_rum"  # Lilly's room
-    assert setup.mask("climate.stue_radiator", REGS, DEVS, words) == "climate.<area>_radiator"
+    assert setup.mask("climate.stue_radiator", REGS, DEVS, words) == "climate.stue_radiator"  # rooms stay
     assert setup.mask("sensor.vvb_temp", REGS, DEVS, words) == "sensor.vvb_temp"  # nothing personal: the whole name
 
 
