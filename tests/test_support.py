@@ -40,3 +40,14 @@ def test_answers(monkeypatch):
     ans["reports"][0]["msgs"].append({"from": "dev", "text": "more", "t": "2026-11-15T08:00:00Z"})
     asyncio.run(s.fetch_answers())
     assert len(p.calls) == 2 and len(s.visible()["reports"]) == 1
+
+
+def test_home_assistant_restarting_is_not_reported():
+    import aiohttp
+
+    from heat_pilot.support import _network
+
+    assert _network(aiohttp.ClientResponseError(None, (), status=502))
+    assert _network(TimeoutError())
+    assert not _network(aiohttp.ClientResponseError(None, (), status=400))
+    assert not _network(KeyError("x"))
