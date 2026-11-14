@@ -192,8 +192,10 @@
   @media (prefers-reduced-motion: reduce) { .vl-spin, .vl-rip, .vl-in, .vl-out, .vl-steam, .vl-pulse, .vl-whoosh, .vl-fog { animation:none; } }
 
   /* ---- the new look (in the family of Energy Pilot): glowing rooms in 3D, thermostat dials, a floating menu ---- */
-  :root { --glow1:rgba(255,122,47,.28); --glow2:rgba(91,107,255,.22); --tile:rgba(255,255,255,.04); --tileB:rgba(255,255,255,.07); --slab1:#141a33; --slab2:#0f1428; }
-  @media (prefers-color-scheme: light) { :root:not([data-theme=dark]) { --glow1:rgba(255,122,47,.22); --glow2:rgba(91,107,255,.14); --tile:#ffffff; --tileB:rgba(15,23,42,.08); --slab1:#d9dde8; --slab2:#c6cbd8; } }
+  :root { --glow1:rgba(255,122,47,.28); --glow2:rgba(91,107,255,.22); --tile:rgba(255,255,255,.04); --tileB:rgba(255,255,255,.07); --slab1:#141a33; --slab2:#0f1428;
+    --wallA:#2c3356; --wallB:#20264a; --wallC:#252c50; --wallCap:#3c4472; --wallLine:#4a5384; --plinthTop:#1a2042; --plinthL:#151a36; --plinthR:#10142c; --labBg:#1f2546; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme=dark]) { --glow1:rgba(255,122,47,.22); --glow2:rgba(91,107,255,.14); --tile:#ffffff; --tileB:rgba(15,23,42,.08); --slab1:#d9dde8; --slab2:#c6cbd8;
+    --wallA:#fdfcff; --wallB:#e4dfea; --wallC:#efebf3; --wallCap:#ffffff; --wallLine:#d9d2e2; --plinthTop:#f8f5fa; --plinthL:#e4dee9; --plinthR:#cfc8d8; --labBg:#ffffff; } }
   main { padding-bottom:120px; }
   .hero2 { position:relative; padding:0 !important; background:none !important; border:0 !important; overflow:visible !important; }
   .hero2::before { content:""; position:absolute; inset:-40px -16px 0; z-index:-1; pointer-events:none;
@@ -206,10 +208,32 @@
   .seg2 { display:flex; gap:4px; background:var(--tile); border:1px solid var(--tileB); border-radius:14px; padding:4px; margin-top:16px; }
   .seg2 button { flex:1; font:inherit; font-size:13px; font-weight:600; padding:8px 0; border-radius:10px; border:0; background:none; color:var(--muted); cursor:pointer; }
   .seg2 button.on { background:var(--line2); color:var(--text); }
+  #planEd { position:fixed; inset:0; z-index:60; background:var(--bg); overflow-y:auto; }
+  .pe { max-width:720px; margin:0 auto; padding:16px 16px 140px; }
+  .peHead { display:flex; align-items:center; gap:12px; } .peHead b { font-size:19px; flex:1; }
+  .peBack { font:inherit; font-size:20px; background:none; border:0; color:var(--text); cursor:pointer; }
+  .peDone { font:inherit; font-weight:700; color:#fff; background:linear-gradient(135deg,#ff9a4d,#ff5e3a); border:0; border-radius:99px; padding:8px 16px; cursor:pointer; }
+  .peHint { color:var(--muted); font-size:12.5px; margin:6px 0 10px; }
+  .peTools { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .peChip { font:inherit; font-size:12px; font-weight:650; color:var(--text); background:var(--surface); border:1px solid var(--line2); border-radius:99px; padding:7px 11px; cursor:pointer; }
+  .peChip.on { background:var(--text); color:var(--bg); border-color:var(--text); }
+  .peSize { display:flex; align-items:center; gap:10px; font-size:12px; color:var(--muted); margin-bottom:10px; flex-wrap:wrap; } .peSize input { flex:1; min-width:120px; }
+  .peLink { font:inherit; font-size:12px; background:none; border:0; color:var(--heat); cursor:pointer; }
+  .peCanvas { background:var(--surface); border-radius:18px; border:1px solid var(--line); overflow:hidden; touch-action:none; }
+  #peSvg { width:100%; display:block; } #peSvg .peGl { stroke:var(--line); stroke-width:1; }
+  #peSvg .peRoom { cursor:grab; } #peSvg .peName { font-size:11px; font-weight:700; fill:#2b2f3c; }
+  #peSvg .peDim { font-size:10px; font-weight:700; fill:#ff6a3d; } #peSvg .peHandle { fill:#fff; stroke:#ff6a3d; stroke-width:3; cursor:nwse-resize; }
+  .peSheet { position:fixed; left:0; right:0; bottom:0; background:var(--surface); border-radius:24px 24px 0 0; box-shadow:0 -10px 30px rgba(0,0,0,.15); padding:14px 18px 18px; max-width:720px; margin:0 auto; }
+  .peSh1 { display:flex; align-items:center; gap:8px; margin-bottom:10px; } .peSh1 b { font-size:15px; } .peSh1 em { font-style:normal; margin-left:auto; font-size:12px; color:var(--muted); font-weight:600; }
   .isoWrap { position:relative; margin-top:4px; }
   svg.iso { width:100%; display:block; overflow:visible; }
-  svg.iso .rt { font-size:12.5px; font-weight:700; fill:#fff; text-anchor:middle; paint-order:stroke; stroke:rgba(0,0,0,.4); stroke-width:3px; pointer-events:none; }
-  svg.iso .rn { font-size:8.5px; font-weight:600; fill:rgba(255,255,255,.9); text-anchor:middle; paint-order:stroke; stroke:rgba(0,0,0,.35); stroke-width:2.5px; pointer-events:none; }
+  svg.iso .rt { font-size:12.5px; font-weight:800; fill:var(--text); text-anchor:middle; pointer-events:none; }
+  svg.iso .rn { font-size:7.8px; font-weight:650; fill:var(--muted); text-anchor:middle; pointer-events:none; }
+  svg.iso .rx { font-size:9px; font-weight:650; fill:var(--muted); text-anchor:middle; letter-spacing:.3px; opacity:.8; pointer-events:none; }
+  svg.iso .lbg { fill:var(--labBg); filter:drop-shadow(0 5px 9px rgba(20,12,40,.22)); }
+  svg.iso .lab { cursor:pointer; } svg.iso .glow2 { animation:hpglow 3s ease-in-out infinite; } @keyframes hpglow { 50% { opacity:.65; } }
+  .isoTools { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:2px; flex-wrap:wrap; }
+  .editPlan { font:inherit; font-size:12px; font-weight:700; color:var(--heat); background:var(--surface); border:1px solid var(--line2); border-radius:99px; padding:6px 12px; cursor:pointer; }
   svg.iso .cell { cursor:pointer; transition:filter .2s; } svg.iso .cell:hover { filter:brightness(1.15); }
   svg.iso .wave { fill:none; stroke:#ffb36b; stroke-width:1.6; stroke-linecap:round; opacity:.85; animation:hpwave 2.4s ease-in-out infinite; }
   @keyframes hpwave { 0% { transform:translateY(4px); opacity:0; } 40% { opacity:.9; } 100% { transform:translateY(-8px); opacity:0; } }
@@ -600,51 +624,225 @@ function skyNow() {
   const time = q.get("t") || (!isNaN(el) ? (el > 6 ? "day" : el > -6 ? "dusk" : "night") : (data.sun === "below_horizon" ? "night" : "day"));
   return { now, cond, time, season: seasonOf(now)[0], holiday: holidayOf(now), snowing: /snow/.test(cond), rain: /rain|pouring|lightning/.test(cond) };
 }
-function isoHouse(rooms, sk) {
-  const C = Math.cos(Math.PI / 6), S = 0.5, W = 240, D = 150, ox = 144, oy = 30;
-  const P = (x, y, z) => [ox + (x - y) * C, oy + (x + y) * S - z];
-  const poly = (pts, attrs) => `<polygon points="${pts.map(([x, y, z]) => P(x, y, z).map((v) => v.toFixed(1)).join(",")).join(" ")}" ${attrs}/>`;
-  const n = rooms.length, cols = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(n * 1.6)))), rows = Math.max(1, Math.ceil(n / cols));
-  let defs = Object.entries(HPC).map(([k, [a, b]]) => `<linearGradient id="hg-${k}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}" stop-opacity=".95"/><stop offset="1" stop-color="${b}" stop-opacity=".55"/></linearGradient>`).join("");
-  defs += `<filter id="hg-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
-  let out = poly([[0, D, 0], [W, D, 0], [W, D, -10], [0, D, -10]], 'style="fill:var(--slab1)"') + poly([[W, 0, 0], [W, D, 0], [W, D, -10], [W, 0, -10]], 'style="fill:var(--slab2)"');
-  let labels = "";
-  rooms.forEach((r, i) => {
-    const row = Math.floor(i / cols), inRow = row === rows - 1 ? n - row * cols : cols, col = i - row * cols;
-    const w = W / inRow, d = D / rows, x = col * w, y = row * d, g = 3, k = roomState(r), [c1, c2] = HPC[k];
-    out += `<g class="cell" data-room="${esc(r.area_id)}">` + poly([[x + g, y + g, 0], [x + w - g, y + g, 0], [x + w - g, y + d - g, 0], [x + g, y + d - g, 0]],
-      `fill="url(#hg-${k})" stroke="${c2}" stroke-width="1" stroke-opacity=".5" ${k === "heat" ? 'filter="url(#hg-glow)"' : ""}`)
-      + poly([[x + g, y + d - g, 0], [x + w - g, y + d - g, 0], [x + w - g, y + d - g, 6], [x + g, y + d - g, 6]], `fill="${c1}" opacity=".35"`)
-      + poly([[x + w - g, y + g, 0], [x + w - g, y + d - g, 0], [x + w - g, y + d - g, 6], [x + w - g, y + g, 6]], `fill="${c1}" opacity=".22"`) + "</g>";
-    const [cx, cy] = P(x + w / 2, y + d / 2, 0), nm = r.name.length > 14 ? r.name.slice(0, 13) + "…" : r.name;
-    labels += `<text x="${cx.toFixed(1)}" y="${(cy - 2).toFixed(1)}" class="rt">${r.temp == null ? "–" : num(deg(r.temp))}°</text><text x="${cx.toFixed(1)}" y="${(cy + 11).toFixed(1)}" class="rn">${esc(nm)}</text>`;
-    if (k === "heat") [-10, 0, 10].forEach((dx, j) => { labels += `<path d="M${(cx + dx).toFixed(1)} ${(cy - 18).toFixed(1)} q4 -6 0 -12 q-4 -6 0 -12" class="wave" style="animation-delay:${j * .35}s"/>`; });
+// The plan of a floor: each room's place in metres (x, y, w, h) - chosen in "Fit the plan", or laid out by itself in a grid.
+function planOf(rooms, floorId) {
+  const L = data.layout || {}, out = [];
+  const placed = rooms.filter((r) => L[r.area_id]), loose = rooms.filter((r) => !L[r.area_id]);
+  placed.forEach((r) => out.push({ r, ...L[r.area_id] }));
+  (data.layout_extra || []).filter((e) => (e.floor || null) === (floorId || null)).forEach((e) => out.push({ extra: e, ...e }));
+  if (loose.length) {  // the ones not placed yet: a neat grid below the rest
+    const top = out.length ? Math.max(...out.map((o) => o.y + o.h)) : 0;
+    const n = loose.length, cols = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(n * 1.6)))), rows = Math.ceil(n / cols);
+    loose.forEach((r, i) => {  // the last row is spread out too, so there's no hole
+      const row = Math.floor(i / cols), inRow = row === rows - 1 ? n - row * cols : cols, w = 12 / inRow;
+      out.push({ r, x: (i - row * cols) * w, y: top + row * 4, w, h: 4, auto: true });
+    });
+  }
+  return out;
+}
+const ROOM_ICON = [[/stue|living|wohn|vardag|stua|woonk|salon/i, "🛋️"], [/bad|bath|wc|toilet|dusch|douche/i, "🛁"], [/sove|bed|schlaf|sov|slaap|chambre/i, "🛏️"],
+  [/køkken|kitchen|küche|kök|kjøkken|keuken|cuisine/i, "🍳"], [/kontor|office|büro|kontor|study/i, "💻"], [/gang|entr|hall|flur|corridor/i, "🚪"],
+  [/værelse|room|zimmer|rum|kamer|kids|børn/i, "🧸"], [/kælder|basement|keller/i, "📦"], [/vaske|laundry|wasch/i, "🧺"]];
+const roomIcon = (n) => (ROOM_ICON.find(([re]) => re.test(n || "")) || [0, ""])[1];
+
+function isoHouse(rooms, sk, floorId) {
+  const items = planOf(rooms, floorId);
+  if (!items.length) return "";
+  const x0 = Math.min(...items.map((o) => o.x)), y0 = Math.min(...items.map((o) => o.y));
+  items.forEach((o) => { o.x -= x0; o.y -= y0; });
+  const BW = Math.max(...items.map((o) => o.x + o.w)), BH = Math.max(...items.map((o) => o.y + o.h));
+  const C = Math.cos(Math.PI / 6), SN = 0.5, VW = 364, VH = 270;
+  const WH = 1.25, F = 0.1, T2 = 0.16;
+  const S = Math.min((VW - 30) / ((BW + BH + 1) * C), (VH - 50) / ((BW + BH + 1) * SN + WH + 1.4));
+  const ox = VW / 2 - ((BW - BH) / 2) * C * S, oy = 30 + WH * S;
+  const P = (x, y, z = 0) => [ox + (x - y) * C * S, oy + (x + y) * SN * S - z * S];
+  const pts = (a) => a.map((p) => p.map((v) => v.toFixed(1)).join(",")).join(" ");
+  const dark = !matchMedia("(prefers-color-scheme: light)").matches || document.documentElement.dataset.theme === "dark";
+  const COLS = { heat: ["#ffb07a", "#ff7a3d"], ok: ["#ffe0a8", "#ffc46b"], low: ["#cfe3ff", "#8dbcff"], off: ["#e9ecf2", "#cfd5df"], none: ["#eef0f4", "#dfe3ea"] };
+  const night = sk.time === "night" || (sk.holiday === "jul" && sk.time !== "day");
+  let defs = `<filter id="hs-sh" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="12"/></filter><filter id="hs-b6"><feGaussianBlur stdDeviation="5"/></filter>
+    <radialGradient id="hs-glow"><stop offset="0" stop-color="#ff8a3d" stop-opacity=".75"/><stop offset=".55" stop-color="#ff8a3d" stop-opacity=".25"/><stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/></radialGradient>
+    <radialGradient id="hs-cool"><stop offset="0" stop-color="#7fb2ff" stop-opacity=".45"/><stop offset="1" stop-color="#7fb2ff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="hs-wN" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--wallA)"/><stop offset="1" style="stop-color:var(--wallB)"/></linearGradient>
+    <linearGradient id="hs-wW" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--wallA)"/><stop offset="1" style="stop-color:var(--wallC)"/></linearGradient>`;
+  let g = `<polygon points="${pts([P(-.5, -.5), P(BW + .5, -.5), P(BW + .5, BH + .5), P(-.5, BH + .5)])}" transform="translate(5,18)" fill="#1b1230" opacity="${dark ? .5 : .25}" filter="url(#hs-sh)"/>`;
+  if (sk.season === "winter" || sk.snowing || sk.holiday === "jul") g += `<ellipse cx="${VW / 2}" cy="${P(BW / 2 + .5, BH / 2 + .5)[1] + 10}" rx="${VW / 2 - 4}" ry="${(BW + BH) * SN * S / 2 + 18}" fill="#fff" opacity="${dark ? .14 : .85}"/>`;
+  g += `<polygon points="${pts([P(BW + .4, -.4), P(BW + .4, BH + .4), P(BW + .4, BH + .4, -.8), P(BW + .4, -.4, -.8)])}" style="fill:var(--plinthR)"/>`;
+  g += `<polygon points="${pts([P(-.4, BH + .4), P(BW + .4, BH + .4), P(BW + .4, BH + .4, -.8), P(-.4, BH + .4, -.8)])}" style="fill:var(--plinthL)"/>`;
+  g += `<polygon points="${pts([P(-.4, -.4), P(BW + .4, -.4), P(BW + .4, BH + .4), P(-.4, BH + .4)])}" style="fill:var(--plinthTop)"/>`;
+  const wall = (ax, ay, bx, by, fill) => {
+    const horiz = ay === by, A = P(ax, ay, F), B = P(bx, by, F), At = P(ax, ay, WH), Bt = P(bx, by, WH);
+    const cap = horiz ? [P(ax, ay - T2, WH), P(bx, by - T2, WH), P(bx, by, WH), P(ax, ay, WH)] : [P(ax - T2, ay, WH), P(ax, ay, WH), P(bx, by, WH), P(bx - T2, by, WH)];
+    return `<polygon points="${pts([A, B, Bt, At])}" style="fill:${fill}"/><polygon points="${pts(cap)}" style="fill:var(--wallCap);stroke:var(--wallLine)" stroke-width=".7"/>`;
+  };
+  let labels = "", fx = "";
+  items.slice().sort((a, b) => (a.x + a.y) - (b.x + b.y)).forEach((o, i) => {
+    const k = o.r ? roomState(o.r) : "none", [c1, c2] = COLS[k] || COLS.ok, X0 = o.x, Y0 = o.y, X1 = o.x + o.w, Y1 = o.y + o.h, id = "hr" + i;
+    defs += `<linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient><clipPath id="${id}c"><polygon points="${pts([P(X0, Y0, F), P(X1, Y0, F), P(X1, Y1, F), P(X0, Y1, F)])}"/></clipPath>`;
+    const floor = [P(X0, Y0, F), P(X1, Y0, F), P(X1, Y1, F), P(X0, Y1, F)];
+    let planks = ""; for (let q = X0 + .5; q < X1; q += .5) { const a = P(q, Y0, F), b = P(q, Y1, F); planks += `<line x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}"/>`; }
+    const [cx, cy] = P((X0 + X1) / 2, (Y0 + Y1) / 2, F);
+    g += `<g class="cell"${o.r ? ` data-room="${esc(o.r.area_id)}"` : ""}><polygon points="${pts(floor)}" fill="url(#${id})" opacity="${dark ? .92 : 1}"/>
+      <g clip-path="url(#${id}c)"><g stroke="#fff" stroke-opacity=".26" stroke-width="1">${planks}</g>
+      ${k === "heat" ? `<ellipse class="glow2" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${(o.w * S).toFixed(1)}" ry="${(o.h * S * .55).toFixed(1)}" fill="url(#hs-glow)"/>` : k === "low" ? `<ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${(o.w * S * .9).toFixed(1)}" ry="${(o.h * S * .5).toFixed(1)}" fill="url(#hs-cool)"/>` : ""}
+      <polygon points="${pts([P(X0, Y0, F), P(X1, Y0, F), P(X1, Y0 + .7, F), P(X0, Y0 + .7, F)])}" fill="#1b1230" opacity=".08"/><polygon points="${pts([P(X0, Y0, F), P(X0 + .7, Y0, F), P(X0 + .7, Y1, F), P(X0, Y1, F)])}" fill="#1b1230" opacity=".06"/></g></g>`;
+    const tint = k === "heat" ? (dark ? "#5a3a2c" : "#ffe8da") : k === "low" ? (dark ? "#2c3a5a" : "#e6f0ff") : null;
+    g += wall(X0, Y0, X1, Y0, tint || "url(#hs-wN)") + wall(X0, Y0, X0, Y1, tint || "url(#hs-wW)");
+    const win = night ? "#ffd98a" : (dark ? "#3b5a85" : "#bfe0ff");
+    if (Y0 === 0 && o.w > 2) { const m = (X0 + X1) / 2; g += `<polygon points="${pts([P(m - .6, 0, .5), P(m + .6, 0, .5), P(m + .6, 0, 1), P(m - .6, 0, 1)])}" fill="${win}" stroke="var(--wallCap)" stroke-width="2"/>`; }
+    if (X0 === 0 && o.h > 2) { const m = (Y0 + Y1) / 2; g += `<polygon points="${pts([P(0, m - .6, .5), P(0, m + .6, .5), P(0, m + .6, 1), P(0, m - .6, 1)])}" fill="${win}" stroke="var(--wallCap)" stroke-width="2"/>`; }
+    if (k === "heat") [-10, 2, 14].forEach((dx, j) => { fx += `<path d="M${(cx + dx).toFixed(1)} ${(cy - 14).toFixed(1)} q5 -9 0 -18 q-5 -9 0 -18" class="wave" style="animation-delay:${j * .35}s"/>`; });
+    if (!o.r) { labels += `<text x="${cx.toFixed(1)}" y="${(cy + 3).toFixed(1)}" class="rx">${esc((o.name || "").toUpperCase())}</text>`; return; }
+    const col = k === "heat" ? "#ff6a2b" : k === "low" ? "#3f84f5" : k === "off" ? "#8a93a3" : "#e39a2b", nm = o.r.name.length > 14 ? o.r.name.slice(0, 13) + "…" : o.r.name, ic = roomIcon(o.r.name);
+    labels += `<g class="lab" transform="translate(${cx.toFixed(1)},${(cy - 24).toFixed(1)})" data-room="${esc(o.r.area_id)}"><line x1="0" y1="13" x2="0" y2="24" stroke="${col}" stroke-width="1.5" opacity=".6"/><circle cx="0" cy="24" r="2.6" fill="${col}"/>
+      <rect x="-37" y="-16" width="74" height="30" rx="15" class="lbg"/>${ic ? `<circle cx="-22" cy="-1" r="10" fill="${col}" opacity=".16"/><text x="-22" y="3" text-anchor="middle" font-size="10.5">${ic}</text>` : ""}
+      <text x="${ic ? 6 : 0}" y="0" class="rt">${o.r.temp == null ? "–" : num(deg(o.r.temp))}°</text><text x="${ic ? 6 : 0}" y="10" class="rn">${esc(nm)}</text></g>`;
   });
-  // decorations: the season and the holidays, on the house itself
+  // the outer front walls, low, so you look into the house
+  g += `<polygon points="${pts([P(BW, 0, F), P(BW, BH, F), P(BW, BH, .5), P(BW, 0, .5)])}" style="fill:var(--wallA)" opacity=".5"/><polygon points="${pts([P(BW, 0, .5), P(BW + T2, 0, .5), P(BW + T2, BH, .5), P(BW, BH, .5)])}" style="fill:var(--wallCap)"/>`;
+  g += `<polygon points="${pts([P(0, BH, F), P(BW, BH, F), P(BW, BH, .5), P(0, BH, .5)])}" style="fill:var(--wallA)" opacity=".55"/><polygon points="${pts([P(0, BH, .5), P(BW, BH, .5), P(BW, BH + T2, .5), P(0, BH + T2, .5)])}" style="fill:var(--wallCap)"/>`;
+  // the season and the holidays, on the house itself
   let deco = "";
-  const edge = [...Array(31)].map((_, i) => [i * 8, D, 0]).concat([...Array(18)].map((_, i) => [W, D - (i + 1) * 8, 0]));
+  if (sk.season === "winter" || sk.snowing || sk.holiday === "jul")
+    items.forEach((o) => { deco += `<polyline points="${pts([P(o.x, o.y + o.h, WH + .12), P(o.x, o.y, WH + .12), P(o.x + o.w, o.y, WH + .12)])}" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity=".95"/>`; });
+  const corner = P(BW + 1.1, BH + 1.1, 0);
   if (sk.holiday === "jul") {
-    const cols2 = ["#ff4d5e", "#ffd34d", "#4dff9a", "#4dc3ff", "#ff7af0"];
-    deco += `<polyline points="${edge.map(([x, y, z], i) => { const [a, b] = P(x, y, z + 2); return `${a.toFixed(1)},${(b + (i % 2 ? 3 : 0)).toFixed(1)}`; }).join(" ")}" fill="none" stroke="#2a3150" stroke-width="1"/>`;
-    deco += edge.map(([x, y, z], i) => { const [a, b] = P(x, y, z + 2), c = cols2[i % 5]; return `<circle class="bulb" style="animation-delay:-${(i * .37 % 1.6).toFixed(2)}s;filter:drop-shadow(0 0 4px ${c})" cx="${a.toFixed(1)}" cy="${(b + (i % 2 ? 3 : 0)).toFixed(1)}" r="2.4" fill="${c}"/>`; }).join("");
-    const [tx, ty] = P(28, D - 26, 0);
-    deco += `<g transform="translate(${tx.toFixed(1)},${ty.toFixed(1)})"><path d="M0 -34 L11 -12 L5 -12 L14 0 L-14 0 L-5 -12 L-11 -12Z" fill="#1f9d63" stroke="#7af0b4" stroke-width=".8"/><rect x="-2.5" y="0" width="5" height="5" fill="#8a5a2b"/><circle cx="0" cy="-36" r="3" fill="#ffd34d" style="filter:drop-shadow(0 0 5px #ffd34d)"/><circle cx="-5" cy="-6" r="1.6" fill="#ff4d5e"/><circle cx="6" cy="-16" r="1.6" fill="#4dc3ff"/><circle cx="3" cy="-4" r="1.6" fill="#ffd34d"/></g>`;
+    const cl = ["#ff4d5e", "#ffd34d", "#4dff9a", "#4dc3ff", "#ff7af0"]; let n = 0;
+    const chain = (ax, ay, bx, by) => { const A = P(ax, ay, WH + .05), B = P(bx, by, WH + .05), m = Math.max(3, Math.round(Math.hypot(bx - ax, by - ay) * 2));
+      let o = `<path d="M${A[0].toFixed(1)} ${A[1].toFixed(1)} Q${((A[0] + B[0]) / 2).toFixed(1)} ${((A[1] + B[1]) / 2 + 5).toFixed(1)} ${B[0].toFixed(1)} ${B[1].toFixed(1)}" stroke="#3b3355" stroke-width=".8" fill="none" opacity=".6"/>`;
+      for (let q = 1; q < m; q++) { const t = q / m, x = A[0] + (B[0] - A[0]) * t, y = A[1] + (B[1] - A[1]) * t + Math.sin(t * Math.PI) * 5, c = cl[n++ % 5];
+        o += `<circle class="bulb" style="animation-delay:-${(n * .37 % 1.6).toFixed(2)}s;filter:drop-shadow(0 0 4px ${c})" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2" fill="${c}"/>`; } return o; };
+    deco += chain(0, 0, BW, 0) + chain(0, 0, 0, BH);
+    items.filter((o) => o.x > 0).forEach((o) => { deco += chain(o.x, o.y, o.x, o.y + o.h); });
+    deco += `<g transform="translate(${corner[0].toFixed(1)},${corner[1].toFixed(1)})"><ellipse cy="2" rx="14" ry="5" fill="#1b1230" opacity=".2"/><polygon points="0,-46 -15,-14 15,-14" fill="#2f8a57"/><polygon points="0,-34 -19,0 19,0" fill="#27794b"/><rect x="-3" width="6" height="6" fill="#7a4b2a"/>
+      <circle class="bulb" cx="-6" cy="-22" r="2" fill="#ffd34d"/><circle class="bulb" cx="7" cy="-28" r="2" fill="#ff4d5e" style="animation-delay:-.6s"/><circle class="bulb" cx="-9" cy="-6" r="2" fill="#4dc3ff" style="animation-delay:-1s"/><circle class="bulb" cx="9" cy="-8" r="2" fill="#ffd34d" style="animation-delay:-.3s"/>
+      <circle cx="0" cy="-48" r="3.5" fill="#ffd34d" style="filter:drop-shadow(0 0 5px #ffd34d)"/></g>`;
   } else if (sk.holiday === "halloween") {
-    const [tx, ty] = P(24, D - 22, 0);
-    deco += `<g transform="translate(${tx.toFixed(1)},${ty.toFixed(1)})" style="filter:drop-shadow(0 0 8px #ff8a1f)"><ellipse rx="13" ry="10" fill="#ff8a1f"/><path d="M-1 -10 q2 -6 6 -7" stroke="#3a7d2c" stroke-width="2.5" fill="none"/><path d="M-6 -3 l3 -3 l3 3z M3 -3 l3 -3 l3 3z M-7 3 q7 6 14 0" fill="#3a1500"/></g>`;
+    deco += `<g transform="translate(${corner[0].toFixed(1)},${corner[1].toFixed(1)})" style="filter:drop-shadow(0 0 8px #ff8a1f)"><ellipse rx="13" ry="10" fill="#ff8a1f"/><path d="M-1 -10 q2 -6 6 -7" stroke="#3a7d2c" stroke-width="2.5" fill="none"/><path d="M-6 -3 l3 -3 l3 3z M3 -3 l3 -3 l3 3z M-7 3 q7 6 14 0" fill="#3a1500"/></g>`;
   } else if (sk.holiday === "paaske") {
-    [[30, D - 18, "#ffd34d"], [44, D - 12, "#ff9ad5"], [212, D - 20, "#9ad8ff"]].forEach(([x, y, c]) => { const [a, b] = P(x, y, 0); deco += `<ellipse cx="${a.toFixed(1)}" cy="${(b - 6).toFixed(1)}" rx="5" ry="7" fill="${c}" stroke="#fff" stroke-width=".8"/>`; });
+    [[BW + .8, BH * .3, "#ffd34d"], [BW + .9, BH * .6, "#ff9ad5"], [BW * .4, BH + .9, "#9ad8ff"]].forEach(([x, y, c]) => { const [a, b] = P(x, y, 0); deco += `<ellipse cx="${a.toFixed(1)}" cy="${(b - 6).toFixed(1)}" rx="5" ry="7" fill="${c}" stroke="#fff" stroke-width=".8"/>`; });
   } else if (sk.holiday === "sankthans") {
-    const [a, b] = P(W + 26, D + 16, 0);
-    deco += `<g transform="translate(${a.toFixed(1)},${b.toFixed(1)})"><circle r="26" fill="#ff7a2f" opacity=".25" style="filter:blur(8px)"/><path d="M-8 0 l8 -22 l8 22z" fill="#ffb347"/><path d="M-4 0 l4 -13 l4 13z" fill="#fff1a8"/><path d="M-12 2 h24" stroke="#6b4423" stroke-width="3"/></g>`;
+    deco += `<g transform="translate(${corner[0].toFixed(1)},${corner[1].toFixed(1)})"><circle r="26" fill="#ff7a2f" opacity=".25" style="filter:blur(8px)"/><path d="M-8 0 l8 -22 l8 22z" fill="#ffb347"/><path d="M-4 0 l4 -13 l4 13z" fill="#fff1a8"/><path d="M-12 2 h24" stroke="#6b4423" stroke-width="3"/></g>`;
   } else if (sk.holiday === "nytaar") {
-    [[60, 6, "#ff4d5e"], [300, -6, "#4dc3ff"], [200, 14, "#ffd34d"]].forEach(([x, y, c]) => { deco += `<g transform="translate(${x},${y})" style="filter:drop-shadow(0 0 4px ${c})">${[...Array(12)].map((_, i) => { const t = i * Math.PI / 6; return `<line x1="${(Math.cos(t) * 5).toFixed(1)}" y1="${(Math.sin(t) * 5).toFixed(1)}" x2="${(Math.cos(t) * 16).toFixed(1)}" y2="${(Math.sin(t) * 16).toFixed(1)}" stroke="${c}" stroke-width="1.6" stroke-linecap="round"/>`; }).join("")}</g>`; });
+    [[60, 12, "#ff4d5e"], [300, 4, "#4dc3ff"], [190, 18, "#ffd34d"]].forEach(([x, y, c]) => { deco += `<g transform="translate(${x},${y})" style="filter:drop-shadow(0 0 4px ${c})">${[...Array(12)].map((_, q) => { const t = q * Math.PI / 6; return `<line x1="${(Math.cos(t) * 5).toFixed(1)}" y1="${(Math.sin(t) * 5).toFixed(1)}" x2="${(Math.cos(t) * 16).toFixed(1)}" y2="${(Math.sin(t) * 16).toFixed(1)}" stroke="${c}" stroke-width="1.6" stroke-linecap="round"/>`; }).join("")}</g>`; });
   }
-  if (sk.season === "winter" || sk.snowing) {  // rim along the far edges
-    const fr = [P(0, D, 0), P(0, 0, 0), P(W, 0, 0)].map((p) => p.map((v) => v.toFixed(1)).join(",")).join(" ");
-    deco += `<polyline points="${fr}" fill="none" stroke="#e8f4ff" stroke-width="3" stroke-linecap="round" opacity=".8"/>`;
+  return `<svg viewBox="0 0 ${VW} ${VH}" class="iso" role="img"><defs>${defs}</defs>${g}${fx}${deco}${labels}</svg>`;
+}
+// ---- "Fit the plan": drag the rooms to where they are on your own floor plan (top-down, in metres) ----
+const TP_T = {
+  da: { edit: "Tilpas plan", title: "Tilpas plan", hint: "Træk et rum for at flytte det · træk i hjørnet for at gøre det større", done: "Færdig", cancel: "Annuller", image: "📐 Plantegning bag", imageOff: "Fjern plantegning", imageSize: "Plantegningens bredde", add: "+ Rum uden termostat", addQ: "Navn på rummet (fx Gang)", rotate: "↻ Drej", name: "Navn", del: "Slet", noThermo: "Uden termostat", m: "m", reset: "Start forfra", resetQ: "Lægge alle rum på etagen tilbage i et gitter?" },
+  en: { edit: "Fit the plan", title: "Fit the plan", hint: "Drag a room to move it · drag a corner to make it bigger", done: "Done", cancel: "Cancel", image: "📐 Floor plan behind", imageOff: "Remove floor plan", imageSize: "Width of the floor plan", add: "+ Room without thermostat", addQ: "Name of the room (e.g. Hall)", rotate: "↻ Rotate", name: "Name", del: "Delete", noThermo: "No thermostat", m: "m", reset: "Start over", resetQ: "Put all rooms on this floor back in a grid?" },
+  de: { edit: "Plan anpassen", title: "Plan anpassen", hint: "Raum ziehen zum Verschieben · Ecke ziehen zum Vergrößern", done: "Fertig", cancel: "Abbrechen", image: "📐 Grundriss dahinter", imageOff: "Grundriss entfernen", imageSize: "Breite des Grundrisses", add: "+ Raum ohne Thermostat", addQ: "Name des Raums (z. B. Flur)", rotate: "↻ Drehen", name: "Name", del: "Löschen", noThermo: "Ohne Thermostat", m: "m", reset: "Neu anfangen", resetQ: "Alle Räume dieser Etage wieder im Raster anordnen?" },
+  sv: { edit: "Anpassa planen", title: "Anpassa planen", hint: "Dra ett rum för att flytta det · dra i hörnet för att göra det större", done: "Klar", cancel: "Avbryt", image: "📐 Planritning bakom", imageOff: "Ta bort planritning", imageSize: "Planritningens bredd", add: "+ Rum utan termostat", addQ: "Rummets namn (t.ex. Hall)", rotate: "↻ Vrid", name: "Namn", del: "Ta bort", noThermo: "Utan termostat", m: "m", reset: "Börja om", resetQ: "Lägga alla rum på våningen i ett rutnät igen?" },
+  nb: { edit: "Tilpass planen", title: "Tilpass planen", hint: "Dra et rom for å flytte det · dra i hjørnet for å gjøre det større", done: "Ferdig", cancel: "Avbryt", image: "📐 Plantegning bak", imageOff: "Fjern plantegning", imageSize: "Plantegningens bredde", add: "+ Rom uten termostat", addQ: "Navn på rommet (f.eks. Gang)", rotate: "↻ Drei", name: "Navn", del: "Slett", noThermo: "Uten termostat", m: "m", reset: "Start på nytt", resetQ: "Legge alle rom på etasjen tilbake i et rutenett?" },
+  nl: { edit: "Plattegrond aanpassen", title: "Plattegrond aanpassen", hint: "Sleep een ruimte om te verplaatsen · sleep een hoek om te vergroten", done: "Klaar", cancel: "Annuleren", image: "📐 Plattegrond erachter", imageOff: "Plattegrond weghalen", imageSize: "Breedte van de plattegrond", add: "+ Ruimte zonder thermostaat", addQ: "Naam van de ruimte (bijv. Hal)", rotate: "↻ Draaien", name: "Naam", del: "Verwijderen", noThermo: "Zonder thermostaat", m: "m", reset: "Opnieuw beginnen", resetQ: "Alle ruimtes op deze verdieping weer in een raster zetten?" },
+  fr: { edit: "Ajuster le plan", title: "Ajuster le plan", hint: "Glissez une pièce pour la déplacer · glissez un coin pour l'agrandir", done: "Terminé", cancel: "Annuler", image: "📐 Plan derrière", imageOff: "Retirer le plan", imageSize: "Largeur du plan", add: "+ Pièce sans thermostat", addQ: "Nom de la pièce (ex. Entrée)", rotate: "↻ Pivoter", name: "Nom", del: "Supprimer", noThermo: "Sans thermostat", m: "m", reset: "Recommencer", resetQ: "Remettre toutes les pièces de cet étage en grille ?" },
+};
+const TP = () => TP_T[LANG] || TP_T.en;
+let ed = null;
+const snap = (v) => Math.round(v * 4) / 4;
+const fm = (v) => num(v, v % 1 ? (v * 2 % 1 ? 2 : 1) : 0);
+
+function edFloors() {
+  const rooms = data.rooms.filter((r) => !r.excluded);
+  const floors = (data.floors || []).filter((f) => rooms.some((r) => r.floor_id === f.floor_id)).sort((a, b) => b.level - a.level);
+  return { rooms, floors };
+}
+function edItems() {  // the rooms on the floor being edited, with a place each (rooms not placed yet get the grid place)
+  const { rooms, floors } = edFloors();
+  const onFloor = floors.length ? rooms.filter((r) => r.floor_id === ed.floor) : rooms;
+  const keep = data.layout; data.layout = ed.layout; const ex = data.layout_extra; data.layout_extra = ed.extra;
+  const items = planOf(onFloor, floors.length ? ed.floor : null);
+  data.layout = keep; data.layout_extra = ex;
+  items.forEach((o) => { if (o.r && !ed.layout[o.r.area_id]) ed.layout[o.r.area_id] = { x: o.x, y: o.y, w: o.w, h: o.h }; });
+  return items.map((o) => o.r ? { key: o.r.area_id, name: o.r.name, ref: ed.layout[o.r.area_id] } : { key: "x:" + o.extra.id, name: o.extra.name, ref: o.extra, extra: true });
+}
+function planEditor(open) {
+  let box = document.getElementById("planEd");
+  if (open) {
+    const { floors } = edFloors();
+    ed = { layout: JSON.parse(JSON.stringify(data.layout || {})), extra: JSON.parse(JSON.stringify(data.layout_extra || [])),
+           plans: JSON.parse(JSON.stringify(data.layout_plans || {})), floor: floors.length ? (floorSel || floors[0].floor_id) : null, sel: null, t: Date.now() };
+    if (!box) { box = document.createElement("div"); box.id = "planEd"; document.body.appendChild(box); }
   }
-  return `<svg viewBox="0 0 364 236" class="iso" role="img"><defs>${defs}</defs>${out}${deco}${labels}</svg>`;
+  if (!ed || !box) return;
+  const t = TP(), { floors } = edFloors(), items = edItems(), fk = ed.floor || "_", plan = ed.plans[fk];
+  const sel = items.find((i) => i.key === ed.sel);
+  box.innerHTML = `<div class="pe">
+    <div class="peHead"><button class="peBack" data-pe="cancel">←</button><b>${t.title}</b><button class="peDone" data-pe="done">${t.done}</button></div>
+    <p class="peHint">${t.hint}</p>
+    <div class="peTools">${floors.length > 1 ? floors.map((f) => `<button class="peChip ${f.floor_id === ed.floor ? "on" : ""}" data-pefloor="${esc(f.floor_id)}">${esc(f.name ? f.name.charAt(0).toLocaleUpperCase() + f.name.slice(1) : "")}</button>`).join("") : ""}
+      <label class="peChip">${t.image}<input type="file" accept="image/*" hidden data-peimg></label>
+      <button class="peChip" data-pe="add">${t.add}</button><button class="peChip" data-pe="reset">${t.reset}</button></div>
+    ${plan ? `<div class="peSize"><span>${t.imageSize}</span><input type="range" min="4" max="40" step="0.5" value="${plan.w || 14}" data-pesize><b>${fm(plan.w || 14)} ${t.m}</b><button class="peLink" data-pe="imgoff">${t.imageOff}</button></div>` : ""}
+    <div class="peCanvas"><svg id="peSvg"></svg></div>
+    ${sel ? `<div class="peSheet"><div class="peSh1"><span>${roomIcon(sel.name) || "🏠"}</span><b>${esc(sel.name)}</b><em>${fm(sel.ref.w)} × ${fm(sel.ref.h)} ${t.m}${sel.extra ? " · " + t.noThermo : ""}</em></div>
+      <div class="peTools"><button class="peChip" data-pe="rotate">${t.rotate}</button>${sel.extra ? `<button class="peChip" data-pe="rename">${t.name}</button><button class="peChip" data-pe="del">${t.del}</button>` : ""}</div></div>` : ""}
+  </div>`;
+  edDraw(items);
+  box.querySelectorAll("[data-pefloor]").forEach((b) => b.onclick = () => { ed.floor = b.dataset.pefloor; ed.sel = null; planEditor(); });
+  box.querySelectorAll("[data-pe]").forEach((b) => b.onclick = () => edAct(b.dataset.pe));
+  const sz = box.querySelector("[data-pesize]"); if (sz) sz.oninput = () => { ed.plans[fk] = { ...(ed.plans[fk] || {}), w: Number(sz.value) }; sz.nextElementSibling.textContent = fm(Number(sz.value)) + " " + t.m; edDraw(edItems()); };
+  const fi = box.querySelector("[data-peimg]"); if (fi) fi.onchange = async () => {
+    const f = fi.files[0]; if (!f) return;
+    const url = await new Promise((ok) => { const img = new Image(), u = URL.createObjectURL(f); img.onload = () => { const k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement("canvas"); c.width = img.width * k; c.height = img.height * k; c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); ok(c.toDataURL("image/jpeg", .82)); }; img.src = u; });
+    await api("/api/plan", { floor: fk, image: url });
+    ed.plans[fk] = { w: (ed.plans[fk] || {}).w || 14, ratio: 1 }; ed.t = Date.now(); planEditor();
+  };
+}
+function edDraw(items) {
+  const svg = document.getElementById("peSvg"); if (!svg) return;
+  const fk = ed.floor || "_", plan = ed.plans[fk];
+  const BW = Math.max(12, ...items.map((i) => i.ref.x + i.ref.w + 1), plan ? plan.w : 0), wpx = svg.parentElement.clientWidth || 360;
+  const E = (wpx - 16) / BW, BH = Math.max(9, ...items.map((i) => i.ref.y + i.ref.h + 1)), H = BH * E + 16;
+  svg.setAttribute("viewBox", `0 0 ${wpx} ${H}`); svg.setAttribute("height", H);
+  const X = (m) => 8 + m * E;
+  let o = `<defs><pattern id="peGrid" width="${E / 2}" height="${E / 2}" patternUnits="userSpaceOnUse" x="8" y="8"><path d="M ${E / 2} 0 L 0 0 0 ${E / 2}" fill="none" class="peGl"/></pattern></defs><rect width="${wpx}" height="${H}" fill="url(#peGrid)"/>`;
+  if (plan) o += `<image href="api/plan?floor=${encodeURIComponent(fk)}&t=${ed.t}" x="8" y="8" width="${plan.w * E}" preserveAspectRatio="xMinYMin meet" opacity=".4"/>`;
+  const COLS = { heat: ["#ffd2b3", "#ff7a3d"], ok: ["#ffe7bd", "#f0b85a"], low: ["#d8e8ff", "#6aa0ef"], off: ["#eceff4", "#b9c0cc"] };
+  items.forEach((i) => {
+    const r = data.rooms.find((x) => x.area_id === i.key), k = r ? roomState(r) : "off", [f, s] = COLS[k] || COLS.ok, on = i.key === ed.sel, R = i.ref;
+    o += `<g class="peRoom" data-key="${esc(i.key)}"><rect x="${X(R.x) + 2}" y="${X(R.y) + 2}" width="${R.w * E - 4}" height="${R.h * E - 4}" rx="9" fill="${f}" stroke="${on ? "#ff6a3d" : s}" stroke-width="${on ? 3 : 1.5}" ${i.extra ? 'stroke-dasharray="5 4"' : ""}/>
+      <text x="${X(R.x + R.w / 2)}" y="${X(R.y + R.h / 2) - 3}" text-anchor="middle" font-size="14">${roomIcon(i.name)}</text><text x="${X(R.x + R.w / 2)}" y="${X(R.y + R.h / 2) + 12}" text-anchor="middle" class="peName">${esc(i.name.length > 14 ? i.name.slice(0, 13) + "…" : i.name)}</text></g>`;
+    if (on) {
+      o += `<text x="${X(R.x + R.w / 2)}" y="${X(R.y) - 4}" text-anchor="middle" class="peDim">${fm(R.w)} m</text><text x="${X(R.x + R.w) + 4}" y="${X(R.y + R.h / 2)}" class="peDim">${fm(R.h)} m</text>`;
+      o += `<circle class="peHandle" data-key="${esc(i.key)}" cx="${X(R.x + R.w)}" cy="${X(R.y + R.h)}" r="9"/>`;
+    }
+  });
+  svg.innerHTML = o;
+  // drag: a room moves, its corner resizes - in steps of 25 cm
+  svg.querySelectorAll(".peRoom, .peHandle").forEach((el) => el.onpointerdown = (ev) => {
+    ev.preventDefault(); const it = items.find((i) => i.key === el.dataset.key); if (!it) return;
+    const resize = el.classList.contains("peHandle"), R = it.ref, st = { x: ev.clientX, y: ev.clientY, R: { ...R } }, scale = svg.getBoundingClientRect().width / wpx;
+    ed.sel = it.key;
+    el.setPointerCapture(ev.pointerId);
+    el.onpointermove = (m) => {
+      const dx = (m.clientX - st.x) / scale / E, dy = (m.clientY - st.y) / scale / E;
+      if (resize) { R.w = Math.max(1, snap(st.R.w + dx)); R.h = Math.max(1, snap(st.R.h + dy)); } else { R.x = Math.max(0, snap(st.R.x + dx)); R.y = Math.max(0, snap(st.R.y + dy)); }
+      edDraw(items);
+    };
+    el.onpointerup = () => { el.onpointermove = null; planEditor(); };
+  });
+}
+async function edAct(a) {
+  const t = TP(), items = edItems(), sel = items.find((i) => i.key === ed.sel), fk = ed.floor || "_";
+  if (a === "cancel") { document.getElementById("planEd")?.remove(); ed = null; return; }
+  if (a === "done") {
+    await api("/api/layout", { layout: ed.layout, extra: ed.extra, plans: ed.plans });
+    document.getElementById("planEd")?.remove(); ed = null; lastPageKey = ""; load(); return;
+  }
+  if (a === "add") {
+    const name = prompt(t.addQ); if (!name || !name.trim()) return;
+    const top = items.length ? Math.max(...items.map((i) => i.ref.y + i.ref.h)) : 0, id = Math.random().toString(36).slice(2, 9);
+    ed.extra.push({ id, name: name.trim().slice(0, 30), floor: ed.floor, x: 0, y: top, w: 3, h: 2 }); ed.sel = "x:" + id;
+  } else if (a === "reset") {
+    if (!confirm(t.resetQ)) return;
+    items.forEach((i) => { if (!i.extra) delete ed.layout[i.key]; }); ed.extra = ed.extra.filter((e) => (e.floor || null) !== (ed.floor || null)); ed.sel = null;
+  } else if (a === "imgoff") { await api("/api/plan", { floor: fk, image: null }); delete ed.plans[fk]; }
+  else if (sel && a === "rotate") { [sel.ref.w, sel.ref.h] = [sel.ref.h, sel.ref.w]; }
+  else if (sel && a === "rename") { const n = prompt(t.name, sel.name); if (n && n.trim()) sel.ref.name = n.trim().slice(0, 30); }
+  else if (sel && a === "del") { ed.extra = ed.extra.filter((e) => "x:" + e.id !== sel.key); ed.sel = null; }
+  planEditor();
 }
 function heroFx(sk) {
   // falling things in front of the house: snow, rain, autumn leaves, spring petals, confetti - phased so a redraw doesn't restart them
@@ -706,8 +904,8 @@ function nowTab(rooms) {
       <div class="h2sub">${HOLI[sk.holiday] ? HOLI[sk.holiday] + " " : ""}${T.houseAll || ""}${heating ? ` · <b>${T.mHeating}: ${heating}</b>` : ""}</div>
       <div class="chips2">${chips}</div>
       ${floors.length > 1 ? `<div class="seg2">${floors.map((f) => `<button data-floor="${esc(f.floor_id)}" class="${f.floor_id === floorSel ? "on" : ""}">${esc(cap(f.name))} · ${rooms.filter((r) => r.floor_id === f.floor_id).length}</button>`).join("")}</div>` : ""}
-      <div class="isoWrap">${heroFx(sk)}${isoHouse(shown, sk)}</div>
-      <div class="legend2"><span><i style="background:#ff7a2f"></i>${T.lgHeat}</span><span><i style="background:#ffb547"></i>${T.lgOk}</span><span><i style="background:#3aa0ff"></i>${T.lgLow}</span></div>
+      <div class="isoWrap">${heroFx(sk)}${isoHouse(shown, sk, floors.length ? floorSel : null)}</div>
+      <div class="isoTools"><div class="legend2"><span><i style="background:#ff7a2f"></i>${T.lgHeat}</span><span><i style="background:#ffb547"></i>${T.lgOk}</span><span><i style="background:#3aa0ff"></i>${T.lgLow}</span></div><button class="editPlan" data-editplan>✎ ${TP().edit}</button></div>
     </div>
     <div class="card status"><div class="dotc">${FLAME}</div><div><h2>${esc(sentence(rooms))}</h2><p>${T.heroP}${data.agree != null ? " · " + T.agree.replace("{x}", data.agree) : ""}</p></div></div>
     ${alertsCard()}
@@ -832,6 +1030,7 @@ function render() {
   document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; location.hash = tab; render(); });
   document.querySelectorAll("[data-room]").forEach((el) => el.onclick = () => openRoom(el.dataset.room));
   document.querySelectorAll("[data-floor]").forEach((b) => b.onclick = () => { floorSel = b.dataset.floor; render(); });
+  document.querySelectorAll("[data-editplan]").forEach((b) => b.onclick = () => planEditor(true));
   const ash = document.getElementById("allshadow"); if (ash) ash.onclick = async () => { await api("/api/mode", { area_id: null, mode: "shadow" }); load(); };
   const actl = document.getElementById("allcontrol"); if (actl) actl.onclick = async () => { if (!confirm(T.ctlHouseQ)) return; await api("/api/mode", { area_id: "*", mode: "control" }); load(); };
   document.querySelectorAll("[data-tune]").forEach((b) => b.onclick = async () => { await api("/api/tune", { key: b.dataset.tune, value: Number(b.dataset.v) }); load(); });

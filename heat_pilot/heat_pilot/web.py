@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import re
+import base64
 from pathlib import Path
+from typing import Any
 
 from aiohttp import web
 
@@ -158,6 +161,50 @@ def make_app(pilot) -> web.Application:
             pilot.save()
         return web.json_response({**res, **(await sup.status())})
 
+    def _num(v: Any, lo: float, hi: float) -> float:
+        return max(lo, min(hi, round(float(v) * 4) / 4))
+
+    async def layout(req: web.Request) -> web.Response:
+        """"Fit the plan": each room's place on the floor plan in metres, rooms without a thermostat, the plan's width."""
+        b = await req.json()
+        rooms = {r["area_id"] for r in pilot.rooms()}
+        lay = {a: {k: _num(v[k], 0 if k in "xy" else 0.5, 60) for k in ("x", "y", "w", "h")}
+               for a, v in (b.get("layout") or {}).items() if a in rooms and isinstance(v, dict) and all(k in v for k in "xywh")}
+        extra = [{"id": str(e.get("id"))[:12], "name": str(e.get("name") or "")[:30], "floor": e.get("floor"),
+                  **{k: _num(e[k], 0 if k in "xy" else 0.5, 60) for k in ("x", "y", "w", "h")}}
+                 for e in (b.get("extra") or [])[:40] if isinstance(e, dict) and all(k in e for k in "xywh")]
+        plans = {str(f)[:64]: {"w": _num((v or {}).get("w", 14), 2, 60)} for f, v in (b.get("plans") or {}).items() if _plan_file(str(f)).exists()}
+        pilot.settings.update({"layout": lay, "layout_extra": extra, "layout_plans": plans})
+        pilot.save()
+        return web.json_response({"ok": True})
+
+    def _plan_file(floor: str) -> Path:
+        safe = re.sub(r"[^a-zA-Z0-9_-]", "_", floor or "_")[:64]
+        return pilot.file.parent / "plans" / f"{safe}.jpg"
+
+    async def plan(req: web.Request) -> web.Response:
+        """A picture of the floor plan, shown faintly behind the rooms while fitting them."""
+        if req.method == "GET":
+            f = _plan_file(req.query.get("floor", "_"))
+            return web.FileResponse(f, headers={"Cache-Control": "no-cache"}) if f.exists() else web.Response(status=404)
+        b = await req.json()
+        f = _plan_file(str(b.get("floor") or "_"))
+        img = b.get("image")
+        if not img:
+            f.unlink(missing_ok=True)
+            pilot.settings.get("layout_plans", {}).pop(str(b.get("floor") or "_"), None)
+            pilot.save()
+            return web.json_response({"ok": True})
+        m = re.match(r"data:image/(?:jpeg|png|webp);base64,(.+)", str(img), re.S)
+        if not m:
+            return web.json_response({"ok": False}, status=400)
+        raw = base64.b64decode(m.group(1))
+        if len(raw) > 4_000_000:
+            return web.json_response({"ok": False, "error": "too big"}, status=413)
+        f.parent.mkdir(exist_ok=True)
+        f.write_bytes(raw)
+        return web.json_response({"ok": True})
+
     async def suggest(req: web.Request) -> web.Response:
         """"Fits your home too" (suggest.js): what HA has, for the shared suggestions - and what was shown or closed."""
         if req.method == "POST":
@@ -206,6 +253,9 @@ def make_app(pilot) -> web.Application:
     app.router.add_get("/api/diagnostics", diagnostics)
     app.router.add_post("/api/support", support)
     app.router.add_get("/support.js", support_js)
+    app.router.add_post("/api/layout", layout)
+    app.router.add_get("/api/plan", plan)
+    app.router.add_post("/api/plan", plan)
     app.router.add_get("/api/suggest", suggest)
     app.router.add_post("/api/suggest", suggest)
     app.router.add_get("/suggest.js", suggest_js)
