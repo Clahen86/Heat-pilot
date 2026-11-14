@@ -159,6 +159,8 @@ def make_app(pilot) -> web.Application:
         elif a == "share":
             sup.d["share"] = bool(b.get("on", True))
             pilot.save()
+        elif a == "snooze":
+            sup.snooze()
         return web.json_response({**res, **(await sup.status())})
 
     def _num(v: Any, lo: float, hi: float) -> float:

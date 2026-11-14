@@ -17,6 +17,7 @@ from datetime import date, datetime
 import hashlib
 import logging
 import os
+import re
 import time
 import traceback
 from typing import Any
@@ -27,6 +28,17 @@ URL = os.environ.get("HP_REPORT_URL", "https://ep-reports.clahen86.workers.dev")
 APP = "heat-pilot"
 DAY = 24 * 3600
 ANSWER_DAYS, FRESH, CLOSED_KEEP, SEEN_KEEP = 60, 7 * DAY, 7 * DAY, 14 * DAY
+PATCH_WAIT, MINOR_WAIT, IMPORTANT_WAIT, SNOOZE = 7 * DAY, 2 * DAY, 30 * DAY, 7 * DAY
+FIXED_MSG = {"da": "✅ Fejlen, du havde i Varmepilot, er rettet i version {v}. Opdater i add-on-butikken.",
+             "en": "✅ The error you had in Heat Pilot is fixed in version {v}. Update in the add-on store.",
+             "de": "✅ Der Fehler in Heat Pilot ist in Version {v} behoben. Aktualisiere im Add-on-Store.",
+             "fr": "✅ L'erreur dans Heat Pilot est corrigée dans la version {v}. Mettez à jour dans la boutique.",
+             "nl": "✅ De fout in Heat Pilot is opgelost in versie {v}. Werk bij in de add-on-winkel.",
+             "sv": "✅ Felet i Heat Pilot är rättat i version {v}. Uppdatera i tilläggsbutiken.",
+             "nb": "✅ Feilen i Heat Pilot er rettet i versjon {v}. Oppdater i tilleggsbutikken."}
+IMPORTANT_MSG = {"da": "⬆️ Varmepilot {v} har en vigtig rettelse. Opdater i add-on-butikken.", "en": "⬆️ Heat Pilot {v} has an important fix. Update in the add-on store.",
+                 "de": "⬆️ Heat Pilot {v} enthält eine wichtige Korrektur.", "fr": "⬆️ Heat Pilot {v} contient une correction importante.",
+                 "nl": "⬆️ Heat Pilot {v} bevat een belangrijke oplossing.", "sv": "⬆️ Heat Pilot {v} har en viktig rättning.", "nb": "⬆️ Heat Pilot {v} har en viktig retting."}
 NEW_MESSAGE = {
     "da": "💬 Ny besked fra udvikleren. Åbn Varmepilot → 🛟 Hjælp for at læse den.",
     "en": "💬 New message from the developer. Open Heat Pilot → 🛟 Help to read it.",
@@ -132,10 +144,13 @@ class Support:
             await asyncio.sleep(600)
 
     async def fetch_answers(self) -> None:
-        d = await self._post("/replies", {"install": self.d["install"]})
+        d = await self._post("/replies", {"install": self.d["install"], "version": self.version()})
         if not d or "reports" not in d:
             return
         self.d["replies"] = {"reports": d["reports"][:5], "notes": (d.get("notes") or [])[:5], "t": time.time()}
+        if isinstance(d.get("latest"), dict) and d["latest"].get("version"):
+            self.d["latest"] = d["latest"]
+        await self._update_notices()
         newest = max((self._newest(r) for r in self.d["replies"]["reports"] + self.d["replies"]["notes"]), default="")
         seen = self.d.get("seen") if isinstance(self.d.get("seen"), str) else ""
         self.d["seen"] = max(newest, seen)
@@ -179,10 +194,71 @@ class Support:
                 out[kind].append({**r, "key": k})
         return out
 
+    # ---------- updates (the same rules as the integrations' support module) ----------
+    @staticmethod
+    def version() -> str:
+        return os.environ.get("BUILD_VERSION", "dev")
+
+    @staticmethod
+    def _ver(v: Any) -> tuple[int, ...]:
+        return tuple(int(x) for x in re.findall(r"\d+", str(v or ""))[:3]) or (0,)
+
+    def _fixed(self) -> list[dict[str, str]]:
+        cur, out = self._ver(self.version()), []
+        for n in (self.d.get("replies") or {}).get("notes") or []:
+            for m in n.get("msgs") or []:
+                hit = re.search(r"fixed in v?(\d+\.\d+(?:\.\d+)?)", str(m.get("text") or ""), re.I)
+                if hit and self._ver(hit.group(1)) > cur:
+                    out.append({"error": str(n.get("error") or "")[:120], "version": hit.group(1), "key": str(n.get("hash") or n.get("error"))[:60]})
+                    break
+        return out
+
+    def update(self) -> dict[str, Any] | None:
+        lt, cur = self.d.get("latest") or {}, self.version()
+        lv, fixed = str(lt.get("version") or ""), self._fixed()
+        if not lv or cur == "dev" or self._ver(lv) <= self._ver(cur):
+            return None
+        now, since = time.time(), self.d.setdefault("behind", {})
+        if lv not in since:
+            try:
+                since[lv] = datetime.fromisoformat(str(lt.get("date"))).timestamp() if lt.get("date") else now
+            except ValueError:
+                since[lv] = now
+        big = self._ver(lv)[:2] > self._ver(cur)[:2]
+        snooze = self.d.get("snooze") or {}
+        snoozed = now < float(snooze.get("until") or 0) and not (big and self._ver(lv)[:2] > self._ver(snooze.get("version"))[:2])
+        due = bool(fixed) or (now - float(since[lv]) >= (MINOR_WAIT if big else PATCH_WAIT) and not snoozed)
+        return {"version": lv, "current": cur, "note": str(lt.get("note") or ""), "important": bool(lt.get("important")),
+                "repo": str(lt.get("repo") or ""), "big": big, "fixed": fixed, "due": due}
+
+    async def _update_notices(self) -> None:
+        u = self.update()
+        if not u:
+            return
+        told, lang, msgs = self.d.setdefault("told", {}), self.pilot.lang(), []
+        for f in u["fixed"]:
+            if told.get("fixed:" + f["key"]) != f["version"]:
+                told["fixed:" + f["key"]] = f["version"]
+                msgs.append(("heat_pilot_fixed", FIXED_MSG.get(lang, FIXED_MSG["en"]).format(v=f["version"])))
+        if u["important"] and time.time() - float((self.d.get("behind") or {}).get(u["version"]) or time.time()) >= IMPORTANT_WAIT and told.get("important") != u["version"]:
+            told["important"] = u["version"]
+            msgs.append(("heat_pilot_update", IMPORTANT_MSG.get(lang, IMPORTANT_MSG["en"]).format(v=u["version"])))
+        for nid, text in msgs:
+            try:
+                await self.pilot.ha.call_service("persistent_notification", "create", {"notification_id": nid, "title": "Heat Pilot", "message": text})
+            except Exception:  # noqa: BLE001
+                pass
+        self._save()
+
+    def snooze(self) -> None:
+        u = self.update()
+        self.d["snooze"] = {"until": time.time() + SNOOZE, "version": (u or {}).get("version") or self.version()}
+        self._save()
+
     async def status(self) -> dict[str, Any]:
         if self.answer_every() and time.time() - float((self.d.get("replies") or {}).get("t") or 0) > 300:
             await self.fetch_answers()
-        out = {"share": self.share, "last_help": self.d.get("last_help"), "answers": self.visible(mark_seen=True)}
+        out = {"share": self.share, "last_help": self.d.get("last_help"), "answers": self.visible(mark_seen=True), "update": self.update()}
         self._save()
         return out
 
