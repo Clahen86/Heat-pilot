@@ -158,6 +158,33 @@ def make_app(pilot) -> web.Application:
             pilot.save()
         return web.json_response({**res, **(await sup.status())})
 
+    async def suggest(req: web.Request) -> web.Response:
+        """"Fits your home too" (suggest.js): what HA has, for the shared suggestions - and what was shown or closed."""
+        if req.method == "POST":
+            b = await req.json() if req.can_read_body else {}
+            pilot.settings["suggest"] = b.get("value") if isinstance(b.get("value"), dict) else None
+            pilot.save()
+            return web.json_response({"ok": True})
+        ha = pilot.ha
+        try:
+            reg = (await ha.command({"type": "config/entity_registry/list_for_display"})).get("entities", [])
+        except Exception:  # noqa: BLE001 - suggestions just get fewer
+            reg = []
+        keep = {"mobile_app", "zha", "mqtt", "zwave_js", "deconz"}
+        cfg = ha.config or {}
+        return web.json_response({
+            "language": cfg.get("language") or "en",
+            "config": {"components": cfg.get("components") or [], "country": cfg.get("country")},
+            "states": {e: {"attributes": {k: v for k, v in (st.get("attributes") or {}).items() if k in ("device_class", "friendly_name")}}
+                       for e, st in ha.states.items()},
+            "entities": {r["ei"]: {"entity_id": r["ei"], "platform": r.get("pl"), "device_id": r.get("di")} for r in reg if r.get("pl") in keep},
+            "store": pilot.settings.get("suggest"),
+        })
+
+    async def suggest_js(_req: web.Request) -> web.Response:
+        return web.Response(text=(FRONTEND / "suggest.js").read_text(), content_type="application/javascript",
+                            headers={"Cache-Control": "no-cache"})
+
     async def support_js(_req: web.Request) -> web.Response:
         return web.Response(text=(FRONTEND / "support.js").read_text(), content_type="application/javascript",
                             headers={"Cache-Control": "no-cache"})
@@ -179,4 +206,7 @@ def make_app(pilot) -> web.Application:
     app.router.add_get("/api/diagnostics", diagnostics)
     app.router.add_post("/api/support", support)
     app.router.add_get("/support.js", support_js)
+    app.router.add_get("/api/suggest", suggest)
+    app.router.add_post("/api/suggest", suggest)
+    app.router.add_get("/suggest.js", suggest_js)
     return app

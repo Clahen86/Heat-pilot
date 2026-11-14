@@ -265,6 +265,18 @@
     el.lang = document.documentElement.dataset.lang || "en";
     el.api = (action, data) => fetch("api/support", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...data }) }).then((r) => r.json());
     document.getElementById("support-wrap").appendChild(el);
+    // "Fits your home too" and "From the same developer" (suggest.js) under Help - the same file as in the integrations.
+    import("./suggest.js").then(async ({ defineSuggest }) => {
+      const d = await fetch("api/suggest").then((r) => r.json());
+      const hass = { language: el.lang, states: d.states, entities: d.entities, config: d.config,
+        callWS: async (m) => m.type === "frontend/get_user_data" ? { value: d.store }
+          : fetch("api/suggest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ value: m.value }) }).then(() => ({})) };
+      for (const mode of ["card", "list"]) {
+        const s = document.createElement(defineSuggest("heat_pilot"));
+        s.setAttribute("mode", mode); s.hass = hass;
+        document.getElementById("support-wrap").appendChild(s);
+      }
+    }).catch(() => {});
   </script>
 </main>
 <div class="sheet" id="sheet"><div class="box" id="sheetbox"></div></div>
