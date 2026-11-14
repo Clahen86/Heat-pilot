@@ -3,7 +3,7 @@
 **Smart heating for every room in Home Assistant – found by itself, in shadow first, as easy as it gets.**
 
 <p align="center"><img src="docs/now_dark.png" width="260" alt="Now"> <img src="docs/now_light.png" width="260" alt="Light theme"> <img src="docs/christmas.png" width="260" alt="At Christmas"></p>
-<p align="center"><img src="docs/plan.png" width="260" alt="Fit the plan"> <img src="docs/rooms.png" width="260" alt="Rooms"></p>
+<p align="center"><img src="docs/plan.png" width="260" alt="Fit the plan"> <img src="docs/rooms.png" width="260" alt="Rooms"> <img src="docs/hotwater.png" width="260" alt="Hot water"></p>
 
 Heat Pilot finds your rooms, thermostats, room sensors, windows, doors, motion sensors, people, ventilation and
 district heating meter by itself, learns how your home is used, and shows what it would do in each room. It
@@ -23,6 +23,10 @@ district heating meter by itself, learns how your home is used, and shows what i
 - **District heating**: finds your heat meter (Kamstrup, Danfoss, Landis+Gyr …), shows the cooling and the
   bonus/penalty, and warms gently when cooling is poor.
 - **Electric heating and heat pumps** follow the electricity price (same price integrations as Energy Pilot).
+- **Hot water**: the tank becomes a small battery – heated when power is cheap (60°), allowed to cool in the dear
+  hours (45°, never lower), warm in time for the showers, and a weekly heat-up against legionella in a cheap hour.
+  Water heaters (heat pumps with a tank, smart water heaters) and immersion heaters on a switch – a tank sensor makes
+  it more precise. Only shown when a tank is found, and starts in shadow.
 - **Ventilation** (Dantherm, Nilan, Genvex, Komfovent, Vallox, Zehnder …): boost after a shower, more air with high
   CO₂/humidity, free cooling – and never heating against it.
 - **Warnings**: mould risk, stale air, windows left open, thermostats not responding, low batteries, rooms that
@@ -30,6 +34,8 @@ district heating meter by itself, learns how your home is used, and shows what i
 - **Turned by hand** is respected, with an echo guard for Zigbee thermostats.
 - **The house in 3D**: rooms with walls, windows and wood floors – a warm glow where it heats, a cool blue where it's lowered – in a garden with a lawn, bushes and a tree that follow the season, with soft shadows. Floor by floor, with the real weather, night and day and the holidays (snow on the walls, Christmas lights and a tree, fireworks, Easter eggs, a pumpkin …).
 - **Fit the plan**: drag the rooms to where they are in your home and resize them (25 cm steps, sizes in metres), make L-shaped rooms with "+ Part" (the part snaps to the room, no wall inside), add rooms without a thermostat such as the hall, and put a picture of your own floor plan faintly behind to trace it. Rooms as thermostat dials, a 48-hour chart per room, a 24-hour plan, a dashboard card and a monthly report.
+- **Tells you about updates – without nagging**: a small card in the app when a newer version is out (small fixes
+  after a week, new features after two days, at once when an error you had is fixed). *Later* hides it for a week.
 - **7 languages** (English, Danish, German, French, Dutch, Swedish, Norwegian), **°C and °F**.
 
 ## Thermostats
@@ -71,4 +77,5 @@ Then open `http://<host>:8099`. (Add `-v /path/to/ha/config:/homeassistant` to h
 ---
 
 **Dansk:** Varme i hvert rum – finder selv rum, termostater, følere, vinduer, personer, ventilation og fjernvarme,
-lærer hvordan huset bruges, og starter altid i skygge. Styring slås til rum for rum. Huset vises i 3D med vægge, vinduer, trægulv og en have, der følger årstiden, og med **Tilpas plan** flytter du rummene, så de passer til din egen plantegning – også L-formede rum.
+lærer hvordan huset bruges, og starter altid i skygge. **Varmtvand**: beholderen varmes op, når strømmen er billig, og
+køler lidt af, når den er dyr – altid varm til badet og ugentlig legionella-opvarmning. Styring slås til rum for rum. Huset vises i 3D med vægge, vinduer, trægulv og en have, der følger årstiden, og med **Tilpas plan** flytter du rummene, så de passer til din egen plantegning – også L-formede rum.
