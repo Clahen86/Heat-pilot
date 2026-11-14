@@ -88,8 +88,12 @@ def entity(entity_id: str | None, use: str, states: dict[str, Any], regs: dict[s
     return out
 
 
-def _dev(device_id: str | None, devs: dict[str, dict]) -> dict[str, str]:
+def _dev(device_id: str | None, devs: dict[str, dict], regs: dict[str, dict] | None = None, platform: str | None = None) -> dict[str, str]:
+    """The maker and model - from the device, else from any device of the same integration that has them."""
     d = devs.get(device_id or "") or {}
+    if not (d.get("manufacturer") or d.get("model")) and platform and regs:
+        d = next((devs[e["device_id"]] for e in regs.values() if e.get("platform") == platform and e.get("device_id") in devs
+                  and (devs[e["device_id"]].get("manufacturer") or devs[e["device_id"]].get("model"))), d)
     return {"manufacturer": str(d.get("manufacturer") or "")[:60], "model": str(d.get("model") or "")[:60]} if d else {}
 
 
@@ -130,12 +134,12 @@ def collect(p: Any, full: bool) -> dict[str, Any]:
                         "extra": {"mode": (p.settings.get("ventilation") or {}).get("mode") or "shadow"}})
     m = getattr(p, "meter", None)
     if m:
-        devices.append({"kind": "meter", "platform": (regs.get(m.get("supply") or "") or {}).get("platform"), **_dev(m.get("device"), devs),
+        devices.append({"kind": "meter", "platform": (regs.get(m.get("supply") or "") or {}).get("platform"), **_dev(m.get("device"), devs, regs, (regs.get(m.get("supply") or "") or {}).get("platform")),
                         "entities": [x for k in ("supply", "return", "flow", "volume") if (x := ent(m.get(k), k))]})
     hw = p.settings.get("hotwater") or {}
     if hw.get("entity"):
         reg = regs.get(hw["entity"]) or {}
-        devices.append({"kind": "hotwater", "platform": reg.get("platform"), **_dev(reg.get("device_id"), devs),
+        devices.append({"kind": "hotwater", "platform": reg.get("platform"), **_dev(reg.get("device_id"), devs, regs, reg.get("platform")),
                         "entities": [x for x in (ent(hw["entity"], "tank"), ent(hw.get("temp"), "tank_temp")) if x],
                         "extra": {"mode": hw.get("mode") or "shadow"}})
     pe = getattr(p, "price_entity", None)
