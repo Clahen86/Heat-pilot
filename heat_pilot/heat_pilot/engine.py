@@ -554,7 +554,8 @@ class Pilot:
             self.learning.see_result(a_id, now, temp, want["temp"], r["cfg"]["comfort"], want["why"])
             self.timelines[a_id] = plan.timeline(r, r["cfg"], now, by_day, temp, rate)
             # Floor heating with a slow valve (a W600 keeps ~18 % open while the room is already over): when the room is
-            # more than half a degree over, ask 2° less so the valve closes - and back once the room is down at its target.
+            # more than half a degree over, the valve is turned off (or, without an off, asked 2° less) - and back once
+            # the room is down at its target.
             send = want["temp"]
             pulled = self.floor_pull.get(a_id, False)
             if r.get("heating") == "floor" and send is not None and temp is not None:
@@ -569,11 +570,16 @@ class Pilot:
                 a = dict(s.get("attributes") or {})
                 a["_state"] = s.get("state")
                 prof = th["profile"]
-                c = brands.off_calls(th["entity_id"], a, prof) if want["temp"] is None else brands.heat_calls(th["entity_id"], a, prof, self.out_unit(send))
+                # Pulled and the valve can be turned off: off, not 2° less - some (a W600 in a cold basement) keep ~17 %
+                # open at any setpoint below the room, and warm water running through a warm room spoils the cooling.
+                off_pull = pulled and want["temp"] is not None and brands.can_turn_off(a, prof)
+                c = brands.off_calls(th["entity_id"], a, prof) if want["temp"] is None or off_pull else brands.heat_calls(th["entity_id"], a, prof, self.out_unit(send))
                 calls += c
                 cur_off = s.get("state") == "off"
                 cur = self.c(a.get("temperature"))
-                if want["temp"] is None:
+                if off_pull:
+                    same = same and cur_off
+                elif want["temp"] is None:
                     same = same and (cur_off or (cur is not None and cur <= (self.c(a.get("min_temp")) or 5) + 0.1))
                 else:
                     # Another system that turns the valve off once the room is warm enough heats to the same.

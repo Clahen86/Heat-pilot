@@ -130,3 +130,25 @@ def test_whole_house_at_once(tmp_path):
     assert all(p.mode(r["area_id"]) == "control" for r in p.found)
     p.set_mode(None, "shadow")
     assert all(p.mode(r["area_id"]) == "shadow" for r in p.found)
+
+
+def test_floor_heating_turned_off_when_the_room_is_over(tmp_path):
+    """A floor-heated room more than half a degree over its target: the valve is turned off (a W600 keeps ~17 % open at
+    a low setpoint), and on again with the target once the room is down."""
+    ha = FakeHA()
+    ha.states["climate.bad"] = st("heat", hvac_modes=["off", "heat", "auto"], temperature=20, current_temperature=23.0,
+                                  hvac_action="heating", min_temp=5, max_temp=30, target_temp_step=0.5)
+    p = Pilot(ha, tmp_path)
+    asyncio.run(p.discover())
+    p.set_room("bad", {"heating": "floor"})
+    p.tick()
+    bad = p.now["bad"]
+    if bad["want"]["temp"] is None or bad["want"]["temp"] > 22.4:
+        return  # (a comfort hour at this time of day: nothing to pull)
+    assert any(c["service"] == "set_hvac_mode" and c["data"]["hvac_mode"] == "off" for c in bad["calls"])
+    ha.states["climate.bad"] = st("off", hvac_modes=["off", "heat", "auto"], temperature=20, current_temperature=bad["want"]["temp"] - 0.5,
+                                  hvac_action="idle", min_temp=5, max_temp=30, target_temp_step=0.5)
+    p.tick()
+    calls = p.now["bad"]["calls"]
+    assert not any(c["service"] == "set_hvac_mode" and c["data"].get("hvac_mode") == "off" for c in calls)
+    assert any(c["service"] in ("set_temperature", "set_hvac_mode") for c in calls)
