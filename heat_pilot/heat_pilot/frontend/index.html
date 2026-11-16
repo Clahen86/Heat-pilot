@@ -1053,7 +1053,7 @@ function planTab(rooms) {
   return `<div class="card"><p class="eyebrow">${T.planTitle}</p><p class="muted" style="margin:-4px 0 14px">${T.planHint}</p>
     <div class="tl">${rowsHtml}</div><div class="axis">${ticks}</div><div class="legend">${legend}</div></div>`;
 }
-let gstep = 0, moreOpen = false; const grpOpen = {};
+let gstep = 0, moreOpen = false, lastDrawnTab = null, lastRoom = null; const grpOpen = {};
 function guide() {
   const g = document.getElementById("guide");
   if (!data || data.setup_done || !data.rooms.length) { g.classList.remove("open"); return; }
@@ -1077,6 +1077,18 @@ let shownTab = null;  // fade in only when a page is opened - not when the numbe
 let lastPageKey = "";
 // the same page without the animations' start points (they follow the clock, so they differ every time)
 const stableKey = (h) => h.replace(/animation-delay:\s*-?[\d.]+s;?/g, "");
+// What is open and where you are stays as it was when the page is drawn again after a change - only a new tab or
+// room starts from the top.
+const detKey = (d) => d.dataset.g || d.id || (d.querySelector("summary")?.textContent || "").trim();
+function keepState(box, same, draw) {
+  const open = same ? new Set([...box.querySelectorAll("details[open]")].map(detKey)) : null;
+  const scrollers = [box, box.parentElement].filter(Boolean).map((el) => [el, el.scrollTop]), y = window.scrollY;
+  draw();
+  if (!same) return;
+  box.querySelectorAll("details").forEach((d) => { if (open.has(detKey(d))) d.open = true; });
+  scrollers.forEach(([el, top]) => { el.scrollTop = top; });
+  window.scrollTo(0, y);
+}
 function render() {
   const app = document.getElementById("app");
   if (!data) return;
@@ -1141,7 +1153,8 @@ function render() {
   if (key === lastPageKey && app.childElementCount) return;
   lastPageKey = key;
   const oldHouse = app.querySelector(".card.house");
-  app.innerHTML = html;
+  keepState(app, tab === lastDrawnTab, () => { app.innerHTML = html; });
+  lastDrawnTab = tab;
   const newHouse = app.querySelector(".card.house");
   if (oldHouse && newHouse && stableKey(oldHouse.innerHTML) === stableKey(newHouse.innerHTML)) newHouse.replaceWith(oldHouse);
   document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; location.hash = tab; render(); });
@@ -1204,7 +1217,9 @@ function openRoom(id) {
     <p class="eyebrow" style="margin-top:18px">${T.modeT}</p>
     <div class="row" style="border-top:0"><div class="t"><span>${T.modeH}</span></div><div class="seg" data-modeseg>${["shadow", "control", "off"].map((m) => `<button data-mode="${m}" class="${(r.mode || "shadow") === m ? "on" : ""}">${T.modes[m]}</button>`).join("")}</div></div>
     <p class="eyebrow" style="margin-top:18px">${T.settingsT}</p>`;
-  document.getElementById("sheetbox").innerHTML = `<h3>${esc(r.name)}</h3><p class="muted">${T.windows.replace("{n}", r.windows.length)} · ${T.presence.replace("{n}", r.presence.length)} · <span class="${r.same ? "agreeok" : "agreeno"}">${r.same ? T.same : T.diff}</span></p>${top}
+  const sheetbox = document.getElementById("sheetbox"), sameRoom = lastRoom === id && document.getElementById("sheet")?.classList.contains("open");
+  lastRoom = id;
+  keepState(sheetbox, sameRoom, () => { sheetbox.innerHTML = `<h3>${esc(r.name)}</h3><p class="muted">${T.windows.replace("{n}", r.windows.length)} · ${T.presence.replace("{n}", r.presence.length)} · <span class="${r.same ? "agreeok" : "agreeno"}">${r.same ? T.same : T.diff}</span></p>${top}
     <div class="row"><div class="t"><b>${T.comfort}</b><span>${T.comfortH}${r.comfort_learned ? " · " + T.learnedC : ""}</span></div>${numIn("comfort", c.comfort)}</div>
     <div class="row"><div class="t"><b>${T.hours}</b><span>${T.hoursH}</span></div><span>${hourSel("day_from", c.day_from)} – ${hourSel("day_to", c.day_to)}</span></div>
     <div class="row"><div class="t"><b>${T.night}</b>${floorNote}</div>${numIn("night", c.night)}</div>
@@ -1223,7 +1238,7 @@ function openRoom(id) {
     <div class="row"><div class="t"><b>${T.exclude}</b></div><input type="checkbox" data-k="excluded" ${r.excluded ? "checked" : ""}></div>
     </details>
     <details><summary>${T.nowSet} / ${T.would}</summary><p class="muted">${now}</p><div class="calls">${esc(calls)}</div></details>
-    <button class="btn" id="save">${T.save}</button><button class="btn ghost" id="close">${T.close}</button>`;
+    <button class="btn" id="save">${T.save}</button><button class="btn ghost" id="close">${T.close}</button>`; });
   const sheet = document.getElementById("sheet");
   sheet.classList.add("open");
   api("/api/history?area=" + encodeURIComponent(id)).then((h) => { const el = document.getElementById("roomchart"); if (el) el.innerHTML = roomChart(h, col); }).catch(() => {});
@@ -1260,7 +1275,7 @@ function openRoom(id) {
 async function load() { try { data = await api("/api/status"); render(); if (openFirst) { const id = openFirst; openFirst = null; openRoom(id); } } catch (e) { /* tries again */ } }
 load();
 setInterval(() => { if (!document.getElementById("sheet").classList.contains("open")) load(); }, 30000);
-document.addEventListener("toggle", (e) => { const d = e.target; if (d.id === "alerts") alertsOpen = d.open; else if (d.classList && d.classList.contains("more")) moreOpen = d.open; }, true);
+document.addEventListener("toggle", (e) => { const d = e.target; if (d.id === "alerts") alertsOpen = d.open; else if (d.classList && d.classList.contains("more")) moreOpen = d.open; else if (d.classList && d.classList.contains("grp")) grpOpen[d.dataset.g] = d.open; }, true);
 </script>
 </body>
 </html>
