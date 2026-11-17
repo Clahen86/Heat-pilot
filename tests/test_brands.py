@@ -5,7 +5,7 @@ from heat_pilot import brands
 
 def test_profiles_by_model_and_platform():
     assert brands.profile("mqtt", "Smart radiator thermostat E1", "Aqara")["away_is_frost"]
-    assert brands.profile("mqtt", "TRVZB", "SONOFF")["room_sensor"][0] == "external_temperature_input"
+    assert "external_temperature_input" in brands.profile("mqtt", "TRVZB", "SONOFF")["room_sensor"][0]
     assert brands.profile("mqtt", "014G2461", "Danfoss")["no_off"]
     assert brands.profile("netatmo", None, None)["expires_min"] == 120
     assert brands.profile("tado", None, None)["cloud"]

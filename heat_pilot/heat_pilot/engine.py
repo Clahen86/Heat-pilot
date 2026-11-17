@@ -368,14 +368,22 @@ class Pilot:
             rule = prof.get("room_sensor")
             if not rule:
                 continue
-            number, select, option = rule
+            names = lambda x: (x,) if isinstance(x, str) else tuple(x or ())  # noqa: E731
             base = th["entity_id"].split(".", 1)[1]
-            if select and option:
-                sel = f"select.{base}_{select}"
-                if (self.ha.states.get(sel) or {}).get("state") not in (None, option, "unavailable", "unknown"):
-                    out.append({"domain": "select", "service": "select_option", "data": {"entity_id": sel, "option": option}})
-            num = f"number.{base}_{number}"
-            if num not in self.ha.states:
+            # The valve's parts are named after the device, which may differ from the climate's own name
+            # ("termostat_traeningsrum_termostat" -> "termostat_traeningsrum_..."): both are tried.
+            bases = [base] + ([base.rsplit("_", 1)[0]] if "_" in base else [])
+            find = lambda dom, ns: next((f"{dom}.{b}_{n}" for b in bases for n in ns if f"{dom}.{b}_{n}" in self.ha.states), None)  # noqa: E731
+            number, select, option = rule
+            sel = find("select", names(select)) if select else None
+            if sel:
+                st_sel = self.ha.states.get(sel) or {}
+                opts = (st_sel.get("attributes") or {}).get("options") or []
+                want = next((o for o in names(option) if o in opts), None) if opts else (names(option) or (None,))[0]
+                if want and st_sel.get("state") not in (want, "unavailable", "unknown"):
+                    out.append({"domain": "select", "service": "select_option", "data": {"entity_id": sel, "option": want}})
+            num = find("number", names(number))
+            if not num:
                 continue
             every = float(prof.get("room_sensor_every_min") or ROOM_SENSOR_EVERY_MIN)
             last = fed.get(num)

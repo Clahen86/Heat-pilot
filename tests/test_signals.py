@@ -139,3 +139,27 @@ def test_card_hold_and_boost_are_never_learned_from():
     assert p.hold("nowhere", boost=True) is None
     p.resume("r")
     assert "r" not in p.watch.manual
+
+
+def test_sonoff_with_newer_zigbee2mqtt_names():
+    # Hobby: "Zigbee thermostatic radiator valve" by SONOFF, parts named after the device, not the climate
+    from types import SimpleNamespace
+
+    from heat_pilot import brands
+    from heat_pilot.engine import Pilot
+
+    prof = brands.profile("mqtt", "Zigbee thermostatic radiator valve", "SONOFF")
+    assert prof["name"] == "SONOFF TRVZB"
+    p = Pilot.__new__(Pilot)
+    p.ha = SimpleNamespace(states={
+        "sensor.room": {"state": "17.76", "last_updated": T0.isoformat()},
+        "number.termostat_hobby_external_temperature_sensor_value": {"state": "17.8"},
+        "select.termostat_hobby_temperature_sensor": {"state": "local_temperature",
+                                                      "attributes": {"options": ["local_temperature", "remote_temperature", "remote_source_offline"]}},
+    })
+    r = {"temp_sensor": "sensor.room", "thermostats": [{"entity_id": "climate.termostat_hobby_termostat", "profile": prof}]}
+    calls = p.room_sensor_calls(r, T0)
+    assert {"domain": "select", "service": "select_option",
+            "data": {"entity_id": "select.termostat_hobby_temperature_sensor", "option": "remote_temperature"}} in calls
+    assert {"domain": "number", "service": "set_value",
+            "data": {"entity_id": "number.termostat_hobby_external_temperature_sensor_value", "value": 17.76}} in calls

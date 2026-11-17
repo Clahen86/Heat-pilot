@@ -71,8 +71,12 @@ MODELS: list[tuple[str, dict[str, Any]]] = [
                                                   "room_sensor": ("external_temperature_input", "sensor", "external")}),
     (r"W600|lumi\.airrtc\.aeu005", {"name": "Aqara W600", "manual_hvac": "heat", "own_schedule": True,
                                     "room_sensor": ("external_temperature_input", "sensor", "external")}),
-    (r"TRVZB", {"name": "SONOFF TRVZB", "manual_hvac": "heat",
-                "room_sensor": ("external_temperature_input", "temperature_sensor_select", "external")}),
+    # Zigbee2MQTT names it "Zigbee thermostatic radiator valve" (SONOFF); newer converters call the parts
+    # external_temperature_sensor_value / temperature_sensor: remote_temperature.
+    (r"TRVZB|SONOFF.*thermostatic radiator valve|thermostatic radiator valve.*SONOFF",
+     {"name": "SONOFF TRVZB", "manual_hvac": "heat",
+      "room_sensor": (("external_temperature_input", "external_temperature_sensor_value"),
+                      ("temperature_sensor_select", "temperature_sensor"), ("external", "remote_temperature"))}),
     (r"014G246[13]|eTRV0100|Ally", {"name": "Danfoss Ally", "no_off": True, "own_schedule": True,
                                     "manual_select": ("programming_operation_mode", "setpoint"),
                                     "room_sensor": ("external_measured_room_sensor", None, None), "room_sensor_scale": 100,
