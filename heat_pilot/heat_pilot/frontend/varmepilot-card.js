@@ -16,13 +16,13 @@ const VP_COL = { comfort: "#ff8a3d", preheat: "#ffb347", occupied: "#ff8a3d", sh
 
 /* reasons the house card didn't name yet */
 const VPR_WHY = {
-  da: { comfort_evening: "Aftenkomfort", hold: "Holder varmen", floor: "Gulvvarme", floor_keep: "Gulvvarme", door: "Dør åben", buffer: "Gemmer varme", phones: "På vej hjem", noshow: "Ingen i dag", cold_snap: "Kulde på vej" },
-  en: { comfort_evening: "Evening comfort", hold: "Keeping warm", floor: "Floor heating", floor_keep: "Floor heating", door: "Door open", buffer: "Storing heat", phones: "On the way home", noshow: "Nobody today", cold_snap: "Cold coming" },
-  de: { comfort_evening: "Abendkomfort", hold: "Hält warm", floor: "Fußbodenheizung", floor_keep: "Fußbodenheizung", door: "Tür offen", buffer: "Speichert Wärme", phones: "Auf dem Heimweg", noshow: "Heute niemand", cold_snap: "Kälte kommt" },
-  fr: { comfort_evening: "Confort du soir", hold: "Garde la chaleur", floor: "Plancher chauffant", floor_keep: "Plancher chauffant", door: "Porte ouverte", buffer: "Stocke la chaleur", phones: "En route", noshow: "Personne aujourd'hui", cold_snap: "Froid annoncé" },
-  nl: { comfort_evening: "Avondcomfort", hold: "Houdt warm", floor: "Vloerverwarming", floor_keep: "Vloerverwarming", door: "Deur open", buffer: "Slaat warmte op", phones: "Onderweg naar huis", noshow: "Vandaag niemand", cold_snap: "Kou op komst" },
-  sv: { comfort_evening: "Kvällskomfort", hold: "Håller värmen", floor: "Golvvärme", floor_keep: "Golvvärme", door: "Dörr öppen", buffer: "Lagrar värme", phones: "På väg hem", noshow: "Ingen i dag", cold_snap: "Kyla på väg" },
-  nb: { comfort_evening: "Kveldskomfort", hold: "Holder varmen", floor: "Gulvvarme", floor_keep: "Gulvvarme", door: "Dør åpen", buffer: "Lagrer varme", phones: "På vei hjem", noshow: "Ingen i dag", cold_snap: "Kulde på vei" },
+  da: { safe: "Sikker tilstand", comfort_evening: "Aftenkomfort", hold: "Holder varmen", floor: "Gulvvarme", floor_keep: "Gulvvarme", door: "Dør åben", buffer: "Gemmer varme", phones: "På vej hjem", noshow: "Ingen i dag", cold_snap: "Kulde på vej" },
+  en: { safe: "Safe mode", comfort_evening: "Evening comfort", hold: "Keeping warm", floor: "Floor heating", floor_keep: "Floor heating", door: "Door open", buffer: "Storing heat", phones: "On the way home", noshow: "Nobody today", cold_snap: "Cold coming" },
+  de: { safe: "Sicherer Modus", comfort_evening: "Abendkomfort", hold: "Hält warm", floor: "Fußbodenheizung", floor_keep: "Fußbodenheizung", door: "Tür offen", buffer: "Speichert Wärme", phones: "Auf dem Heimweg", noshow: "Heute niemand", cold_snap: "Kälte kommt" },
+  fr: { safe: "Mode sécurité", comfort_evening: "Confort du soir", hold: "Garde la chaleur", floor: "Plancher chauffant", floor_keep: "Plancher chauffant", door: "Porte ouverte", buffer: "Stocke la chaleur", phones: "En route", noshow: "Personne aujourd'hui", cold_snap: "Froid annoncé" },
+  nl: { safe: "Veilige modus", comfort_evening: "Avondcomfort", hold: "Houdt warm", floor: "Vloerverwarming", floor_keep: "Vloerverwarming", door: "Deur open", buffer: "Slaat warmte op", phones: "Onderweg naar huis", noshow: "Vandaag niemand", cold_snap: "Kou op komst" },
+  sv: { safe: "Säkert läge", comfort_evening: "Kvällskomfort", hold: "Håller värmen", floor: "Golvvärme", floor_keep: "Golvvärme", door: "Dörr öppen", buffer: "Lagrar värme", phones: "På väg hem", noshow: "Ingen i dag", cold_snap: "Kyla på väg" },
+  nb: { safe: "Trygg modus", comfort_evening: "Kveldskomfort", hold: "Holder varmen", floor: "Gulvvarme", floor_keep: "Gulvvarme", door: "Dør åpen", buffer: "Lagrer varme", phones: "På vei hjem", noshow: "Ingen i dag", cold_snap: "Kulde på vei" },
 };
 for (const k of Object.keys(VP_T)) Object.assign(VP_T[k].why, VPR_WHY[k] || VPR_WHY.en);
 Object.assign(VP_COL, { comfort_evening: "#ff8a3d", hold: "#ffb347", floor: "#ff9f6e", floor_keep: "#ff9f6e", door: "#5ab8ff", buffer: "#ffb347", phones: "#ffb347", noshow: "#5ab8ff", cold_snap: "#ff8a3d" });

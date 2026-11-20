@@ -120,6 +120,41 @@ def test_room_temperature_sent_to_the_valve_every_five_minutes():
     assert p.room_sensor_calls({**r, "temp_sensor": None}, now) == []  # no room sensor: never its own reading fed back
 
 
+def test_lost_room_sensor_puts_the_valve_back_on_its_own_sensor():
+    from types import SimpleNamespace
+
+    from heat_pilot.engine import Pilot
+
+    p = Pilot.__new__(Pilot)
+    p.ha = SimpleNamespace(states={
+        "sensor.room": {"state": "unavailable", "last_updated": T0.isoformat()},
+        "number.v_external_temperature_input": {"state": "22.54"},
+        "select.v_sensor": {"state": "external", "attributes": {"options": ["internal", "external"]}},
+    })
+    r = {"area_id": "bad", "temp_sensor": "sensor.room", "thermostats": [{"entity_id": "climate.v",
+         "profile": {"room_sensor": ("external_temperature_input", "sensor", "external")}}]}
+    assert p.room_sensor_calls(r, T0) == []  # just gone: a sensor often blinks
+    assert not p.sensor_lost(r, T0 + timedelta(minutes=10))
+    calls = p.room_sensor_calls(r, T0 + timedelta(minutes=15))
+    assert calls == [{"domain": "select", "service": "select_option", "data": {"entity_id": "select.v_sensor", "option": "internal"}}]
+    p.ha.states["select.v_sensor"]["state"] = "internal"
+    assert p.room_sensor_calls(r, T0 + timedelta(minutes=20)) == []  # done once, no old number sent
+    p.ha.states["sensor.room"] = {"state": "21.0", "last_updated": (T0 + timedelta(minutes=25)).isoformat()}
+    assert not p.sensor_lost(r, T0 + timedelta(minutes=25))  # back: normal again
+    assert {"domain": "select", "service": "select_option", "data": {"entity_id": "select.v_sensor", "option": "external"}} \
+        in p.room_sensor_calls(r, T0 + timedelta(minutes=25))
+
+
+def test_lost_room_sensor_alert_says_safe_mode():
+    from heat_pilot import alerts
+
+    a = {"kind": "sensor_lost", "room": "Badeværelse kælder", "device": "Føler", "safe": True, "temp": 18.0}
+    assert "18.0°" in alerts.text(a, "da") and "Gulvvarmen" in alerts.text(a, "da")
+    assert "own sensor" in alerts.text({**a, "safe": False}, "en")
+    for lang in ("da", "en", "de", "fr", "nl", "sv", "nb"):
+        assert alerts.text(a, lang) and alerts.text({**a, "safe": False}, lang)
+
+
 def test_card_hold_and_boost_are_never_learned_from():
     from types import SimpleNamespace
 

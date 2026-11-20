@@ -2,6 +2,13 @@
 
 Newest first. Each version lists what changed since the one before.
 
+## 0.30.0 – 2026-11-20
+
+- Lost room sensor: after 15 minutes the thermostat is put back on its own sensor, so it never regulates on an old number
+- Floor heating in safe mode while the room sensor is lost: it holds the room's setback temperature until the sensor is back (the thermostat isn't in the room)
+- New warning "Room sensor not responding" after 30 minutes - in the app and to the chosen phones; the room shows "Safe mode"
+- Everything returns to normal by itself when the sensor is back
+
 ## 0.29.6 – 2026-11-20
 
 - Home Assistant now downloads the ready-made app (amd64/aarch64) instead of building it on your machine: faster updates and no build leftovers on the disk

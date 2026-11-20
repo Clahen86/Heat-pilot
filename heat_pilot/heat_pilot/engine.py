@@ -54,6 +54,8 @@ BOOST_UP = 2.0  # a boost: this much above comfort (or above what it was)
 MIN_HOLD, MAX_HOLD = 5.0, 28.0
 ROOM_SENSOR_EVERY_MIN = 5  # the room temperature to the valve this often (it falls back to its own sensor if it stops)
 ROOM_SENSOR_FRESH_H = 12  # a room sensor that hasn't changed in this long is taken as gone
+INTERNAL_OPTIONS = ("internal", "internal_sensor", "local", "local_temperature")
+SENSOR_LOST_MIN = 15  # a room sensor gone this long: valves back on their own sensor, floor heating to a safe setback
 SENSOR_SWITCH_S = 180  # a valve that swapped temperature sensor this recently: its setpoint jump isn't a person
 
 
@@ -354,13 +356,15 @@ class Pilot:
         if not sensor:
             return []
         s = self.ha.states.get(sensor) or {}
-        try:
-            value = float(s.get("state"))
-            seen = datetime.fromisoformat(s.get("last_updated") or s.get("last_changed"))
-        except (TypeError, ValueError):
-            return []
-        if (now - seen).total_seconds() > ROOM_SENSOR_FRESH_H * 3600:
-            return []
+        value = None
+        if not self.sensor_gone(r, now):
+            try:
+                value = float(s.get("state"))
+            except (TypeError, ValueError):
+                value = None
+        lost = self.sensor_lost(r, now)
+        if value is None and not lost:
+            return []  # just gone: wait a little before touching the valves (a sensor often blinks)
         fed = self.__dict__.setdefault("_fed", {})
         out = []
         for th in r["thermostats"]:
@@ -379,9 +383,14 @@ class Pilot:
             if sel:
                 st_sel = self.ha.states.get(sel) or {}
                 opts = (st_sel.get("attributes") or {}).get("options") or []
-                want = next((o for o in names(option) if o in opts), None) if opts else (names(option) or (None,))[0]
+                if value is None:  # the room sensor is lost: the valve back on its own sensor, not on an old number
+                    want = next((o for o in INTERNAL_OPTIONS if o in opts), None)
+                else:
+                    want = next((o for o in names(option) if o in opts), None) if opts else (names(option) or (None,))[0]
                 if want and st_sel.get("state") not in (want, "unavailable", "unknown"):
                     out.append({"domain": "select", "service": "select_option", "data": {"entity_id": sel, "option": want}})
+            if value is None:
+                continue
             num = find("number", names(number))
             if not num:
                 continue
@@ -393,6 +402,29 @@ class Pilot:
             v = round(value * float(prof.get("room_sensor_scale") or 1), 2)
             out.append({"domain": "number", "service": "set_value", "data": {"entity_id": num, "value": v}})
         return out
+
+    def sensor_gone(self, r: dict[str, Any], now: datetime) -> bool:
+        """The room's own sensor is unavailable, not a number, or hasn't changed in 12 hours."""
+        sensor = r.get("temp_sensor")
+        if not sensor:
+            return False
+        s = self.ha.states.get(sensor) or {}
+        try:
+            float(s.get("state"))
+            seen = datetime.fromisoformat(s.get("last_updated") or s.get("last_changed"))
+        except (TypeError, ValueError):
+            return True
+        return (now - seen).total_seconds() > ROOM_SENSOR_FRESH_H * 3600
+
+    def sensor_lost(self, r: dict[str, Any], now: datetime) -> bool:
+        """Gone for SENSOR_LOST_MIN minutes in a row (counted from when Heat Pilot first saw it gone)."""
+        since = self.__dict__.setdefault("_lost_since", {})
+        a = r.get("area_id") or r.get("temp_sensor")
+        if not self.sensor_gone(r, now):
+            since.pop(a, None)
+            return False
+        first = since.setdefault(a, now)
+        return (now - first).total_seconds() >= SENSOR_LOST_MIN * 60
 
     # ---------- every minute ----------
 
@@ -564,9 +596,14 @@ class Pilot:
             # Floor heating with a slow valve (a W600 keeps ~18 % open while the room is already over): when the room is
             # more than half a degree over, the valve is turned off (or, without an off, asked 2° less) - and back once
             # the room is down at its target.
+            # The room sensor is lost and the valve isn't in the room (floor heating): a safe setback until it's back -
+            # the valve's own reading is from somewhere else, so neither comfort nor an old number is trusted.
+            if r.get("heating") == "floor" and want["temp"] is not None and self.sensor_lost(r, now):
+                safe = float(r["cfg"].get("setback") or plan.defaults(r).get("setback") or 18.0)
+                want = {**want, "temp": min(want["temp"], safe), "why": "safe"}
             send = want["temp"]
             pulled = self.floor_pull.get(a_id, False)
-            if r.get("heating") == "floor" and send is not None and temp is not None:
+            if r.get("heating") == "floor" and send is not None and temp is not None and want["why"] != "safe":
                 pulled = temp > send + 0.5 or (pulled and temp > send + 0.1)
                 self.floor_pull[a_id] = pulled
                 if pulled:

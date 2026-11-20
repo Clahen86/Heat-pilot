@@ -7,6 +7,7 @@ warning is sent at most once every 12 hours, and not at night unless allowed.
 - air: CO2 over 1,200 ppm for half an hour
 - window: a window open for 30 minutes while it is under 10° outside
 - offline: a thermostat that has been unavailable for 30 minutes
+- sensor_lost: a room's own temperature sensor gone for 30 minutes (floor heating then holds a safe setback)
 - battery: a thermostat's or room sensor's battery under 15 % - for a valve that tells its voltage, by the voltage:
   rechargeable AA cells (1.2 V) make it report a low % while they are full
 - too_warm: a room more than 2 degrees above its target for 6 hours while it is under 15° outside - the valve
@@ -23,7 +24,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
-KINDS = ["mold", "air", "window", "offline", "battery", "not_warming", "too_warm", "not_obeying", "cooling", "monthly"]
+KINDS = ["mold", "air", "window", "offline", "sensor_lost", "battery", "not_warming", "too_warm", "not_obeying", "cooling", "monthly"]
 REPEAT_H = 12
 TOO_WARM = 2.0  # degrees over the target ...
 TOO_WARM_H = 6  # ... for this long (the sun alone doesn't keep a room 2 degrees too warm for 6 hours)
@@ -98,6 +99,19 @@ class Alerts:
                 t = _since(s)
                 if s.get("state") in ("unavailable", "unknown") and t and (now - t) >= timedelta(minutes=30):
                     out.append({"kind": "offline", "room": name, "key": f"offline:{th['entity_id']}", "device": th["name"]})
+            ts = r.get("temp_sensor")
+            if ts:
+                s = states.get(ts) or {}
+                t = _since(s)
+                try:
+                    float(s.get("state"))
+                    gone = False
+                except (TypeError, ValueError):
+                    gone = True
+                if gone and t and (now - t) >= timedelta(minutes=30):
+                    out.append({"kind": "sensor_lost", "room": name, "key": f"sensor_lost:{ts}",
+                                "device": (s.get("attributes") or {}).get("friendly_name") or ts,
+                                "safe": (n.get("want") or {}).get("why") == "safe", "temp": (n.get("want") or {}).get("temp")})
             for b in r.get("batteries") or []:
                 v = _num(states, b)
                 if v is not None and v < 15 and not cells_ok(states, b):
@@ -144,6 +158,8 @@ TEXT = {
            "air": "Dårlig luft i {room} ({co2} ppm CO₂). Luft ud et par minutter.",
            "window": "Vinduet i {room} har været åbent i {minutes} min. Varmen er slukket imens.",
            "offline": "{device} i {room} svarer ikke. Tjek batteri eller forbindelse.",
+           "sensor_lost": "Rumføleren i {room} svarer ikke. Termostaten styrer på sin egen føler.",
+           "sensor_lost_safe": "Rumføleren i {room} svarer ikke. Gulvvarmen holder sikre {temp}°, til føleren er tilbage.",
            "battery": "{device} har {level} % tilbage – skift batteriet.",
            "not_warming": "{room} bliver ikke varmt ({temp}° af {want}°). Måske luft i radiatoren eller en ventil, der sidder fast.",
            "too_warm": "{room} er for varmt ({temp}° mod {want}°) i flere timer. Måske sidder ventilen fast åben, eller noget andet varmer rummet.",
@@ -156,6 +172,8 @@ TEXT = {
            "air": "Stale air in {room} ({co2} ppm CO₂). Open a window for a few minutes.",
            "window": "The window in {room} has been open for {minutes} min. Heating is off meanwhile.",
            "offline": "{device} in {room} isn't responding. Check its battery or connection.",
+           "sensor_lost": "The room sensor in {room} isn't responding. The thermostat uses its own sensor.",
+           "sensor_lost_safe": "The room sensor in {room} isn't responding. The floor heating holds a safe {temp}° until it's back.",
            "battery": "{device} has {level} % left – change the battery.",
            "not_warming": "{room} isn't getting warm ({temp}° of {want}°). Maybe air in the radiator or a stuck valve.",
            "too_warm": "{room} has been too warm for hours ({temp}° vs {want}°). Maybe the valve is stuck open, or something else heats the room.",
@@ -170,6 +188,8 @@ TEXT["de"] = {"mold": "Schimmelgefahr in {room}: {hum} % Feuchte. Lüften und de
               "air": "Schlechte Luft in {room} ({co2} ppm CO₂). Ein paar Minuten lüften.",
               "window": "Das Fenster in {room} ist seit {minutes} min offen. Die Heizung ist so lange aus.",
               "offline": "{device} in {room} antwortet nicht. Batterie oder Verbindung prüfen.",
+              "sensor_lost": "Der Raumfühler in {room} antwortet nicht. Das Thermostat nutzt seinen eigenen Fühler.",
+              "sensor_lost_safe": "Der Raumfühler in {room} antwortet nicht. Die Fußbodenheizung hält sichere {temp}°, bis er zurück ist.",
               "battery": "{device} hat noch {level} % – Batterie wechseln.",
               "not_warming": "{room} wird nicht warm ({temp}° von {want}°). Vielleicht Luft im Heizkörper oder ein klemmendes Ventil.",
               "too_warm": "{room} ist seit Stunden zu warm ({temp}° statt {want}°). Vielleicht klemmt das Ventil offen, oder etwas anderes heizt den Raum.",
@@ -182,6 +202,8 @@ TEXT["fr"] = {"mold": "Risque de moisissure dans {room} : {hum} % d'humidité. A
               "air": "Air vicié dans {room} ({co2} ppm de CO₂). Aérez quelques minutes.",
               "window": "La fenêtre de {room} est ouverte depuis {minutes} min. Le chauffage est coupé en attendant.",
               "offline": "{device} dans {room} ne répond pas. Vérifiez la pile ou la connexion.",
+              "sensor_lost": "La sonde de {room} ne répond pas. Le thermostat utilise sa propre sonde.",
+              "sensor_lost_safe": "La sonde de {room} ne répond pas. Le plancher chauffant garde {temp}° en sécurité jusqu'à son retour.",
               "battery": "{device} n'a plus que {level} % – changez la pile.",
               "not_warming": "{room} ne chauffe pas ({temp}° sur {want}°). Peut-être de l'air dans le radiateur ou une vanne bloquée.",
               "too_warm": "{room} est trop chaud depuis des heures ({temp}° au lieu de {want}°). La vanne est peut-être bloquée ouverte, ou autre chose chauffe la pièce.",
@@ -194,6 +216,8 @@ TEXT["nl"] = {"mold": "Schimmelrisico in {room}: {hum} % vocht. Lucht en houd de
               "air": "Slechte lucht in {room} ({co2} ppm CO₂). Lucht een paar minuten.",
               "window": "Het raam in {room} staat al {minutes} min open. De verwarming is zolang uit.",
               "offline": "{device} in {room} reageert niet. Controleer batterij of verbinding.",
+              "sensor_lost": "De kamersensor in {room} reageert niet. De thermostaat gebruikt zijn eigen sensor.",
+              "sensor_lost_safe": "De kamersensor in {room} reageert niet. De vloerverwarming houdt veilig {temp}° tot hij terug is.",
               "battery": "{device} heeft nog {level} % – vervang de batterij.",
               "not_warming": "{room} wordt niet warm ({temp}° van {want}°). Misschien lucht in de radiator of een vastzittende klep.",
               "too_warm": "{room} is al uren te warm ({temp}° i.p.v. {want}°). Misschien zit de klep open vast, of iets anders verwarmt de kamer.",
@@ -206,6 +230,8 @@ TEXT["sv"] = {"mold": "Mögelrisk i {room}: {hum} % fukt. Vädra och håll rumme
               "air": "Dålig luft i {room} ({co2} ppm CO₂). Vädra några minuter.",
               "window": "Fönstret i {room} har varit öppet i {minutes} min. Värmen är av så länge.",
               "offline": "{device} i {room} svarar inte. Kontrollera batteri eller anslutning.",
+              "sensor_lost": "Rumsgivaren i {room} svarar inte. Termostaten använder sin egen givare.",
+              "sensor_lost_safe": "Rumsgivaren i {room} svarar inte. Golvvärmen håller säkra {temp}° tills den är tillbaka.",
               "battery": "{device} har {level} % kvar – byt batteri.",
               "not_warming": "{room} blir inte varmt ({temp}° av {want}°). Kanske luft i elementet eller en ventil som fastnat.",
               "too_warm": "{room} har varit för varmt i flera timmar ({temp}° mot {want}°). Kanske har ventilen fastnat öppen, eller något annat värmer rummet.",
@@ -218,6 +244,8 @@ TEXT["nb"] = {"mold": "Muggfare i {room}: {hum} % fukt. Luft ut og hold rommet v
               "air": "Dårlig luft i {room} ({co2} ppm CO₂). Luft ut noen minutter.",
               "window": "Vinduet i {room} har vært åpent i {minutes} min. Varmen er av så lenge.",
               "offline": "{device} i {room} svarer ikke. Sjekk batteri eller tilkobling.",
+              "sensor_lost": "Romføleren i {room} svarer ikke. Termostaten bruker sin egen føler.",
+              "sensor_lost_safe": "Romføleren i {room} svarer ikke. Gulvvarmen holder trygge {temp}° til den er tilbake.",
               "battery": "{device} har {level} % igjen – bytt batteri.",
               "not_warming": "{room} blir ikke varmt ({temp}° av {want}°). Kanskje luft i radiatoren eller en ventil som har satt seg fast.",
               "too_warm": "{room} har vært for varmt i flere timer ({temp}° mot {want}°). Kanskje ventilen står fast åpen, eller noe annet varmer rommet.",
@@ -231,4 +259,5 @@ TEXT["nb"] = {"mold": "Muggfare i {room}: {hum} % fukt. Luft ut og hold rommet v
 def text(a: dict[str, Any], lang: str) -> str:
     t = TEXT.get(lang, TEXT["en"])
     vals = {k: (f"{v:.1f}" if isinstance(v, float) else v) for k, v in a.items()}
-    return t[a["kind"]].format(**vals)
+    kind = "sensor_lost_safe" if a["kind"] == "sensor_lost" and a.get("safe") else a["kind"]
+    return t[kind].format(**vals)
