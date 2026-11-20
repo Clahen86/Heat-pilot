@@ -2,6 +2,10 @@
 
 Newest first. Each version lists what changed since the one before.
 
+## 0.29.6 – 2026-11-20
+
+- Home Assistant now downloads the ready-made app (amd64/aarch64) instead of building it on your machine: faster updates and no build leftovers on the disk
+
 ## 0.29.5 – 2026-11-19
 
 - Rain looks like rain (blue slanted drops), snow is visible, no sun or moon in bad weather, a bare tree in snow
