@@ -2,6 +2,10 @@
 
 Newest first. Each version lists what changed since the one before.
 
+## 0.30.1 – 2026-11-21
+
+- The ventilation no longer looks for an old AppDaemon app's limits at start - it uses its own and what you set
+
 ## 0.30.0 – 2026-11-20
 
 - Lost room sensor: after 15 minutes the thermostat is put back on its own sensor, so it never regulates on an old number

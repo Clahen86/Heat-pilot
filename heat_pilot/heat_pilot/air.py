@@ -200,19 +200,6 @@ def decide(rooms: list[dict[str, Any]], states: dict[str, Any], watch: AirWatch,
     return pick("normal", "normal")
 
 
-def params_from_appdaemon(states: dict[str, Any]) -> dict[str, Any]:
-    """An AppDaemon indoor-climate app already learned this house's limits: start from them."""
-    a = (states.get("sensor.indeklima_learning") or {}).get("attributes") or {}
-    out = {}
-    for mine, theirs in (("co2_boost", "co2_boost"), ("humidity_rise", "humidity_rise_pct"), ("pm25_boost", "pm25_boost"), ("warm_day", "warm_day_temp")):
-        try:
-            if a.get(theirs) is not None:
-                out[mine] = float(a[theirs])
-        except (TypeError, ValueError):
-            pass
-    return out
-
-
 def room_air(room: dict[str, Any], states: dict[str, Any], own: dict[str, Any] | None = None) -> dict[str, Any]:
     """What the house shows on a room: its vents and the colour of its air (good / warn / bad)."""
     flow = airflow(room, own)

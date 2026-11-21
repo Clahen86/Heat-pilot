@@ -506,7 +506,7 @@ class Pilot:
                                 house_temp=sum(temps) / len(temps) if temps else None,
                                 comfort=sum(comforts) / len(comforts) if comforts else 21.0, outdoor=outdoor_now,
                                 outdoor_dp=air.outdoor_dewpoint(st), own=own_rooms,
-                                params={**air.params_from_appdaemon(st), **((self.settings.get("ventilation") or {}).get("params") or {})},
+                                params=(self.settings.get("ventilation") or {}).get("params") or {},
                                 tomorrow_max=max((t for w, t, _c in self.forecast if now + timedelta(hours=6) <= w <= now + timedelta(hours=24)), default=None))
             vs = self.settings.get("ventilation") or {}
             hold = vs.get("hold")
