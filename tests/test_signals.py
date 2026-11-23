@@ -198,3 +198,16 @@ def test_sonoff_with_newer_zigbee2mqtt_names():
             "data": {"entity_id": "select.termostat_hobby_temperature_sensor", "option": "remote_temperature"}} in calls
     assert {"domain": "number", "service": "set_value",
             "data": {"entity_id": "number.termostat_hobby_external_temperature_sensor_value", "value": 17.76}} in calls
+
+
+def test_a_valve_falling_back_to_its_old_setpoint_is_not_by_hand():
+    # An Aqara E1 took 22 and reported its old 17 again minutes later: it was copied to the room's other valves as "by hand"
+    w = Watch()
+    w.see_setpoint("stue", "climate.c", 17.0, T0, True)
+    w.wrote("climate.c", 22.0, T0 + timedelta(minutes=1))
+    w.see_setpoint("stue", "climate.c", 22.0, T0 + timedelta(minutes=1), True)  # echo
+    w.see_setpoint("stue", "climate.c", 17.0, T0 + timedelta(minutes=5), True)  # fell back
+    assert w.manual_for("stue", T0 + timedelta(minutes=5)) is None
+    w.see_setpoint("stue", "climate.c", 22.0, T0 + timedelta(minutes=6), True)
+    w.see_setpoint("stue", "climate.c", 17.0, T0 + timedelta(minutes=30), True)  # long after: a person
+    assert w.manual_for("stue", T0 + timedelta(minutes=30))["temp"] == 17.0

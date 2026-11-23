@@ -2,6 +2,10 @@
 
 Newest first. Each version lists what changed since the one before.
 
+## 0.30.2 – 2026-11-23
+
+- A thermostat that falls back to its old setpoint soon after Heat Pilot set it (an Aqara E1 restarting on weak batteries) is no longer taken as turned by hand - so its old value isn't copied to the room's other thermostats or learned as the room's comfort. It is sent again next round
+
 ## 0.30.1 – 2026-11-21
 
 - The ventilation no longer looks for an old AppDaemon app's limits at start - it uses its own and what you set

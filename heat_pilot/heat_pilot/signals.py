@@ -21,6 +21,7 @@ SUNNY = ("sunny", "partlycloudy", "clear-night")
 ECHO_S = 120
 FROST_FALLBACK = 8.0
 MANUAL_MIN = 60
+REVERT_S = 900  # a valve back on its old setpoint this soon after our write: it didn't take it - not a person
 DOOR_AWAY_MIN = 10
 SHOWER_MIN = 60
 
@@ -40,6 +41,7 @@ class Watch:
         self.door_at: datetime | None = None
         self.last_set: dict[str, float] = {}          # entity -> setpoint seen last minute
         self.ours: dict[str, tuple[float, datetime]] = {}  # entity -> (value, when) Heat Pilot wrote
+        self.before: dict[str, float | None] = {}  # entity -> its setpoint just before our last write
         self.manual: dict[str, dict[str, Any]] = {}  # room -> {"temp", "until"}
 
     def see(self, room: dict[str, Any], states: dict[str, Any], now: datetime, heating: bool, temp: float | None) -> None:
@@ -113,6 +115,7 @@ class Watch:
     # ---------- turned by hand ----------
 
     def wrote(self, entity: str, value: float, now: datetime) -> None:
+        self.before[entity] = self.last_set.get(entity)
         self.ours[entity] = (value, now)
 
     def see_setpoint(self, area: str, entity: str, setpoint: float | None, now: datetime, controlled: bool,
@@ -128,6 +131,9 @@ class Watch:
         mine = self.ours.get(entity)
         if mine and abs(mine[0] - setpoint) < 0.05 and (now - mine[1]).total_seconds() <= ECHO_S:
             return  # our own write echoing back
+        old = self.before.get(entity)
+        if mine and old is not None and abs(setpoint - old) < 0.05 and (now - mine[1]).total_seconds() <= REVERT_S:
+            return  # back on the value it had before our write: the valve didn't take it (sent again next round), not a person
         if setpoint <= FROST_FALLBACK:
             return  # the thermostat fell back to frost protection - a fault, put right next round
         self.manual[area] = {"temp": setpoint, "until": now + timedelta(minutes=MANUAL_MIN)}
