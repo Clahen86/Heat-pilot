@@ -18,14 +18,19 @@ from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
 LOST_MIN = 20       # a command not followed for this long is lost
+SILENT_H = 3        # a thermostat that hasn't reported anything for this long has fallen off the network
 MIN_ROOMS = 2       # rooms on the same integration before it's the radio, not one valve
 PAUSE_H = 2         # between two restarts of the same integration
 RADIOS = {"mqtt": "Zigbee2MQTT", "zha": "ZHA", "matter": "Matter"}
 
 
 def disobeying(rooms: list[dict[str, Any]], now_rooms: dict[str, dict[str, Any]], states: dict[str, Any],
-               sent: dict[str, tuple[float, datetime]], to_c, controlled) -> list[tuple[str, str, str]]:
-    """(room name, thermostat, platform) for the thermostats that don't show what Heat Pilot sent them."""
+               sent: dict[str, tuple[float, datetime]], to_c, controlled, last_sent: dict[str, datetime] | None = None,
+               now: datetime | None = None) -> list[tuple[str, str, str]]:
+    """(room name, thermostat, platform) for the thermostats that don't show what Heat Pilot sent them - a setpoint,
+    but also "off" (a floor turned off while the room is warm) - and the ones that have gone silent: no report for
+    SILENT_H hours while Zigbee2MQTT keeps showing their last state (a valve that fell off the network on 25 November
+    2026 kept heating a bathroom to 24 °C for a day, and nothing said so)."""
     out = []
     for r in rooms:
         if not controlled(r["area_id"]):
@@ -38,6 +43,21 @@ def disobeying(rooms: list[dict[str, Any]], now_rooms: dict[str, dict[str, Any]]
             if s.get("state") in ("unavailable", "unknown"):
                 if e in sent:
                     out.append((r["name"], e, th.get("platform") or ""))
+                continue
+            if now is not None:
+                seen = s.get("last_reported") or s.get("last_updated")
+                try:
+                    silent = seen and (now - datetime.fromisoformat(seen)).total_seconds() > SILENT_H * 3600
+                except (TypeError, ValueError):
+                    silent = False
+                if silent:
+                    out.append((r["name"], e, th.get("platform") or ""))
+                    continue
+            wants_off = any(c.get("service") == "set_hvac_mode" and c["data"].get("entity_id") == e and c["data"].get("hvac_mode") == "off"
+                            for c in calls)
+            if wants_off and s.get("state") != "off" and now is not None and (last_sent or {}).get(e) \
+                    and (now - last_sent[e]).total_seconds() > LOST_MIN * 60:
+                out.append((r["name"], e, th.get("platform") or ""))  # told "off" again and again, still heating
                 continue
             if e not in wanted or e not in sent:
                 continue

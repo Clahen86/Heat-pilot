@@ -2,6 +2,10 @@
 
 Newest first. Each version lists what changed since the one before.
 
+## 0.31.0 – 2026-11-26
+- A thermostat that has gone silent (nothing reported for 3 hours, while Zigbee2MQTT keeps showing its last state) is shown as "Thermostat not responding" - one fell off the network and kept heating a bathroom for a day without a word
+- "Off" that isn't followed counts too: told off for 20 minutes and still heating, the thermostat doesn't obey (and two rooms on one radio restart it, as for setpoints)
+- Turned off because the room is warm enough, a thermostat also gets the room's target as its setpoint - not an old 22 °C shown while it rests
 ## 0.30.2 – 2026-11-23
 
 - A thermostat that falls back to its old setpoint soon after Heat Pilot set it (an Aqara E1 restarting on weak batteries) is no longer taken as turned by hand - so its old value isn't copied to the room's other thermostats or learned as the room's comfort. It is sent again next round

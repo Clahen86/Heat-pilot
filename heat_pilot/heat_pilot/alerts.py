@@ -97,7 +97,14 @@ class Alerts:
             for th in r.get("thermostats") or []:
                 s = states.get(th["entity_id"]) or {}
                 t = _since(s)
-                if s.get("state") in ("unavailable", "unknown") and t and (now - t) >= timedelta(minutes=30):
+                # Silent too: Zigbee2MQTT keeps a lost valve's last state, so it never turns "unavailable" -
+                # nothing reported for 3 hours is a valve that fell off the network (it kept heating a bathroom).
+                try:
+                    heard = datetime.fromisoformat(s.get("last_reported") or s.get("last_updated") or "")
+                except (TypeError, ValueError):
+                    heard = None
+                silent = heard is not None and s.get("state") not in ("unavailable", "unknown") and (now - heard) >= timedelta(hours=3)
+                if (s.get("state") in ("unavailable", "unknown") and t and (now - t) >= timedelta(minutes=30)) or silent:
                     out.append({"kind": "offline", "room": name, "key": f"offline:{th['entity_id']}", "device": th["name"]})
             ts = r.get("temp_sensor")
             if ts:

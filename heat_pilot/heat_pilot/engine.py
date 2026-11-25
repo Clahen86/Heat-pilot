@@ -619,6 +619,11 @@ class Pilot:
                 # open at any setpoint below the room, and warm water running through a warm room spoils the cooling.
                 off_pull = pulled and want["temp"] is not None and brands.can_turn_off(a, prof)
                 c = brands.off_calls(th["entity_id"], a, prof) if want["temp"] is None or off_pull else brands.heat_calls(th["entity_id"], a, prof, self.out_unit(send))
+                if off_pull and c and c[0].get("service") == "set_hvac_mode":
+                    # Off because the room is warm: the setpoint shown goes to what the room wants too (not an old
+                    # 22 °C) - set first, then off, so a valve that turns itself on at a new setpoint is off again.
+                    c = [{"domain": "climate", "service": "set_temperature",
+                          "data": {"entity_id": th["entity_id"], "temperature": self.out_unit(want["temp"])}}] + c
                 calls += c
                 cur_off = s.get("state") == "off"
                 cur = self.c(a.get("temperature"))
@@ -643,7 +648,8 @@ class Pilot:
         self.alerts.check(rooms, out, st, now, outdoor_now, getattr(self, "cooling_info", None))
         from . import watchdog
 
-        bad = watchdog.disobeying(rooms, out, st, self.watch.ours, self.c, lambda a: self.mode(a) == "control")
+        bad = watchdog.disobeying(rooms, out, st, self.watch.ours, self.c, lambda a: self.mode(a) == "control",
+                                  getattr(self.sender, "last", None), now)
         for plat, names in self.watchdog.see(bad, now).items():
             restart = bool(self.settings.get("watchdog_restart")) and plat in watchdog.RADIOS
             self.alerts.active.append({"kind": "not_obeying_restart" if restart else "not_obeying", "room": ", ".join(names),

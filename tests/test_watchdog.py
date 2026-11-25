@@ -54,3 +54,14 @@ def test_restart_once_in_two_hours_and_the_right_radio():
     assert not w.due("mqtt", T0 + timedelta(hours=1)) and w.due("mqtt", T0 + timedelta(hours=2))
     assert asyncio.run(w.restart(ha, "zha", T0)) == "ZHA"
     assert calls[-1] == ("homeassistant", "reload_config_entry", {"entry_id": "zha1"})
+
+
+def test_silent_and_ignored_off_are_seen():
+    now = T0 + timedelta(hours=5)
+    r = rooms("bad")
+    st = {"climate.bad": {"state": "heat", "attributes": {"temperature": 22}, "last_reported": T0.isoformat()}}
+    out = {"bad": {"calls": [{"service": "set_hvac_mode", "data": {"entity_id": "climate.bad", "hvac_mode": "off"}}]}}
+    assert disobeying(r, out, st, {}, float, lambda a: True, {}, now) == [("Bad", "climate.bad", "mqtt")]  # silent 5 h
+    st["climate.bad"]["last_reported"] = (now - timedelta(minutes=1)).isoformat()
+    assert disobeying(r, out, st, {}, float, lambda a: True, {"climate.bad": now - timedelta(minutes=30)}, now) == [("Bad", "climate.bad", "mqtt")]
+    assert disobeying(r, out, st, {}, float, lambda a: True, {"climate.bad": now - timedelta(minutes=5)}, now) == []
