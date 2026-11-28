@@ -2,6 +2,9 @@
 
 Newest first. Each version lists what changed since the one before.
 
+## 0.32.0 – 2026-11-28
+- Ask your AI about the heating in your own words: "is it cold in Lilly's room?", "when will the living room be warm?", "why is the bathroom heating?". The Varmepilot integration (0.16.0) gives Home Assistant's AI assistants (Google, ChatGPT, Claude or a local one) a tool to look it up – turn on "Varmepilot" once in the assistant's settings. Only reads; without an AI nothing changes
+
 ## 0.31.0 – 2026-11-26
 - A thermostat that has gone silent (nothing reported for 3 hours, while Zigbee2MQTT keeps showing its last state) is shown as "Thermostat not responding" - one fell off the network and kept heating a bathroom for a day without a word
 - "Off" that isn't followed counts too: told off for 20 minutes and still heating, the thermostat doesn't obey (and two rooms on one radio restart it, as for setpoints)

@@ -64,6 +64,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     for name, schema in SCHEMAS.items():
         hass.services.async_register(DOMAIN, name, call, schema=schema)
+    from . import llm_tools
+
+    if undo := llm_tools.register(hass):  # the tools your AI may look the heating up with (turned on in the AI's settings)
+        entry.async_on_unload(undo)
     return True
 
 

@@ -37,6 +37,7 @@ district heating meter by itself, learns how your home is used, and shows what i
 - **Tells you about updates – without nagging**: a small card in the app when a newer version is out (small fixes
   after a week, new features after two days, at once when an error you had is fixed). *Later* hides it for a week.
 - **7 languages** (English, Danish, German, French, Dutch, Swedish, Norwegian), **°C and °F**.
+- **Ask your AI in your own words** – "is it cold in Lilly's room?", "when will the living room be warm?". The Varmepilot integration gives Home Assistant's AI assistants a tool to look the heating up. Turn on **Varmepilot** once in the assistant's settings. Only reads.
 
 ## Thermostats
 
